@@ -5,30 +5,36 @@ Simple database migrations tool
 import argparse
 
 class UpdateCommand:
-    """Apply changes on the database schema"""
+    """Applies baseline, versioned and repeatable scripts within target database schema"""
     def __init__(self, subparsers):
         parser = subparsers.add_parser("update", help=UpdateCommand.__doc__)
-        parser.add_argument("-f","--force", action="store_true", default=False, help="Force apply updates even if version control tables does not exists")
+        parser.add_argument("schema_name", type=str, help="target database schema")
+        parser.add_argument("-s","--skip-signature-check", action="store_true", default=False, help="to skip the signature check")
         parser.set_defaults(exec=self) 
     def __call__(self, args):
-        print(f"Apply updates force={args.force}")
+        print(f"Apply updates schema_name={args.schema_name}, skip_signature_check={args.skip_signature_check}")
 
 class VerifyCommand:
-    """Verify which of versioned and repeatable scripts will be applied on specified database schema"""
+    """Verifies target schema and lists versioned and repatable scripts to be applied within"""
     def __init__(self, subparsers):
         parser = subparsers.add_parser("verify", help=VerifyCommand.__doc__)
+        parser.add_argument("schema_name", type=str, help="target database schema")
+        parser.add_argument("-b","--build-update-script", action="store_true", default=False, help="to build and list the whole SQL script instead of just listing script files")
+        parser.add_argument("-s","--skip-signature-check", action="store_true", default=False, help="to skip the signature check")
         parser.set_defaults(exec=self) 
     def __call__(self, args):
-        print(f"Verify database schema")
+        print(f"Verify database schema schema={args.schema_name}, {args.build_update_script}, skip_signature_check={args.skip_signature_check}")
 
-class CleanupCommand:
-    """Cleanup specified database schema"""
+class InitCommand:
+    """Creates version control tables in the empty database schema"""
     def __init__(self, subparsers):
-        parser = subparsers.add_parser("cleanup", help=CleanupCommand.__doc__)
-        parser.add_argument("-f","--force", action="store_true", default=False, help="Force clean even if version control tables does not exists")
+        parser = subparsers.add_parser("init", help=InitCommand.__doc__)
+        parser.add_argument("schema_name", type=str, help="target database schema")
+        parser.add_argument("-f","--force-init", action="store_true", default=False, help="to create version control tables even if schema is NOT empty")
+        parser.add_argument("-s","--skip-signature-check", action="store_true", default=False, help="to skip the signature check")
         parser.set_defaults(exec=self) 
     def __call__(self, args):
-        print(f"Cleanup database schema {args.force}")
+        print(f"Creates version control tables schema={args.schema_name}, force_init={args.force_init}, skip_signature_check={args.skip_signature_check}")
 
 
 def main():
@@ -39,7 +45,7 @@ def main():
 
     VerifyCommand(subparsers)
 
-    CleanupCommand(subparsers)
+    InitCommand(subparsers)
 
     # Parse arguments
     args = parser.parse_args()
