@@ -4,6 +4,8 @@ Simple database migrations tool
 
 import argparse
 
+# MAC OS
+#
 # How to install psycopg module
 #
 # $ python3 -m venv .venv
@@ -11,6 +13,9 @@ import argparse
 # $ python3 -m pip install --upgrade pip
 # $ python3 -m pip install "psycopg[binary,pool]"
 
+#  brew services start postgresql@18
+#
+# LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18
 import psycopg;
 
 class UpdateCommand:
