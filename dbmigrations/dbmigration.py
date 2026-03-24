@@ -3,6 +3,8 @@ Simple database migrations tool
 """
 
 import argparse
+import tomllib
+
 
 # MAC OS
 #
@@ -17,6 +19,9 @@ import argparse
 #
 # LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18
 import psycopg;
+
+def __test_connect_to_db():
+    conn = psycopg.connect("dbname=postgres")
 
 class UpdateCommand:
     """Applies baseline, versioned and repeatable scripts within target database schema"""
@@ -76,3 +81,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    #__test_connect_to_db()
+
