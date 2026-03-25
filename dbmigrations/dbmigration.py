@@ -5,15 +5,16 @@ Simple database migrations tool
 import argparse
 import tomllib
 
-
-# MAC OS
 #
-# How to install psycopg module
-#
+# prerequired packages listed in requirements.txt
+# 
+# Use pip to install all required packages
+#  
 # $ python3 -m venv .venv
 # $ source .venv/bin/activate
+#
 # $ python3 -m pip install --upgrade pip
-# $ python3 -m pip install "psycopg[binary,pool]"
+# $ python3 -m pip install -r requirements.txt
 
 #  brew services start postgresql@18
 #
