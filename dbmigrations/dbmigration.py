@@ -4,6 +4,7 @@ Simple database migrations tool
 
 import argparse
 import tomllib
+import os
 
 #
 # prerequired packages listed in requirements.txt
@@ -20,6 +21,27 @@ import tomllib
 #
 # LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18
 import psycopg;
+
+def __test_reading_toml():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    relative_file_path = 'dbmigration.toml'
+    target_path = os.path.join(script_dir, relative_file_path)
+    try:
+        with open(target_path, 'rb') as f:
+            data = tomllib.load(f)
+            
+        print(f"TOML data loaded as a Python dictionary: {data}")
+
+        # Accessing specific values using dictionary syntax
+        #print(f"\nTitle: {data['title']}")
+        #print(f"Database server: {data['database']['server']}")
+        #print(f"First port: {data['database']['ports'][0]}")
+        #print(f"Owner's name: {data['owner']['name']}")
+
+    except FileNotFoundError:
+        print(f"Error: The file '{target_path}' was not found.")
+    except tomllib.TOMLDecodeError as e:
+        print(f"Error decoding TOML file: {e}")
 
 def __test_connect_to_db():
     conn = psycopg.connect("dbname=postgres host=localhost user=postgres password=1234561")
@@ -83,4 +105,5 @@ def main():
 if __name__ == "__main__":
     main()
     __test_connect_to_db()
+    __test_reading_toml()
 
