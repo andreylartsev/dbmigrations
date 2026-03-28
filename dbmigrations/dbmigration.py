@@ -22,39 +22,42 @@ import os
 # LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18
 import psycopg;
 
-def __test_reading_toml():
+def read_toml_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     relative_file_path = 'dbmigration.toml'
     target_path = os.path.join(script_dir, relative_file_path)
-    try:
-        with open(target_path, 'rb') as f:
-            data = tomllib.load(f)
-            
-        print(f"TOML data loaded as a Python dictionary: {data}")
+    with open(target_path, 'rb') as f:
+        data = tomllib.load(f)
+        return data
 
-        # Accessing specific values using dictionary syntax
-        #print(f"\nTitle: {data['title']}")
-        #print(f"Database server: {data['database']['server']}")
-        #print(f"First port: {data['database']['ports'][0]}")
-        #print(f"Owner's name: {data['owner']['name']}")
-
-    except FileNotFoundError:
-        print(f"Error: The file '{target_path}' was not found.")
-    except tomllib.TOMLDecodeError as e:
-        print(f"Error decoding TOML file: {e}")
-
-def __test_connect_to_db():
-    conn = psycopg.connect("dbname=postgres host=localhost user=postgres password=1234561")
+def make_db_connection(connection_settings):
+    conn = psycopg.connect(**connection_settings)
 
 class UpdateCommand:
     """Applies baseline, versioned and repeatable scripts within target database schema"""
     def __init__(self, subparsers):
         parser = subparsers.add_parser("update", help=UpdateCommand.__doc__)
+        parser.add_argument("env_name", type=str, help="the name of target database environment within config file")
         parser.add_argument("schema_name", type=str, help="the name of target database schema")
         parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         parser.add_argument("-s","--skip-signature-check", action="store_true", default=False, help="to skip the signature check")
         parser.set_defaults(exec=self) 
     def __call__(self, args):
+        config = read_toml_config();
+        if not hasattr(args, 'env_name'):
+           raise ValueError("env_name parameter is required")
+        if not isinstance(args.env_name, str):
+           raise ValueError("env_name must be non empty string value")
+        if not len(args.env_name) > 0:
+           raise ValueError("env_name must be non empty string value")
+        
+        if not hasattr(config, 'environment'):
+           raise ValueError("config file does not include environment key")
+        if not hasattr(config.environment, args.env_name):
+           raise ValueError(f"config file does not include environment with name {args.env_name}")
+        
+        connection_settings = config.environment[args.env_name]
+        conn = make_db_connection(connection_settings)
         print(f"Apply updates scripts_path={args.scripts_path}, schema_name={args.schema_name}, skip_signature_check={args.skip_signature_check}")
 
 class VerifyCommand:
@@ -104,6 +107,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    __test_connect_to_db()
-    __test_reading_toml()
 
