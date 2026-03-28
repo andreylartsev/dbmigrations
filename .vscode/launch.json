@@ -8,8 +8,11 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "env": {
+                "USER_PASSWORD": "123451",
+            },
             "args": [
-                "update", "test1", "public", "./",
+                "update", "public", "./"
             ],
         }
     ]
