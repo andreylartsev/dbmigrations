@@ -27,7 +27,7 @@ TOML_CONFIG_FILE = 'dbmigration.toml'
 
 DBCONN_DEFAULT_HOST = 'localhost'
 DBCONN_DEFAULT_PORT = 5432
-DBCONN_DEFAULT_USER = 'postgres'
+DBCONN_DEFAULT_USER = None
 DBCONN_DEFAULT_DBNAME = 'postgres'
 DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
 
@@ -53,23 +53,22 @@ def walk_through_dir_sorted(dir):
     return sorted_files
 
 def dbconn_exec(dbconn, sql):
-    with dbconn:
-        with dbconn.cursor() as cur:
-            cur.execute(sql)
+    with dbconn.cursor() as cur:
+        cur.execute(sql)
 
 def dbconn_get_single_value(dbconn, sql, params):
-    with dbconn:
-        with dbconn.cursor() as cur:
-            cur.execute(sql, params)
-            row = cur.fetchone()
-            return row[0] if not row is None else None
+    with dbconn.cursor() as cur:
+        cur.execute(sql, params)
+        row = cur.fetchone()
+        return row[0] if not row is None else None
 
 class BaseCommand:
     def check_if_schema_exists(self):
         sql = """
             SELECT EXISTS (
-                SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = '%s')"""
-        value = dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name))
+                SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = %s)"""
+        params = (self.args.schema_name,)
+        value = dbconn_get_single_value(self.dbconn, sql, params)
         if value is None:
             raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return value
@@ -79,15 +78,15 @@ class BaseCommand:
             SELECT count(*)
             FROM pg_class c
             JOIN pg_namespace s ON s.oid = c.relnamespace
-            WHERE s.nspname = '%s'
+            WHERE s.nspname = %s
             AND s.nspname NOT IN ('pg_catalog', 'information_schema')
-            AND s.nspname NOT LIKE 'pg_toast%'
-            AND s.nspname NOT LIKE 'pg_temp%';
+            AND s.nspname NOT LIKE 'pg_toast%%'
+            AND s.nspname NOT LIKE 'pg_temp%%';
         """
-        value = dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name))
+        value = dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name,))
         if value is None:
             raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
-        return (value > 0)
+        return (value == 0)
 
     def __init__(self, config, subparsers, command_name, command_help):        
         DBCONNECTION = 'dbconnection'
@@ -111,10 +110,14 @@ class BaseCommand:
         self.parser.add_argument("-s","--skip-signature-check", action="store_true", default=False, help="to skip the signature check")
         self.parser.set_defaults(call=self) 
     def __enter__(self):
-        self.dbconn_settings["host"]=self.args.host
-        self.dbconn_settings["port"]=self.args.port
-        self.dbconn_settings["user"]=self.args.user
-        self.dbconn_settings["dbname"]=self.args.dbname
+        if not self.args.host is None:
+            self.dbconn_settings["host"]=self.args.host
+        if not self.args.port is None:
+            self.dbconn_settings["port"]=self.args.port
+        if not self.args.user is None:
+            self.dbconn_settings["user"]=self.args.user
+        if not self.args.dbname is None:
+            self.dbconn_settings["dbname"]=self.args.dbname
         if not self.args.no_password:
             password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
             if password is None:
@@ -155,9 +158,9 @@ class InitCommand (BaseCommand):
         self.parser.add_argument("-f","--force-init", action="store_true", default=False, help="Force init schema versioning tables even if the target schema is not empty")
     def run(self):
         if not self.check_if_schema_exists():
-            raise FatalError(f"Target schema {self.args.schema_name} is not accessible")
+            raise FatalError(f"The target schema '{self.args.schema_name}' is not accessible")
         if not self.check_if_schema_is_empty():
-            raise FatalError(f"Target schema {self.args.schema_name} is not empty")
+            raise FatalError(f"The target schema '{self.args.schema_name}' must be empty")
         print(f"Schema is empty")
         print(f"Creates version control tables scripts_path={self.args.scripts_path}, schema={self.args.schema_name}, force_init={self.args.force_init}, skip_signature_check={self.args.skip_signature_check}")
 

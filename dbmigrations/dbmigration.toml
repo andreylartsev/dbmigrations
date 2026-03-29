@@ -7,10 +7,10 @@
 host = "localhost"
 port = 5432
 dbname = "postgres"
-user = "postgres"
+# user = "postgres"
 # connect_timeout = 30
 # sslmode = "prefer"
 
 # command options
 [options]
-no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by envrionment variable USER_PASSWORD
+no_password = true # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by envrionment variable USER_PASSWORD
