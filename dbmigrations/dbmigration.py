@@ -52,23 +52,18 @@ def walk_through_dir_sorted(dir):
     sorted_files = sorted(files)
     return sorted_files
 
-def dbconn_exec(dbconn, sql):
-    with dbconn.cursor() as cur:
-        cur.execute(sql)
-
-def dbconn_get_single_value(dbconn, sql, params):
-    with dbconn.cursor() as cur:
-        cur.execute(sql, params)
-        row = cur.fetchone()
-        return row[0] if not row is None else None
-
 class BaseCommand:
+    def dbconn_get_single_value(self, sql, params):
+        with self.dbconn.cursor() as cur:
+            cur.execute(sql, params)
+            row = cur.fetchone()
+            return row[0] if not row is None else None
+        
     def check_if_schema_exists(self):
         sql = """
             SELECT EXISTS (
                 SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = %s)"""
-        params = (self.args.schema_name,)
-        value = dbconn_get_single_value(self.dbconn, sql, params)
+        value = self.dbconn_get_single_value(sql, (self.args.schema_name,))
         if value is None:
             raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return value
@@ -81,9 +76,9 @@ class BaseCommand:
             WHERE s.nspname = %s
             AND s.nspname NOT IN ('pg_catalog', 'information_schema')
             AND s.nspname NOT LIKE 'pg_toast%%'
-            AND s.nspname NOT LIKE 'pg_temp%%';
+            AND s.nspname NOT LIKE 'pg_temp%%'
         """
-        value = dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name,))
+        value = self.dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name,))
         if value is None:
             raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return (value == 0)
@@ -126,8 +121,12 @@ class BaseCommand:
         self.dbconn = psycopg.connect(**self.dbconn_settings)
         print(f"Opened connection")
     def __exit__(self, exc_type, exc_value, traceback):
-        self.dbconn.close()
-        print(f"Closed connection")
+        if exc_type is psycopg.DatabaseError:
+            self.dbconn.rollback()
+            print(f"Rolled back transaction")
+        if not self.dbconn is None:
+            self.dbconn.close()
+            print(f"Closed connection")
         return False # propagate the exception
     def run(self):
         pass
@@ -153,6 +152,31 @@ class VerifyCommand (BaseCommand):
 
 class InitCommand (BaseCommand):
     """Creates version control tables in the empty database schema"""
+
+    def create_version_tracking_tables(self):
+        sql_script = """
+            BEGIN;
+            CREATE TABLE dbmigration_versions (
+                version_id VARCHAR(64) NOT NULL PRIMARY KEY,
+                is_baseline BOOL NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
+                created_from INET DEFAULT INET_CLIENT_ADDR()
+            );
+            
+            CREATE TABLE dbmigration_repeatable (
+                sha256sum VARCHAR(128) NOT NULL PRIMARY KEY,
+                relative_path VARCHAR(2048) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
+                created_from INET DEFAULT INET_CLIENT_ADDR()
+            );
+            COMMIT;
+        """
+        with self.dbconn.cursor() as cur:
+            cur.execute(f"SET search_path TO {self.args.schema_name}, public")
+            cur.execute(sql_script);
+
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "init", InitCommand.__doc__)
         self.parser.add_argument("-f","--force-init", action="store_true", default=False, help="Force init schema versioning tables even if the target schema is not empty")
@@ -161,8 +185,9 @@ class InitCommand (BaseCommand):
             raise FatalError(f"The target schema '{self.args.schema_name}' is not accessible")
         if not self.check_if_schema_is_empty():
             raise FatalError(f"The target schema '{self.args.schema_name}' must be empty")
-        print(f"Schema is empty")
-        print(f"Creates version control tables scripts_path={self.args.scripts_path}, schema={self.args.schema_name}, force_init={self.args.force_init}, skip_signature_check={self.args.skip_signature_check}")
+        print(f"Creating version control tables...")
+        self.create_version_tracking_tables()
+        print(f"Created")
 
 def main():
     try:
