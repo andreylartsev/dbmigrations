@@ -5,6 +5,7 @@ Simple database migrations tool
 import argparse
 import tomllib
 import os
+import pathlib 
 
 #
 # prerequired packages listed in requirements.txt
@@ -30,14 +31,64 @@ DBCONN_DEFAULT_USER = 'postgres'
 DBCONN_DEFAULT_DBNAME = 'postgres'
 DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
 
+class FatalError(Exception):
+    """A critical error terminated the command execution."""
+    def __init__(self, message):
+        super().__init__(message)
+
 def read_toml_config():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    target_path = os.path.join(script_dir, TOML_CONFIG_FILE)
+    script_dir = pathlib.Path(__file__).absolute().parent
+    target_path = script_dir.joinpath(TOML_CONFIG_FILE)
     with open(target_path, 'rb') as f:
         config = tomllib.load(f)
         return config
 
-class BaseCommand:        
+def walk_through_dir_sorted(dir):
+    start_path = pathlib.Path(dir) 
+    if not start_path.exists():
+        raise FatalError(f"The folder '{dir}' does not exists")
+    all_items = start_path.rglob('*')
+    files = [item for item in all_items if item.is_file()]
+    sorted_files = sorted(files)
+    return sorted_files
+
+def dbconn_exec(dbconn, sql):
+    with dbconn:
+        with dbconn.cursor() as cur:
+            cur.execute(sql)
+
+def dbconn_get_single_value(dbconn, sql, params):
+    with dbconn:
+        with dbconn.cursor() as cur:
+            cur.execute(sql, params)
+            row = cur.fetchone()
+            return row[0] if not row is None else None
+
+class BaseCommand:
+    def check_if_schema_exists(self):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = '%s')"""
+        value = dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name))
+        if value is None:
+            raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
+        return value
+
+    def check_if_schema_is_empty(self):
+        sql = """
+            SELECT count(*)
+            FROM pg_class c
+            JOIN pg_namespace s ON s.oid = c.relnamespace
+            WHERE s.nspname = '%s'
+            AND s.nspname NOT IN ('pg_catalog', 'information_schema')
+            AND s.nspname NOT LIKE 'pg_toast%'
+            AND s.nspname NOT LIKE 'pg_temp%';
+        """
+        value = dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name))
+        if value is None:
+            raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
+        return (value > 0)
+
     def __init__(self, config, subparsers, command_name, command_help):        
         DBCONNECTION = 'dbconnection'
         try:        
@@ -58,7 +109,7 @@ class BaseCommand:
         self.parser.add_argument("--user", type=str, default=self.dbconn_settings.get("user", DBCONN_DEFAULT_USER), help="user name")
         self.parser.add_argument("-n","--no-password",  action="store_true", default=self.options.get("no_password", False), help="dont ask user password")
         self.parser.add_argument("-s","--skip-signature-check", action="store_true", default=False, help="to skip the signature check")
-        self.parser.set_defaults(exec=self) 
+        self.parser.set_defaults(call=self) 
     def __enter__(self):
         self.dbconn_settings["host"]=self.args.host
         self.dbconn_settings["port"]=self.args.port
@@ -88,6 +139,7 @@ class UpdateCommand (BaseCommand):
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
     def run(self):
         print(f"Apply updates scripts_path={self.args.scripts_path}, schema_name={self.args.schema_name}, skip_signature_check={self.args.skip_signature_check}")
+        [print(item) for item in walk_through_dir_sorted(self.args.scripts_path)]
 
 class VerifyCommand (BaseCommand):
     """Verifies target schema and lists versioned and repatable scripts to be applied within"""
@@ -102,26 +154,35 @@ class InitCommand (BaseCommand):
         super().__init__(config, subparsers, "init", InitCommand.__doc__)
         self.parser.add_argument("-f","--force-init", action="store_true", default=False, help="Force init schema versioning tables even if the target schema is not empty")
     def run(self):
+        if not self.check_if_schema_exists():
+            raise FatalError(f"Target schema {self.args.schema_name} is not accessible")
+        if not self.check_if_schema_is_empty():
+            raise FatalError(f"Target schema {self.args.schema_name} is not empty")
+        print(f"Schema is empty")
         print(f"Creates version control tables scripts_path={self.args.scripts_path}, schema={self.args.schema_name}, force_init={self.args.force_init}, skip_signature_check={self.args.skip_signature_check}")
 
 def main():
-    config = read_toml_config()
-    parser = argparse.ArgumentParser(description=__doc__)    
-    subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
+    try:
+        config = read_toml_config()
+        parser = argparse.ArgumentParser(description=__doc__)    
+        subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
 
-    UpdateCommand(config, subparsers)
-    VerifyCommand(config, subparsers)
-    InitCommand(config, subparsers)
+        UpdateCommand(config, subparsers)
+        VerifyCommand(config, subparsers)
+        InitCommand(config, subparsers)
 
-    # Parse arguments
-    args = parser.parse_args()
+        # Parse arguments
+        args = parser.parse_args()
 
-    # Call the function associated with the subcommand
-    if hasattr(args, 'exec'):
-        args.exec(args)
-    else:
-        # If no subcommand is given, print help (or handle as needed)
-        parser.print_help()
+        # Call the function associated with the subcommand
+        if hasattr(args, 'call'):
+            args.call(args)
+        else:
+            # If no subcommand is given, print help (or handle as needed)
+            parser.print_help()
+    except Exception as e:
+        print("Error:", e)
+
 
 if __name__ == "__main__":
     main()

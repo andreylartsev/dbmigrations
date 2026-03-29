@@ -12,7 +12,7 @@
                 "USER_PASSWORD": "1234561",
             },
             "args": [
-                "update", "test", "./"
+                "init", "test", "./"
             ],
         }
     ]
