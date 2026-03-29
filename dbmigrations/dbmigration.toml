@@ -1,5 +1,16 @@
+# DB connection options:
+# Full list of options could be found at the following URLs:
+# - https://www.psycopg.org/psycopg3/docs/api/connections.html
+# - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
+#
 [dbconnection]
 host = "localhost"
 port = 5432
-db = "postgres"
+dbname = "postgres"
 user = "postgres"
+# connect_timeout = 30
+# sslmode = "prefer"
+
+# command options
+[options]
+no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by envrionment variable USER_PASSWORD

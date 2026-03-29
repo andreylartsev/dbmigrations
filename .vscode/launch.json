@@ -9,10 +9,10 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "env": {
-                "USER_PASSWORD": "123451",
+                "USER_PASSWORD": "1234561",
             },
             "args": [
-                "update", "public", "./"
+                "update", "test", "./"
             ],
         }
     ]
