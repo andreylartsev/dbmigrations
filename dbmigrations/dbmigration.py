@@ -68,21 +68,6 @@ class BaseCommand:
             raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return value
 
-    def check_if_schema_is_empty(self):
-        sql = """
-            SELECT count(*)
-            FROM pg_class c
-            JOIN pg_namespace s ON s.oid = c.relnamespace
-            WHERE s.nspname = %s
-            AND s.nspname NOT IN ('pg_catalog', 'information_schema')
-            AND s.nspname NOT LIKE 'pg_toast%%'
-            AND s.nspname NOT LIKE 'pg_temp%%'
-        """
-        value = self.dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name,))
-        if value is None:
-            raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
-        return (value == 0)
-
     def __init__(self, config, subparsers, command_name, command_help):        
         DBCONNECTION = 'dbconnection'
         try:        
@@ -153,6 +138,21 @@ class VerifyCommand (BaseCommand):
 class InitCommand (BaseCommand):
     """Creates version control tables in the empty database schema"""
 
+    def check_if_schema_is_empty(self):
+        sql = """
+            SELECT count(*)
+            FROM pg_class c
+            JOIN pg_namespace s ON s.oid = c.relnamespace
+            WHERE s.nspname = %s
+            AND s.nspname NOT IN ('pg_catalog', 'information_schema')
+            AND s.nspname NOT LIKE 'pg_toast%%'
+            AND s.nspname NOT LIKE 'pg_temp%%'
+        """
+        value = self.dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name,))
+        if value is None:
+            raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
+        return (value == 0)
+    
     def create_version_tracking_tables(self):
         sql_script = """
             BEGIN;
