@@ -247,7 +247,7 @@ class UpdateCommand (BaseCommand):
         print(f"Apply baseline scripts...")
         scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
         self.run_versioned_scripts_in_tran(baseline_version, True, scripts_sorted)
-        print(f"Baseline scripts applied.")       
+        print(f"Baseline scripts were applied.")       
 
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
@@ -272,7 +272,7 @@ class UpdateCommand (BaseCommand):
             if len(scripts_sorted) == 0:
                 raise CommandError(f"The scripts subdirectory '{script_verion_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
             self.run_versioned_scripts_in_tran(verion_id, False, scripts_sorted)       
-        print(f"Versioned scripts applied.")
+        print(f"Versioned scripts were applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
@@ -318,7 +318,7 @@ class UpdateCommand (BaseCommand):
                     cur.execute("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", (sha256sum, str(relative_script_path)))       
                     cur.execute("COMMIT")
                     print(f"Committed transaction.")
-        print(f"Repeatable scripts applied.")       
+        print(f"Repeatable scripts were applied.")       
 
     def run(self):
         if not self.check_if_schema_exists():
@@ -431,7 +431,6 @@ def main():
     except Exception as e:
         error_type_name = type(e).__name__ 
         print(f"Error: {error_type_name}:", e)
-
 
 if __name__ == "__main__":
     main()
