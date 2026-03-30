@@ -172,7 +172,6 @@ class UpdateCommand (BaseCommand):
             raise CommandError(f"Unable to get latest installed version")
         return value
 
-
     def check_if_repeatable_script_installed(self, sha256sum):
         sql = """
             SELECT EXISTS (
@@ -197,6 +196,37 @@ class UpdateCommand (BaseCommand):
             cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, is_baseline))       
             cur.execute("COMMIT")       
             print(f"Committed transaction")
+
+    def check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(self, scripts_dir):
+        print(f"Doing cross check for consistency of repeatable scripts target version and versioned and baseline scripts in: {scripts_dir}")
+        latest_version_in_scripts = None
+        baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
+        if baseline_dir.exists():
+            baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
+            if len(baseline_subdirs) == 1:
+                baseline_version_subdir = baseline_subdirs[0]
+                latest_version_in_scripts = baseline_version_subdir.name
+        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
+        if versioned_dir.exists():
+            for item in versioned_dir.iterdir():
+                if item.is_dir():
+                    if item.name > latest_version_in_scripts:
+                        latest_version_in_scripts = item.name
+        if latest_version_in_scripts is None:
+            print(f"No either baseline or versioned script updates found in scripts dir: {scripts_dir}")
+            return        
+        target_version_in_repeatable = None
+        repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
+        if repeatable_dir.exists():
+            target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
+            if target_version_file_path.exists():
+                target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
+        if target_version_in_repeatable is None:
+            print(f"No repeatable scripts found in scripts dir: {scripts_dir}")
+            return 
+        if latest_version_in_scripts != target_version_in_repeatable:
+            raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not corresponds to latest version in versioned scripts '{latest_version_in_scripts}'")
+        print(f"Done.")
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
@@ -240,7 +270,7 @@ class UpdateCommand (BaseCommand):
         for script_verion_dir in newer_version_subdirs_sorted:        
             verion_id = script_verion_dir.name
             scripts_sorted = walk_through_dir_sorted(script_verion_dir, SQL_SCRIPTS_RGLOB_FILTER)
-            self.run_versioned_scripts_in_tran(verion_id, True, scripts_sorted)       
+            self.run_versioned_scripts_in_tran(verion_id, False, scripts_sorted)       
         print(f"Versioned scripts applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
@@ -299,8 +329,9 @@ class UpdateCommand (BaseCommand):
             raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
         scripts_dir = pathlib.Path(self.args.scripts_path)        
         if not scripts_dir.exists():
-            raise CommandError(f"The scripts repository path {self.args.scripts_path} does not exists")       
-        print(f"Running updates from scripts repository {scripts_dir}")
+            raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
+        print(f"Running updates from scripts repository: '{scripts_dir}'")
+        self.check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(scripts_dir)
         self.apply_baseline_scripts(scripts_dir)
         self.apply_versioned_scripts(scripts_dir)
         self.apply_repeatable_scripts(scripts_dir)
