@@ -42,13 +42,6 @@ class CommandError(Exception):
     def __init__(self, message):
         super().__init__(message)
 
-def read_toml_config():
-    script_dir = pathlib.Path(__file__).absolute().parent
-    target_path = script_dir.joinpath(TOML_CONFIG_FILE)
-    with open(target_path, 'rb') as f:
-        config = tomllib.load(f)
-        return config
-
 def walk_through_dir_sorted(dir, rglob_filter):
     start_path = pathlib.Path(dir) 
     if not start_path.exists():
@@ -87,19 +80,6 @@ class BaseCommand:
             SET search_path TO {self.args.schema_name}, public"""
         self.dbconn_exec_with_no_result(sql, [])
 
-    def run_versioned_scripts_in_tran(self, version, is_baseline, scripts):
-         with self.dbconn.cursor() as cur:
-            cur.execute("BEGIN")
-            print(f"Begin transaction")
-            for script_path in scripts:
-                with open(script_path, 'rb') as f:
-                    print(f"Running script {script_path}...")
-                    script_text = f.read()
-                    cur.execute(script_text)                                  
-                    print("done")
-            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, is_baseline))       
-            cur.execute("COMMIT")       
-            print(f"Committed transaction")
 
     def __init__(self, config, subparsers, command_name, command_help):        
         DBCONNECTION = 'dbconnection'
@@ -182,6 +162,7 @@ class UpdateCommand (BaseCommand):
         if value is None:
             raise CommandError(f"Unable to get latest installed version")
         return value
+
     def check_if_repeatable_script_installed(self, sha256sum):
         sql = """
             SELECT EXISTS (
@@ -192,7 +173,21 @@ class UpdateCommand (BaseCommand):
         if value is None:
             raise CommandError(f"Unable to check if repeatable script was installed")
         return value
-    
+
+    def run_versioned_scripts_in_tran(self, version, is_baseline, scripts):
+         with self.dbconn.cursor() as cur:
+            cur.execute("BEGIN")
+            print(f"Begin transaction")
+            for script_path in scripts:
+                with open(script_path, 'rb') as f:
+                    print(f"Running script {script_path}...")
+                    script_text = f.read()
+                    cur.execute(script_text)                                  
+                    print("done")
+            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, is_baseline))       
+            cur.execute("COMMIT")       
+            print(f"Committed transaction")
+
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
 
@@ -213,7 +208,7 @@ class UpdateCommand (BaseCommand):
         print(f"Apply baseline scripts...")
         scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
         self.run_versioned_scripts_in_tran(baseline_version, True, scripts_sorted)
-        print(f"Applied.")       
+        print(f"Baseline scripts applied.")       
 
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
@@ -231,12 +226,12 @@ class UpdateCommand (BaseCommand):
             return
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
         print(f"Found {len(newer_version_subdirs)} new versions to install.")       
-        print(f"Apply versioned scripts")
+        print(f"Apply versioned scripts...")
         for script_verion_dir in newer_version_subdirs_sorted:        
             verion_id = script_verion_dir.name
             scripts_sorted = walk_through_dir_sorted(script_verion_dir, SQL_SCRIPTS_RGLOB_FILTER)
             self.run_versioned_scripts_in_tran(verion_id, True, scripts_sorted)       
-        print(f"Applied.")
+        print(f"Versioned scripts applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
@@ -260,7 +255,7 @@ class UpdateCommand (BaseCommand):
             print(f"No repeatable scripts found to (re)install.")       
             return
         print(f"Found {len(scripts_to_repeat)} scripts to repeat")
-        print(f"Apply repeatable scripts")       
+        print(f"Apply repeatable scripts...")       
         with self.dbconn.cursor() as cur:
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
@@ -274,7 +269,7 @@ class UpdateCommand (BaseCommand):
                     cur.execute("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", (sha256sum, str(relative_script_path)))       
                     cur.execute("COMMIT")
                     print(f"Committed transaction.")
-        print(f"Applied.")       
+        print(f"Repeatable scripts applied.")       
 
     def run(self):
         if not self.check_if_schema_exists():
@@ -288,10 +283,10 @@ class UpdateCommand (BaseCommand):
         if not scripts_dir.exists():
             raise CommandError(f"The scripts repository path {self.args.scripts_path} does not exists")       
         print(f"Running updates from scripts repository {scripts_dir}")
-        if not self.check_if_version_table_include_baseline_version():
-            self.apply_baseline_scripts(scripts_dir)
+        self.apply_baseline_scripts(scripts_dir)
         self.apply_versioned_scripts(scripts_dir)
         self.apply_repeatable_scripts(scripts_dir)
+        print(f"Updated.")
 
 class VerifyCommand (BaseCommand):
     """Verifies target schema and lists versioned and repatable scripts to be applied within"""
@@ -356,6 +351,13 @@ class InitCommand (BaseCommand):
         print(f"Creating version control tables...")
         self.create_version_tracking_tables()
         print(f"Created")
+
+def read_toml_config():
+    script_dir = pathlib.Path(__file__).absolute().parent
+    target_path = script_dir.joinpath(TOML_CONFIG_FILE)
+    with open(target_path, 'rb') as f:
+        config = tomllib.load(f)
+        return config
 
 def main():
     try:
