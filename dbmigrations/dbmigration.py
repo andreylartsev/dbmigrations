@@ -310,7 +310,7 @@ class UpdateCommand (BaseCommand):
                     script_text = f.read()
                     sha256sum = get_sha256sum_for_bytes(script_text)
                     relative_script_path = script_path.relative_to(scripts_dir)
-                    print(f"Running script {script_path}...")
+                    print(f"Running script '{script_path}'...")
                     cur.execute("BEGIN")
                     print(f"Begin transaction")
                     cur.execute(script_text)                                  
