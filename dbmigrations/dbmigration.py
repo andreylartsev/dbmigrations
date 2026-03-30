@@ -251,13 +251,13 @@ class UpdateCommand (BaseCommand):
                 print(f"Checking script {script_path} checksum...")
                 script_text = f.read()
                 sha256sum = get_sha256sum_for_script(script_text)
-                if self.check_if_repeatable_script_installed(self, sha256sum):
-                    scripts_to_repeat += script_path
-                    print(f"The script '{script_path}' with checksum '{sha256sum}' is missing and will be updated")
+                if not self.check_if_repeatable_script_installed(sha256sum):
+                    scripts_to_repeat.append(script_path)
+                    print(f"The script '{script_path}' with checksum '{sha256sum}' is missing and will be (re)installed")
                 else:
                     print(f"The script with checksum '{sha256sum}' seems already installed")        
         if len(scripts_to_repeat) == 0:
-            print(f"Nothing found to install.")       
+            print(f"No repeatable scripts found to (re)install.")       
             return
         print(f"Found {len(scripts_to_repeat)} scripts to repeat")
         print(f"Apply repeatable scripts")       
@@ -271,7 +271,7 @@ class UpdateCommand (BaseCommand):
                     cur.execute("BEGIN")
                     print(f"Begin transaction")
                     cur.execute(script_text)                                  
-                    cur.execute("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", (sha256sum, relative_script_path))       
+                    cur.execute("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", (sha256sum, str(relative_script_path)))       
                     cur.execute("COMMIT")
                     print(f"Committed transaction.")
         print(f"Applied")       

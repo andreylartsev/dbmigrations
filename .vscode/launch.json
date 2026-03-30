@@ -12,7 +12,7 @@
                 "USER_PASSWORD": "1234561",
             },
             "args": [
-                "update", "public", "./dbmigrations/samples/test1"
+                "update", "esbdbjournal", "./dbmigrations/samples/test1"
             ],
         }
     ]
