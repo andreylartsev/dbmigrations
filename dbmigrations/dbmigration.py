@@ -31,8 +31,8 @@ DBCONN_DEFAULT_USER = None
 DBCONN_DEFAULT_DBNAME = 'postgres'
 DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
 
-class FatalError(Exception):
-    """A critical error terminated the command execution."""
+class CommandError(Exception):
+    """A critical command error terminated the command execution."""
     def __init__(self, message):
         super().__init__(message)
 
@@ -46,7 +46,7 @@ def read_toml_config():
 def walk_through_dir_sorted(dir):
     start_path = pathlib.Path(dir) 
     if not start_path.exists():
-        raise FatalError(f"The folder '{dir}' does not exists")
+        raise CommandError(f"The folder '{dir}' does not exists")
     all_items = start_path.rglob('*')
     files = [item for item in all_items if item.is_file()]
     sorted_files = sorted(files)
@@ -65,7 +65,7 @@ class BaseCommand:
                 SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = %s)"""
         value = self.dbconn_get_single_value(sql, (self.args.schema_name,))
         if value is None:
-            raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
+            raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return value
 
     def __init__(self, config, subparsers, command_name, command_help):        
@@ -148,22 +148,23 @@ class InitCommand (BaseCommand):
             AND s.nspname NOT LIKE 'pg_toast%%'
             AND s.nspname NOT LIKE 'pg_temp%%'
         """
-        value = self.dbconn_get_single_value(self.dbconn, sql, (self.args.schema_name,))
+        value = self.dbconn_get_single_value(sql, (self.args.schema_name,))
         if value is None:
-            raise FatalError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
+            raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return (value == 0)
     
     def create_version_tracking_tables(self):
         sql_script = """
-            BEGIN;
-            CREATE TABLE dbmigration_versions (
+            BEGIN;            
+            CREATE TABLE dbmigration_versionsx (
                 version_id VARCHAR(64) NOT NULL PRIMARY KEY,
                 is_baseline BOOL NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR()
             );
-            
+            INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('0', true);
+            DELETE FROM dbmigration_versions WHERE version_id = '0';
             CREATE TABLE dbmigration_repeatable (
                 sha256sum VARCHAR(128) NOT NULL PRIMARY KEY,
                 relative_path VARCHAR(2048) NOT NULL,
@@ -171,6 +172,8 @@ class InitCommand (BaseCommand):
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR()
             );
+            INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ('0', 'test.sql');
+            DELETE FROM dbmigration_repeatable WHERE sha256sum = '0';
             COMMIT;
         """
         with self.dbconn.cursor() as cur:
@@ -182,9 +185,9 @@ class InitCommand (BaseCommand):
         self.parser.add_argument("-f","--force-init", action="store_true", default=False, help="Force init schema versioning tables even if the target schema is not empty")
     def run(self):
         if not self.check_if_schema_exists():
-            raise FatalError(f"The target schema '{self.args.schema_name}' is not accessible")
+            raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
         if not self.check_if_schema_is_empty():
-            raise FatalError(f"The target schema '{self.args.schema_name}' must be empty")
+            raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
         print(f"Creating version control tables...")
         self.create_version_tracking_tables()
         print(f"Created")
@@ -209,7 +212,8 @@ def main():
             # If no subcommand is given, print help (or handle as needed)
             parser.print_help()
     except Exception as e:
-        print("Error:", e)
+        error_type_name = type(e).__name__ 
+        print(f"Error: {error_type_name}:", e)
 
 
 if __name__ == "__main__":
