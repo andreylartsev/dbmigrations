@@ -6,6 +6,7 @@ import argparse
 import tomllib
 import os
 import pathlib 
+import hashlib
 
 #
 # prerequired packages listed in requirements.txt
@@ -33,6 +34,7 @@ DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
 
 BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
+REPEATABLE_DIR_NAME = "repeatable"
 SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
 
 class CommandError(Exception):
@@ -55,6 +57,11 @@ def walk_through_dir_sorted(dir, rglob_filter):
     files = [item for item in all_items if item.is_file()]
     sorted_files = sorted(files)
     return sorted_files
+
+def get_sha256sum_for_script(script_bytes):
+    hash_object = hashlib.sha256(script_bytes)
+    hex_dig = hash_object.hexdigest()
+    return hex_dig
 
 class BaseCommand:
     def dbconn_get_single_value(self, sql, params):
@@ -175,9 +182,20 @@ class UpdateCommand (BaseCommand):
         if value is None:
             raise CommandError(f"Unable to get latest installed version")
         return value
+    def check_if_repeatable_script_installed(self, sha256sum):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM dbmigration_repeatable
+                WHERE sha256sum = %s)"""        
+        value = self.dbconn_get_single_value(sql, (sha256sum,))
+        if value is None:
+            raise CommandError(f"Unable to check if repeatable script was installed")
+        return value
     
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
+
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
@@ -208,6 +226,9 @@ class UpdateCommand (BaseCommand):
         latest_installed_version = self.get_latest_version_installed()
         print(f"The latest installed version: {latest_installed_version}.")       
         newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
+        if len(newer_version_subdirs) == 0:
+            print(f"No newer versions found to install.")       
+            return
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
         print(f"Found {len(newer_version_subdirs)} new versions to install.")       
         print(f"Apply versioned scripts")
@@ -218,8 +239,43 @@ class UpdateCommand (BaseCommand):
         print(f"Applied")
 
     def apply_repeatable_scripts(self, scripts_dir):
+        repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
+        if not repeatable_dir.exists():
+            print(f"The scripts path {repeatable_dir} does not include {REPEATABLE_DIR_NAME} subdirectory. Skip running repeatable updates")
+            return
+        print(f"Check repeatable scripts...")       
+        repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
+        scripts_to_repeat = [] 
+        for script_path in repeatable_scripts_sorted:
+            with open(script_path, 'rb') as f:
+                print(f"Checking script {script_path} checksum...")
+                script_text = f.read()
+                sha256sum = get_sha256sum_for_script(script_text)
+                if self.check_if_repeatable_script_installed(self, sha256sum):
+                    scripts_to_repeat += script_path
+                    print(f"The script '{script_path}' with checksum '{sha256sum}' is missing and will be updated")
+                else:
+                    print(f"The script with checksum '{sha256sum}' seems already installed")        
+        if len(scripts_to_repeat) == 0:
+            print(f"Nothing found to install.")       
+            return
+        print(f"Found {len(scripts_to_repeat)} scripts to repeat")
         print(f"Apply repeatable scripts")       
+        with self.dbconn.cursor() as cur:
+            for script_path in scripts_to_repeat:
+                with open(script_path, 'rb') as f:
+                    script_text = f.read()
+                    sha256sum = get_sha256sum_for_script(script_text)
+                    relative_script_path = script_path.relative_to(scripts_dir)
+                    print(f"Running script {script_path}...")
+                    cur.execute("BEGIN")
+                    print(f"Begin transaction")
+                    cur.execute(script_text)                                  
+                    cur.execute("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", (sha256sum, relative_script_path))       
+                    cur.execute("COMMIT")
+                    print(f"Committed transaction.")
         print(f"Applied")       
+
     def run(self):
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
