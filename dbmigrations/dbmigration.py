@@ -187,10 +187,9 @@ class UpdateCommand (BaseCommand):
             print(f"Begin transaction")
             for script_path in scripts:
                 with open(script_path, 'rb') as f:
-                    print(f"Running script {script_path}...")
+                    print(f"Running script: '{script_path}'...")
                     script_text = f.read()
                     cur.execute(script_text)                                  
-                    print("done")
             cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, is_baseline))       
             cur.execute("COMMIT")       
             print(f"Committed transaction")
@@ -224,7 +223,7 @@ class UpdateCommand (BaseCommand):
             return 
         if latest_version_in_scripts != target_version_in_repeatable:
             raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not corresponds to latest version in versioned scripts '{latest_version_in_scripts}'")
-        print(f"Done.")
+        print(f"Completed.")
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
@@ -292,7 +291,7 @@ class UpdateCommand (BaseCommand):
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
-                print(f"Checking script {script_path} checksum...")
+                print(f"Checking script '{script_path}' checksum...")
                 script_text = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_text)
                 if not self.check_if_repeatable_script_installed(sha256sum):
