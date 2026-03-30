@@ -1,2 +1,2 @@
-insert into t2 values ('1');
-insert into t2 values ('2');
+insert into t3 values ('4');
+insert into t3 values ('5');

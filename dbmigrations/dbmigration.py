@@ -232,10 +232,10 @@ class UpdateCommand (BaseCommand):
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path {baseline_dir} does not include {BASELINE_DIR_NAME} subdirectory. Skip running baseline updates.")
+            print(f"The scripts path {baseline_dir} does not include {BASELINE_DIR_NAME} subdirectory. Skip running baseline scripts.")
             return
         if self.check_if_version_table_include_baseline_version():
-            print(f"The target schema already have baseline version installed. Skip running baseline updates.")
+            print(f"The target schema already have baseline version installed. Skip running baseline scripts.")
             return
         baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
         if len(baseline_subdirs) != 1:
@@ -251,11 +251,13 @@ class UpdateCommand (BaseCommand):
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path {versioned_dir} does not include {VERSIONED_DIR_NAME} subdirectory. Skip running version updates")
+            print(f"The scripts path {versioned_dir} does not include {VERSIONED_DIR_NAME} subdirectory. Skip running versioned scrips")
             return
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if len(versioned_subdirs) == 0:
             raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing found")
+        if not self.check_if_version_table_include_baseline_version():
+            raise CommandError(f"The baseline version must be installed before running versioned scripts")
         latest_installed_version = self.get_latest_version_installed()
         print(f"The latest installed version: {latest_installed_version}.")       
         newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
