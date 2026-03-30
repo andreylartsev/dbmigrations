@@ -104,14 +104,14 @@ class BaseCommand:
                 raise ValueError(f"db user password must be provided via environment variable {DBCONN_USER_PASSWORD_ENVVAR_NAME}")
             self.dbconn_settings["password"]=password
         self.dbconn = psycopg.connect(**self.dbconn_settings)
-        print(f"Opened connection")
+        print(f"Opened db connection")
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is psycopg.DatabaseError:
             self.dbconn.rollback()
             print(f"Rolled back transaction")
         if not self.dbconn is None:
             self.dbconn.close()
-            print(f"Closed connection")
+            print(f"Closed db connection")
         return False # propagate the exception
     def run(self):
         pass
