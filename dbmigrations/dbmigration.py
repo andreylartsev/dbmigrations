@@ -236,7 +236,7 @@ class UpdateCommand (BaseCommand):
             verion_id = script_verion_dir.name
             scripts_sorted = walk_through_dir_sorted(script_verion_dir, SQL_SCRIPTS_RGLOB_FILTER)
             self.run_versioned_scripts_in_tran(verion_id, True, scripts_sorted)       
-        print(f"Applied")
+        print(f"Applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
@@ -274,7 +274,7 @@ class UpdateCommand (BaseCommand):
                     cur.execute("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", (sha256sum, str(relative_script_path)))       
                     cur.execute("COMMIT")
                     print(f"Committed transaction.")
-        print(f"Applied")       
+        print(f"Applied.")       
 
     def run(self):
         if not self.check_if_schema_exists():
