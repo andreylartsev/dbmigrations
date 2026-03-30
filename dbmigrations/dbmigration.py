@@ -198,7 +198,7 @@ class UpdateCommand (BaseCommand):
             print(f"Committed transaction")
 
     def check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(self, scripts_dir):
-        print(f"Doing cross check for consistency of repeatable scripts target version and versioned and baseline scripts in: {scripts_dir}")
+        print(f"A cross-check for consistency is performed between the target version's repeatable scripts, and the versioned scripts in: {scripts_dir}")
         latest_version_in_scripts = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
@@ -283,10 +283,10 @@ class UpdateCommand (BaseCommand):
         if not target_version_file_path.exists():
             raise CommandError(f"The file with target version '{REPEATABLE_SCRIPTS_TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
-        print(f"Target version found {target_version}")
         latest_installed_version = self.get_latest_version_installed() 
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for repeatable scripts does not corresponds to latest installed version {latest_installed_version}.")                  
+        print(f"The target version corresonds to the latest installed version '{target_version}'")
         repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
