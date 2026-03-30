@@ -103,13 +103,11 @@ class BaseCommand:
             raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{OPTIONS}'")
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
-        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.parser.add_argument("--host", type=str, default=self.dbconn_settings.get("host", DBCONN_DEFAULT_HOST), help="db server host name")
         self.parser.add_argument("--port", type=int, default=self.dbconn_settings.get("port", DBCONN_DEFAULT_PORT), help="db server port")
         self.parser.add_argument("--dbname", type=str, default=self.dbconn_settings.get("dbname", DBCONN_DEFAULT_DBNAME), help="database name")
         self.parser.add_argument("--user", type=str, default=self.dbconn_settings.get("user", DBCONN_DEFAULT_USER), help="user name")
         self.parser.add_argument("-n","--no-password",  action="store_true", default=self.options.get("no_password", False), help="dont ask user password")
-        self.parser.add_argument("-s","--skip-signature-check", action="store_true", default=False, help="to skip the signature check")
         self.parser.set_defaults(call=self) 
     def __enter__(self):
         if not self.args.host is None:
@@ -210,7 +208,7 @@ class UpdateCommand (BaseCommand):
         if versioned_dir.exists():
             for item in versioned_dir.iterdir():
                 if item.is_dir():
-                    if item.name > latest_version_in_scripts:
+                    if latest_version_in_scripts is None or item.name > latest_version_in_scripts:
                         latest_version_in_scripts = item.name
         if latest_version_in_scripts is None:
             print(f"No either baseline or versioned script updates found in scripts dir: {scripts_dir}")
@@ -230,6 +228,7 @@ class UpdateCommand (BaseCommand):
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
+        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
 
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
@@ -344,7 +343,7 @@ class VerifyCommand (BaseCommand):
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
     def run(self):
-        print(f"Verify database schema scripts_path={self.args.scripts_path}, schema={self.args.schema_name}, {self.args.build_update_script}, skip_signature_check={self.args.skip_signature_check}")
+        print(f"Not implemented yet")
 
 class InitCommand (BaseCommand):
     """Creates version control tables in the empty database schema"""
@@ -392,7 +391,7 @@ class InitCommand (BaseCommand):
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "init", InitCommand.__doc__)
-        self.parser.add_argument("-f","--force-init", action="store_true", default=False, help="Force init schema versioning tables even if the target schema is not empty")
+
     def run(self):
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
@@ -401,7 +400,7 @@ class InitCommand (BaseCommand):
         self.set_session_search_path()        
         print(f"Creating version control tables...")
         self.create_version_tracking_tables()
-        print(f"Created")
+        print(f"Created.")
 
 def read_toml_config():
     script_dir = pathlib.Path(__file__).absolute().parent
