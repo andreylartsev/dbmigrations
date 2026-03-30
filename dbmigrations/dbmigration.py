@@ -270,6 +270,8 @@ class UpdateCommand (BaseCommand):
         for script_verion_dir in newer_version_subdirs_sorted:        
             verion_id = script_verion_dir.name
             scripts_sorted = walk_through_dir_sorted(script_verion_dir, SQL_SCRIPTS_RGLOB_FILTER)
+            if len(scripts_sorted) == 0:
+                raise CommandError(f"The scripts subdirectory '{script_verion_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
             self.run_versioned_scripts_in_tran(verion_id, False, scripts_sorted)       
         print(f"Versioned scripts applied.")
 
