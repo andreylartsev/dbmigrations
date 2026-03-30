@@ -156,7 +156,7 @@ class InitCommand (BaseCommand):
     def create_version_tracking_tables(self):
         sql_script = """
             BEGIN;            
-            CREATE TABLE dbmigration_versionsx (
+            CREATE TABLE dbmigration_versions (
                 version_id VARCHAR(64) NOT NULL PRIMARY KEY,
                 is_baseline BOOL NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
