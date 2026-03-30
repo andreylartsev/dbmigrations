@@ -159,7 +159,7 @@ class InitCommand (BaseCommand):
             CREATE TABLE dbmigration_versions (
                 version_id VARCHAR(64) NOT NULL PRIMARY KEY,
                 is_baseline BOOL NOT NULL DEFAULT FALSE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR()
             );
@@ -167,7 +167,7 @@ class InitCommand (BaseCommand):
             CREATE TABLE dbmigration_repeatable (
                 sha256sum VARCHAR(128) NOT NULL PRIMARY KEY,
                 relative_path VARCHAR(2048) NOT NULL,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR()
             );
