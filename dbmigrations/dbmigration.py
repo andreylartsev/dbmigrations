@@ -35,6 +35,7 @@ DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
 BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
 REPEATABLE_DIR_NAME = "repeatable"
+REPEATABLE_SCRIPTS_TARGET_VERSION_FILE = "target_version.txt"
 SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
 
 class CommandError(Exception):
@@ -51,10 +52,18 @@ def walk_through_dir_sorted(dir, rglob_filter):
     sorted_files = sorted(files)
     return sorted_files
 
-def get_sha256sum_for_script(script_bytes):
+def get_sha256sum_for_bytes(script_bytes):
     hash_object = hashlib.sha256(script_bytes)
     hex_dig = hash_object.hexdigest()
     return hex_dig
+
+
+def read_as_trimmed_string(file_path):
+    with open(file_path, 'rb') as f:
+        bytes = f.read()
+        str = bytes.decode("utf-8")
+        trimmed_str = str.strip()
+        return trimmed_str
 
 class BaseCommand:
     def dbconn_get_single_value(self, sql, params):
@@ -163,6 +172,7 @@ class UpdateCommand (BaseCommand):
             raise CommandError(f"Unable to get latest installed version")
         return value
 
+
     def check_if_repeatable_script_installed(self, sha256sum):
         sql = """
             SELECT EXISTS (
@@ -239,13 +249,21 @@ class UpdateCommand (BaseCommand):
             print(f"The scripts path {repeatable_dir} does not include {REPEATABLE_DIR_NAME} subdirectory. Skip running repeatable updates")
             return
         print(f"Check repeatable scripts...")       
+        target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
+        if not target_version_file_path.exists():
+            raise CommandError(f"The file with target version '{REPEATABLE_SCRIPTS_TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
+        target_version = read_as_trimmed_string(target_version_file_path)
+        print(f"Target version found {target_version}")
+        latest_installed_version = self.get_latest_version_installed() 
+        if latest_installed_version != target_version:
+            raise CommandError(f"The target version {target_version} for repeatable scripts does not corresponds to latest installed version {latest_installed_version}.")                  
         repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 print(f"Checking script {script_path} checksum...")
                 script_text = f.read()
-                sha256sum = get_sha256sum_for_script(script_text)
+                sha256sum = get_sha256sum_for_bytes(script_text)
                 if not self.check_if_repeatable_script_installed(sha256sum):
                     scripts_to_repeat.append(script_path)
                     print(f"The script '{script_path}' with checksum '{sha256sum}' is missing and will be (re)installed")
@@ -260,7 +278,7 @@ class UpdateCommand (BaseCommand):
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
                     script_text = f.read()
-                    sha256sum = get_sha256sum_for_script(script_text)
+                    sha256sum = get_sha256sum_for_bytes(script_text)
                     relative_script_path = script_path.relative_to(scripts_dir)
                     print(f"Running script {script_path}...")
                     cur.execute("BEGIN")
