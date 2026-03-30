@@ -1,2 +1,2 @@
-insert into t2 (key) value ('k001');
-insert into t2 (key) value ('k002');
+insert into t2 values ('1');
+insert into t2 values ('2');

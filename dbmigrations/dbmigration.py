@@ -31,6 +31,10 @@ DBCONN_DEFAULT_USER = None
 DBCONN_DEFAULT_DBNAME = 'postgres'
 DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
 
+BASELINE_DIR_NAME = "baseline"
+VERSIONED_DIR_NAME = "versions"
+SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
+
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
     def __init__(self, message):
@@ -43,11 +47,11 @@ def read_toml_config():
         config = tomllib.load(f)
         return config
 
-def walk_through_dir_sorted(dir):
+def walk_through_dir_sorted(dir, rglob_filter):
     start_path = pathlib.Path(dir) 
     if not start_path.exists():
         raise CommandError(f"The folder '{dir}' does not exists")
-    all_items = start_path.rglob('*')
+    all_items = start_path.rglob(rglob_filter)
     files = [item for item in all_items if item.is_file()]
     sorted_files = sorted(files)
     return sorted_files
@@ -58,6 +62,9 @@ class BaseCommand:
             cur.execute(sql, params)
             row = cur.fetchone()
             return row[0] if not row is None else None
+    def dbconn_exec_with_no_result(self, sql, params):
+        with self.dbconn.cursor() as cur:
+            cur.execute(sql, params)
         
     def check_if_schema_exists(self):
         sql = """
@@ -67,6 +74,25 @@ class BaseCommand:
         if value is None:
             raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return value
+    
+    def set_session_search_path(self):
+        sql = f"""
+            SET search_path TO {self.args.schema_name}, public"""
+        self.dbconn_exec_with_no_result(sql, [])
+
+    def run_versioned_scripts_in_tran(self, version, is_baseline, scripts):
+         with self.dbconn.cursor() as cur:
+            cur.execute("BEGIN")
+            print(f"Begin transaction")
+            for script_path in scripts:
+                with open(script_path, 'rb') as f:
+                    print(f"Running script {script_path}...")
+                    script_text = f.read()
+                    cur.execute(script_text)                                  
+                    print("done")
+            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, is_baseline))       
+            cur.execute("COMMIT")       
+            print(f"Committed transaction")
 
     def __init__(self, config, subparsers, command_name, command_help):        
         DBCONNECTION = 'dbconnection'
@@ -106,7 +132,7 @@ class BaseCommand:
         self.dbconn = psycopg.connect(**self.dbconn_settings)
         print(f"Opened db connection")
     def __exit__(self, exc_type, exc_value, traceback):
-        if exc_type is psycopg.DatabaseError:
+        if not exc_type is None:
             self.dbconn.rollback()
             print(f"Rolled back transaction")
         if not self.dbconn is None:
@@ -122,11 +148,94 @@ class BaseCommand:
 
 class UpdateCommand (BaseCommand):
     """Applies baseline, versioned and repeatable scripts within target database schema"""
+
+    def check_if_version_table_exists(self, table_name):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = %s)"""
+        value = self.dbconn_get_single_value(sql, (self.args.schema_name, table_name))
+        if value is None:
+            raise CommandError(f"Unable to check whether table {table_name} exists in target schema")
+        return value
+    def check_if_version_table_include_baseline_version(self):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM dbmigration_versions
+                WHERE is_baseline IS TRUE)"""
+        value = self.dbconn_get_single_value(sql, [])
+        if value is None:
+            raise CommandError(f"Unable to check whether baseline scripts were applied in the target schema")
+        return value
+    
+    def get_latest_version_installed(self):
+        sql = """
+            SELECT MAX(version_id) FROM dbmigration_versions"""
+        value = self.dbconn_get_single_value(sql, [])
+        if value is None:
+            raise CommandError(f"Unable to get latest installed version")
+        return value
+    
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
+    def apply_baseline_scripts(self, scripts_dir):
+        baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
+        if not baseline_dir.exists():
+            print(f"The scripts path {baseline_dir} does not include {BASELINE_DIR_NAME} subdirectory. Skip running baseline updates.")
+            return
+        if self.check_if_version_table_include_baseline_version():
+            print(f"The target schema already have baseline version installed. Skip running baseline updates.")
+            return
+        baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
+        if len(baseline_subdirs) != 1:
+            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with baseline scripts but {len(baseline_subdirs)} found")
+        baseline_version_subdir = baseline_subdirs[0]
+        baseline_version = baseline_version_subdir.name
+        print(f"The baseline version to install {baseline_version}.")       
+        print(f"Apply baseline scripts...")
+        scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
+        self.run_versioned_scripts_in_tran(baseline_version, True, scripts_sorted)
+        print(f"Applied.")       
+
+    def apply_versioned_scripts(self, scripts_dir):
+        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
+        if not versioned_dir.exists():
+            print(f"The scripts path {versioned_dir} does not include {VERSIONED_DIR_NAME} subdirectory. Skip running version updates")
+            return
+        versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
+        if len(versioned_subdirs) == 0:
+            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing found")
+        latest_installed_version = self.get_latest_version_installed()
+        print(f"The latest installed version: {latest_installed_version}.")       
+        newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
+        newer_version_subdirs_sorted = sorted(newer_version_subdirs)
+        print(f"Found {len(newer_version_subdirs)} new versions to install.")       
+        print(f"Apply versioned scripts")
+        for script_verion_dir in newer_version_subdirs_sorted:        
+            verion_id = script_verion_dir.name
+            scripts_sorted = walk_through_dir_sorted(script_verion_dir, SQL_SCRIPTS_RGLOB_FILTER)
+            self.run_versioned_scripts_in_tran(verion_id, True, scripts_sorted)       
+        print(f"Applied")
+
+    def apply_repeatable_scripts(self, scripts_dir):
+        print(f"Apply repeatable scripts")       
+        print(f"Applied")       
     def run(self):
-        print(f"Apply updates scripts_path={self.args.scripts_path}, schema_name={self.args.schema_name}, skip_signature_check={self.args.skip_signature_check}")
-        [print(item) for item in walk_through_dir_sorted(self.args.scripts_path)]
+        if not self.check_if_schema_exists():
+            raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
+        self.set_session_search_path()     
+        if not self.check_if_version_table_exists("dbmigration_versions"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
+        if not self.check_if_version_table_exists("dbmigration_repeatable"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
+        scripts_dir = pathlib.Path(self.args.scripts_path)        
+        if not scripts_dir.exists():
+            raise CommandError(f"The scripts repository path {self.args.scripts_path} does not exists")       
+        print(f"Running updates from scripts repository {scripts_dir}")
+        if not self.check_if_version_table_include_baseline_version():
+            self.apply_baseline_scripts(scripts_dir)
+        self.apply_versioned_scripts(scripts_dir)
+        self.apply_repeatable_scripts(scripts_dir)
 
 class VerifyCommand (BaseCommand):
     """Verifies target schema and lists versioned and repatable scripts to be applied within"""
@@ -177,7 +286,6 @@ class InitCommand (BaseCommand):
             COMMIT;
         """
         with self.dbconn.cursor() as cur:
-            cur.execute(f"SET search_path TO {self.args.schema_name}, public")
             cur.execute(sql_script);
 
     def __init__(self, config, subparsers): 
@@ -188,6 +296,7 @@ class InitCommand (BaseCommand):
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
         if not self.check_if_schema_is_empty():
             raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
+        self.set_session_search_path()        
         print(f"Creating version control tables...")
         self.create_version_tracking_tables()
         print(f"Created")
