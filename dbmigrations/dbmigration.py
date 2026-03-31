@@ -128,7 +128,7 @@ class BaseCommand:
         return value
 
     def check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(self, scripts_dir):
-        print(f"Performing a cross-check for consistency is performed between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
+        print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
         latest_version_in_scripts = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
