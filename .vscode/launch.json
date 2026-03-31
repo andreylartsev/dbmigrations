@@ -12,7 +12,7 @@
                 "USER_PASSWORD": "1234561",
             },
             "args": [
-                "verify", "esbdbjournal", "dbmigrations/samples/test1_only_repeatable"
+                "update", "public", "dbmigrations/samples/test1_just_baseline"
             ],
         }
     ]
