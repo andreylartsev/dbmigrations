@@ -128,7 +128,7 @@ class BaseCommand:
         return value
 
     def check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(self, scripts_dir):
-        print(f"A cross-check for consistency is performed between the target version's repeatable scripts, and the versioned scripts in: {scripts_dir}")
+        print(f"Performing a cross-check for consistency is performed between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
         latest_version_in_scripts = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
@@ -288,21 +288,21 @@ class UpdateCommand (BaseCommand):
         latest_installed_version = self.get_latest_version_installed() 
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for repeatable scripts does not corresponds to the latest installed version {latest_installed_version}.")                  
-        print(f"The target version corresponds to the latest installed version '{target_version}'")
+        print(f"Target version matches the latest installed version '{target_version}'")
         repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
-                print(f"Checking the script '{script_path}' checksum...")
+                print(f"Checking script '{script_path}' checksum...")
                 script_text = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_text)
                 if not self.check_if_repeatable_script_installed(sha256sum):
                     scripts_to_repeat.append(script_path)
-                    print(f"The script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
+                    print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
                 else:
-                    print(f"The script with checksum '{sha256sum}' is already installed")        
+                    print(f"Script with checksum '{sha256sum}' is already installed")        
         if len(scripts_to_repeat) == 0:
-            print(f"No repeatable scripts found to (re)install.")       
+            print(f"No any repeatable scripts found for (re)installation")       
             return
         print(f"{len(scripts_to_repeat)} scripts were found to repeat")
         print(f"Apply repeatable scripts...")       
@@ -332,7 +332,7 @@ class UpdateCommand (BaseCommand):
         scripts_dir = pathlib.Path(self.args.scripts_path)        
         if not scripts_dir.exists():
             raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
-        print(f"Running updates from scripts repository: '{scripts_dir}'")
+        print(f"Performing updates from scripts repository: '{scripts_dir}'")
         self.check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(scripts_dir)
         self.apply_baseline_scripts(scripts_dir)
         self.apply_versioned_scripts(scripts_dir)
@@ -399,7 +399,7 @@ class InitCommand (BaseCommand):
         if not self.check_if_schema_is_empty():
             raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
         self.set_session_search_path()        
-        print(f"Creating version control tables...")
+        print(f"Creating the version control tables...")
         self.create_version_tracking_tables()
         print(f"Created.")
 
