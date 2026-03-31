@@ -26,12 +26,15 @@ import hashlib
 import psycopg;
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
+DBCONN_CONFIG_GROUP = 'dbconnection'
+OPTIONS_CONFIG_GROUP = "options"
 
 DBCONN_DEFAULT_HOST = 'localhost'
 DBCONN_DEFAULT_PORT = 5432
 DBCONN_DEFAULT_USER = None
 DBCONN_DEFAULT_DBNAME = 'postgres'
 DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
+
 
 BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
@@ -173,16 +176,14 @@ class BaseCommand:
             raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
 
     def __init__(self, config, subparsers, command_name, command_help):        
-        DBCONNECTION = 'dbconnection'
         try:        
-            self.dbconn_settings = config[DBCONNECTION]
+            self.dbconn_settings = config[DBCONN_CONFIG_GROUP]
         except:
-            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{DBCONNECTION}'")
-        OPTIONS = "options"
+            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{DBCONN_CONFIG_GROUP}'")
         try:        
-            self.options = config[OPTIONS]
+            self.options = config[OPTIONS_CONFIG_GROUP]
         except:
-            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{OPTIONS}'")
+            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{OPTIONS_CONFIG_GROUP}'")
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
         self.parser.add_argument("--host", type=str, default=self.dbconn_settings.get("host", DBCONN_DEFAULT_HOST), help="db server host name")
