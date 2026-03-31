@@ -2,6 +2,7 @@
 Simple database migrations tool
 """
 
+import sys
 import argparse
 import tomllib
 import os
@@ -545,10 +546,12 @@ def main():
         else:
             # If no subcommand is given, print help (or handle as needed)
             parser.print_help()
+        return 0
     except Exception as e:
         error_type_name = type(e).__name__ 
         print(f"Error: {error_type_name}:", e)
+        return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
 
