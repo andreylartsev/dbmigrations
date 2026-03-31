@@ -222,7 +222,7 @@ class BaseCommand:
             self.run()
 
 class UpdateCommand (BaseCommand):
-    """Applies baseline, versioned and repeatable scripts within target database schema"""
+    """Applies base, versioned, and repeatable scripts to the target database schema."""
 
     def run_versioned_scripts_in_tran(self, version, is_baseline, scripts):
          with self.dbconn.cursor() as cur:
@@ -343,7 +343,7 @@ class UpdateCommand (BaseCommand):
         print(f"Updated.")
 
 class VerifyCommand (BaseCommand):
-    """Verifies target schema and lists versioned and repeatable scripts to be applied within"""
+    """Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."""
     
     def get_baseline_version_installed(self):
         sql = """
@@ -463,7 +463,7 @@ class VerifyCommand (BaseCommand):
         self.verify_repeatable_scripts(self.scripts_dir)
 
 class InitCommand (BaseCommand):
-    """Creates version control tables in the empty database schema"""
+    """Creates version control tables in an empty database schema."""
 
     def check_if_schema_is_empty(self):
         sql = """
