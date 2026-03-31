@@ -3,6 +3,9 @@
         "DBCONN",
         "dbconnection",
         "dbmigration",
-        "nspname"
+        "dbname",
+        "esbdb",
+        "nspname",
+        "sslmode"
     ]
 }
