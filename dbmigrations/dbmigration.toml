@@ -13,4 +13,4 @@ user = "postgres"
 
 # command options
 [options]
-no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by envrionment variable USER_PASSWORD
+no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD

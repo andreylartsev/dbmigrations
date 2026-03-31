@@ -436,7 +436,7 @@ class VerifyCommand (BaseCommand):
         try:
             latest_installed_version = self.get_latest_version_installed()
         except CommandError:
-            print(f"No any versions is installed in the database schema.")
+            print(f"No any versions are installed in the database schema.")
 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
