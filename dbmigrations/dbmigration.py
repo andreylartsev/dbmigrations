@@ -428,9 +428,6 @@ class VerifyCommand (BaseCommand):
             if target_version != self.latest_version_in_scripts:
                 raise CommandError(f"The target version '{target_version}' does not match to the latest installed version '{latest_installed_version}'.")
 
-        latest_version_to_check_with = max(self.latest_version_in_scripts, latest_installed_version)
-        if latest_version_to_check_with != target_version:
-
         repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
