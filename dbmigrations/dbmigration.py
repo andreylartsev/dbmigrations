@@ -354,6 +354,7 @@ class VerifyCommand (BaseCommand):
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
+        self.latest_version_in_scripts = None
 
     def verify_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
@@ -393,6 +394,10 @@ class VerifyCommand (BaseCommand):
             print(f"The latest version installed is {latest_installed_version}. No newer scripts were found for installation.")       
             return
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
+        
+        # remember latest version in scripts for the further use in verify_repeatable()
+        self.latest_version_in_scripts = newer_version_subdirs_sorted[-1].name
+        
         print(f"The versioned scripts to install: ")    
         for script_version_dir in newer_version_subdirs_sorted:        
             scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
@@ -410,6 +415,22 @@ class VerifyCommand (BaseCommand):
         if not target_version_file_path.exists():
             raise CommandError(f"The file with target version '{REPEATABLE_SCRIPTS_TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
+        latest_installed_version = None 
+        try:
+            latest_installed_version = self.get_latest_version_installed()
+        except CommandError:
+            print(f"No any versions is installed in the database schema.")
+
+        if self.latest_version_in_scripts > latest_installed_version:
+            if target_version != self.latest_version_in_scripts:
+                raise CommandError(f"The target version '{target_version}' does not match to the latest version in scripts '{self.latest_version_in_scripts}'.")
+        elif self.latest_version_in_scripts <= latest_installed_version:
+            if target_version != self.latest_version_in_scripts:
+                raise CommandError(f"The target version '{target_version}' does not match to the latest installed version '{latest_installed_version}'.")
+
+        latest_version_to_check_with = max(self.latest_version_in_scripts, latest_installed_version)
+        if latest_version_to_check_with != target_version:
+
         repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
