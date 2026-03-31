@@ -159,7 +159,7 @@ class UpdateCommand (BaseCommand):
                 WHERE is_baseline IS TRUE)"""
         value = self.dbconn_get_single_value(sql, [])
         if value is None:
-            raise CommandError(f"Unable to check whether baseline scripts were applied in the target schema")
+            raise CommandError(f"Unable to check whether the baseline scripts were applied in the target schema")
         return value
     
     def get_latest_version_installed(self):
@@ -232,40 +232,40 @@ class UpdateCommand (BaseCommand):
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path {baseline_dir} does not include {BASELINE_DIR_NAME} subdirectory. Skip running baseline scripts.")
+            print(f"The scripts path {baseline_dir} does not include {BASELINE_DIR_NAME} subdirectory. Skip running the baseline scripts.")
             return
         if self.check_if_version_table_include_baseline_version():
-            print(f"The target schema already have baseline version installed. Skip running baseline scripts.")
+            print(f"The target schema already has the baseline version installed. Skip running the baseline scripts.")
             return
         baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
         if len(baseline_subdirs) != 1:
-            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with baseline scripts but {len(baseline_subdirs)} found")
+            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with the baseline scripts but {len(baseline_subdirs)} was found")
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
         print(f"The baseline version to install {baseline_version}.")       
         print(f"Apply baseline scripts...")
         scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
         self.run_versioned_scripts_in_tran(baseline_version, True, scripts_sorted)
-        print(f"Baseline scripts were applied.")       
+        print(f"The baseline scripts were applied.")       
 
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path {versioned_dir} does not include {VERSIONED_DIR_NAME} subdirectory. Skip running versioned scrips")
+            print(f"The scripts path {versioned_dir} does not include {VERSIONED_DIR_NAME} subdirectory. Skip running the versioned scrips")
             return
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if len(versioned_subdirs) == 0:
-            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing found")
+            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
         if not self.check_if_version_table_include_baseline_version():
             raise CommandError(f"The baseline version must be installed before running versioned scripts")
         latest_installed_version = self.get_latest_version_installed()
-        print(f"The latest installed version: {latest_installed_version}.")       
+        print(f"The latest installed version is {latest_installed_version}.")       
         newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
         if len(newer_version_subdirs) == 0:
-            print(f"No newer versions found to install.")       
+            print(f"No newer versions were found for installation.")       
             return
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
-        print(f"Found {len(newer_version_subdirs)} new versions to install.")       
+        print(f"{len(newer_version_subdirs)} new versions were found for installation.")       
         print(f"Apply versioned scripts...")
         for script_verion_dir in newer_version_subdirs_sorted:        
             verion_id = script_verion_dir.name
@@ -273,12 +273,12 @@ class UpdateCommand (BaseCommand):
             if len(scripts_sorted) == 0:
                 raise CommandError(f"The scripts subdirectory '{script_verion_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
             self.run_versioned_scripts_in_tran(verion_id, False, scripts_sorted)       
-        print(f"Versioned scripts were applied.")
+        print(f"The versioned scripts were applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path {repeatable_dir} does not include {REPEATABLE_DIR_NAME} subdirectory. Skip running repeatable updates")
+            print(f"The scripts path {repeatable_dir} does not include {REPEATABLE_DIR_NAME} subdirectory. Skip running the repeatable updates")
             return
         print(f"Check repeatable scripts...")       
         target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
@@ -298,9 +298,9 @@ class UpdateCommand (BaseCommand):
                 sha256sum = get_sha256sum_for_bytes(script_text)
                 if not self.check_if_repeatable_script_installed(sha256sum):
                     scripts_to_repeat.append(script_path)
-                    print(f"The script '{script_path}' with checksum '{sha256sum}' is missing and will be (re)installed")
+                    print(f"The script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
                 else:
-                    print(f"The script with checksum '{sha256sum}' seems already installed")        
+                    print(f"The script with checksum '{sha256sum}' is already installed")        
         if len(scripts_to_repeat) == 0:
             print(f"No repeatable scripts found to (re)install.")       
             return
@@ -319,7 +319,7 @@ class UpdateCommand (BaseCommand):
                     cur.execute("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", (sha256sum, str(relative_script_path)))       
                     cur.execute("COMMIT")
                     print(f"Committed transaction.")
-        print(f"Repeatable scripts were applied.")       
+        print(f"The repeatable scripts were applied.")       
 
     def run(self):
         if not self.check_if_schema_exists():
