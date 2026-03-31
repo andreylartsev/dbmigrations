@@ -158,6 +158,19 @@ class BaseCommand:
             raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not corresponds to the latest version in versioned scripts '{latest_version_in_scripts}'")
         print(f"Completed.")
 
+    def do_initial_cross_checks(self):
+        self.scripts_dir = pathlib.Path(self.args.scripts_path)        
+        if not self.scripts_dir.exists():
+            raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
+        self.check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(self.scripts_dir)
+        if not self.check_if_schema_exists():
+            raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
+        self.set_session_search_path()     
+        if not self.check_if_version_table_exists("dbmigration_versions"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
+        if not self.check_if_version_table_exists("dbmigration_repeatable"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
+
     def __init__(self, config, subparsers, command_name, command_help):        
         DBCONNECTION = 'dbconnection'
         try:        
@@ -232,7 +245,7 @@ class UpdateCommand (BaseCommand):
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path {baseline_dir} does not include {BASELINE_DIR_NAME} subdirectory. Skip running the baseline scripts.")
+            print(f"The scripts path '{baseline_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. Skip running the baseline scripts.")
             return
         if self.check_if_version_table_include_baseline_version():
             print(f"The target schema already has the baseline version installed. Skip running the baseline scripts.")
@@ -251,7 +264,7 @@ class UpdateCommand (BaseCommand):
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path {versioned_dir} does not include {VERSIONED_DIR_NAME} subdirectory. Skip running the versioned scrips")
+            print(f"The scripts path '{versioned_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory. Skip running the versioned scrips")
             return
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if len(versioned_subdirs) == 0:
@@ -278,7 +291,7 @@ class UpdateCommand (BaseCommand):
     def apply_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path {repeatable_dir} does not include {REPEATABLE_DIR_NAME} subdirectory. Skip running the repeatable updates")
+            print(f"The scripts path '{repeatable_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory. Skip running the repeatable updates")
             return
         print(f"Check repeatable scripts...")       
         target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
@@ -322,29 +335,102 @@ class UpdateCommand (BaseCommand):
         print(f"The repeatable scripts were applied.")       
 
     def run(self):
-        if not self.check_if_schema_exists():
-            raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
-        self.set_session_search_path()     
-        if not self.check_if_version_table_exists("dbmigration_versions"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
-        if not self.check_if_version_table_exists("dbmigration_repeatable"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
-        scripts_dir = pathlib.Path(self.args.scripts_path)        
-        if not scripts_dir.exists():
-            raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
-        print(f"Performing updates from scripts repository: '{scripts_dir}'")
-        self.check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(scripts_dir)
-        self.apply_baseline_scripts(scripts_dir)
-        self.apply_versioned_scripts(scripts_dir)
-        self.apply_repeatable_scripts(scripts_dir)
+        self.do_initial_cross_checks()
+        print(f"Performing updates from scripts repository: '{self.scripts_dir}'")
+        self.apply_baseline_scripts(self.scripts_dir)
+        self.apply_versioned_scripts(self.scripts_dir)
+        self.apply_repeatable_scripts(self.scripts_dir)
         print(f"Updated.")
 
 class VerifyCommand (BaseCommand):
     """Verifies target schema and lists versioned and repeatable scripts to be applied within"""
+    
+    def get_baseline_version_installed(self):
+        sql = """
+                SELECT version_id FROM dbmigration_versions WHERE is_baseline IS TRUE ORDER BY version_id DESC LIMIT 1"""
+        value = self.dbconn_get_single_value(sql, [])
+        return value
+
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
+        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
+
+    def verify_baseline_scripts(self, scripts_dir):
+        baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
+        if not baseline_dir.exists():
+            print(f"The scripts path '{baseline_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
+            return
+        if self.check_if_version_table_include_baseline_version():
+            installed_baseline_version = self.get_baseline_version_installed()
+            print(f"The target schema has the baseline version installed: {installed_baseline_version}")
+            return
+        baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
+        if len(baseline_subdirs) != 1:
+            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with the baseline scripts but {len(baseline_subdirs)} was found")
+        baseline_version_subdir = baseline_subdirs[0]
+        print(f"The baseline scripts to install: ")       
+        scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
+        for item in scripts_sorted:
+            print(f"[{item}]")
+    
+    def verify_versioned_scripts(self, scripts_dir):
+        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
+        if not versioned_dir.exists():
+            print(f"The scripts path '{versioned_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
+            return
+        versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
+        if len(versioned_subdirs) == 0:
+            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
+        latest_installed_version = None 
+        newer_version_subdirs = []
+        try:
+            latest_installed_version = self.get_latest_version_installed()
+            newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
+        except CommandError:
+            newer_version_subdirs = versioned_subdirs
+
+        if len(newer_version_subdirs) == 0:
+            print(f"The latest version installed is {latest_installed_version}. No newer scripts were found for installation.")       
+            return
+        newer_version_subdirs_sorted = sorted(newer_version_subdirs)
+        print(f"The versioned scripts to install: ")    
+        for script_version_dir in newer_version_subdirs_sorted:        
+            scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
+            if len(scripts_sorted) == 0:
+                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
+            for item in scripts_sorted:
+                print(f"[{item}]")
+            
+    def verify_repeatable_scripts(self, scripts_dir):
+        repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
+        if not repeatable_dir.exists():
+            print(f"The scripts path '{repeatable_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
+            return
+        target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
+        if not target_version_file_path.exists():
+            raise CommandError(f"The file with target version '{REPEATABLE_SCRIPTS_TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
+        target_version = read_as_trimmed_string(target_version_file_path)
+        repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
+        print(f"The target version for repeatable scripts is {target_version}.")
+        scripts_to_repeat = []
+        for script_path in repeatable_scripts_sorted:
+            with open(script_path, 'rb') as f:
+                script_text = f.read()
+                sha256sum = get_sha256sum_for_bytes(script_text)
+                if not self.check_if_repeatable_script_installed(sha256sum):
+                    scripts_to_repeat.append(script_path)
+        if len(scripts_to_repeat) == 0:
+            print(f"No any new repeatable scripts were found for installation")
+            return
+        print(f"The repeatable scripts to (re)install: ")
+        for item in scripts_to_repeat:
+            print(f"[{item}]")
+
     def run(self):
-        print(f"Not implemented yet")
+        self.do_initial_cross_checks()
+        self.verify_baseline_scripts(self.scripts_dir)
+        self.verify_versioned_scripts(self.scripts_dir)
+        self.verify_repeatable_scripts(self.scripts_dir)
 
 class InitCommand (BaseCommand):
     """Creates version control tables in the empty database schema"""
