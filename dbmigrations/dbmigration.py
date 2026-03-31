@@ -9,7 +9,7 @@ import pathlib
 import hashlib
 
 #
-# prerequired packages listed in requirements.txt
+# prerequire packages listed in requirements.txt
 # 
 # Use pip to install all required packages
 #  
@@ -89,6 +89,74 @@ class BaseCommand:
             SET search_path TO {self.args.schema_name}, public"""
         self.dbconn_exec_with_no_result(sql, [])
 
+    def check_if_version_table_exists(self, table_name):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = %s)"""
+        value = self.dbconn_get_single_value(sql, (self.args.schema_name, table_name))
+        if value is None:
+            raise CommandError(f"Unable to check whether table {table_name} exists in target schema")
+        return value
+    def check_if_version_table_include_baseline_version(self):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM dbmigration_versions
+                WHERE is_baseline IS TRUE)"""
+        value = self.dbconn_get_single_value(sql, [])
+        if value is None:
+            raise CommandError(f"Unable to check whether the baseline scripts were applied in the target schema")
+        return value
+    
+    def get_latest_version_installed(self):
+        sql = """
+            SELECT MAX(version_id) FROM dbmigration_versions"""
+        value = self.dbconn_get_single_value(sql, [])
+        if value is None:
+            raise CommandError(f"Unable to get latest installed version")
+        return value
+
+    def check_if_repeatable_script_installed(self, sha256sum):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1
+                FROM dbmigration_repeatable
+                WHERE sha256sum = %s)"""        
+        value = self.dbconn_get_single_value(sql, (sha256sum,))
+        if value is None:
+            raise CommandError(f"Unable to check if repeatable script was installed")
+        return value
+
+    def check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(self, scripts_dir):
+        print(f"A cross-check for consistency is performed between the target version's repeatable scripts, and the versioned scripts in: {scripts_dir}")
+        latest_version_in_scripts = None
+        baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
+        if baseline_dir.exists():
+            baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
+            if len(baseline_subdirs) == 1:
+                baseline_version_subdir = baseline_subdirs[0]
+                latest_version_in_scripts = baseline_version_subdir.name
+        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
+        if versioned_dir.exists():
+            for item in versioned_dir.iterdir():
+                if item.is_dir():
+                    if latest_version_in_scripts is None or item.name > latest_version_in_scripts:
+                        latest_version_in_scripts = item.name
+        if latest_version_in_scripts is None:
+            print(f"No either baseline or versioned script updates were found in scripts dir: '{scripts_dir}'")
+            return        
+        target_version_in_repeatable = None
+        repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
+        if repeatable_dir.exists():
+            target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
+            if target_version_file_path.exists():
+                target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
+        if target_version_in_repeatable is None:
+            print(f"No any repeatable scripts were found in scripts dir: '{scripts_dir}'")
+            return 
+        if latest_version_in_scripts != target_version_in_repeatable:
+            raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not corresponds to the latest version in versioned scripts '{latest_version_in_scripts}'")
+        print(f"Completed.")
 
     def __init__(self, config, subparsers, command_name, command_help):        
         DBCONNECTION = 'dbconnection'
@@ -143,44 +211,6 @@ class BaseCommand:
 class UpdateCommand (BaseCommand):
     """Applies baseline, versioned and repeatable scripts within target database schema"""
 
-    def check_if_version_table_exists(self, table_name):
-        sql = """
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = %s)"""
-        value = self.dbconn_get_single_value(sql, (self.args.schema_name, table_name))
-        if value is None:
-            raise CommandError(f"Unable to check whether table {table_name} exists in target schema")
-        return value
-    def check_if_version_table_include_baseline_version(self):
-        sql = """
-            SELECT EXISTS (
-                SELECT 1
-                FROM dbmigration_versions
-                WHERE is_baseline IS TRUE)"""
-        value = self.dbconn_get_single_value(sql, [])
-        if value is None:
-            raise CommandError(f"Unable to check whether the baseline scripts were applied in the target schema")
-        return value
-    
-    def get_latest_version_installed(self):
-        sql = """
-            SELECT MAX(version_id) FROM dbmigration_versions"""
-        value = self.dbconn_get_single_value(sql, [])
-        if value is None:
-            raise CommandError(f"Unable to get latest installed version")
-        return value
-
-    def check_if_repeatable_script_installed(self, sha256sum):
-        sql = """
-            SELECT EXISTS (
-                SELECT 1
-                FROM dbmigration_repeatable
-                WHERE sha256sum = %s)"""        
-        value = self.dbconn_get_single_value(sql, (sha256sum,))
-        if value is None:
-            raise CommandError(f"Unable to check if repeatable script was installed")
-        return value
-
     def run_versioned_scripts_in_tran(self, version, is_baseline, scripts):
          with self.dbconn.cursor() as cur:
             cur.execute("BEGIN")
@@ -194,36 +224,6 @@ class UpdateCommand (BaseCommand):
             cur.execute("COMMIT")       
             print(f"Committed transaction")
 
-    def check_if_max_version_versioned_scripts_corresponds_to_repeatable_target(self, scripts_dir):
-        print(f"A cross-check for consistency is performed between the target version's repeatable scripts, and the versioned scripts in: {scripts_dir}")
-        latest_version_in_scripts = None
-        baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
-        if baseline_dir.exists():
-            baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
-            if len(baseline_subdirs) == 1:
-                baseline_version_subdir = baseline_subdirs[0]
-                latest_version_in_scripts = baseline_version_subdir.name
-        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
-        if versioned_dir.exists():
-            for item in versioned_dir.iterdir():
-                if item.is_dir():
-                    if latest_version_in_scripts is None or item.name > latest_version_in_scripts:
-                        latest_version_in_scripts = item.name
-        if latest_version_in_scripts is None:
-            print(f"No either baseline or versioned script updates found in scripts dir: {scripts_dir}")
-            return        
-        target_version_in_repeatable = None
-        repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
-        if repeatable_dir.exists():
-            target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
-            if target_version_file_path.exists():
-                target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
-        if target_version_in_repeatable is None:
-            print(f"No repeatable scripts found in scripts dir: {scripts_dir}")
-            return 
-        if latest_version_in_scripts != target_version_in_repeatable:
-            raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not corresponds to latest version in versioned scripts '{latest_version_in_scripts}'")
-        print(f"Completed.")
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
@@ -267,12 +267,12 @@ class UpdateCommand (BaseCommand):
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
         print(f"{len(newer_version_subdirs)} new versions were found for installation.")       
         print(f"Apply versioned scripts...")
-        for script_verion_dir in newer_version_subdirs_sorted:        
-            verion_id = script_verion_dir.name
-            scripts_sorted = walk_through_dir_sorted(script_verion_dir, SQL_SCRIPTS_RGLOB_FILTER)
+        for script_version_dir in newer_version_subdirs_sorted:        
+            version_id = script_version_dir.name
+            scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
             if len(scripts_sorted) == 0:
-                raise CommandError(f"The scripts subdirectory '{script_verion_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
-            self.run_versioned_scripts_in_tran(verion_id, False, scripts_sorted)       
+                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
+            self.run_versioned_scripts_in_tran(version_id, False, scripts_sorted)       
         print(f"The versioned scripts were applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
@@ -287,13 +287,13 @@ class UpdateCommand (BaseCommand):
         target_version = read_as_trimmed_string(target_version_file_path)
         latest_installed_version = self.get_latest_version_installed() 
         if latest_installed_version != target_version:
-            raise CommandError(f"The target version {target_version} for repeatable scripts does not corresponds to latest installed version {latest_installed_version}.")                  
-        print(f"The target version corresonds to the latest installed version '{target_version}'")
+            raise CommandError(f"The target version {target_version} for repeatable scripts does not corresponds to the latest installed version {latest_installed_version}.")                  
+        print(f"The target version corresponds to the latest installed version '{target_version}'")
         repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
-                print(f"Checking script '{script_path}' checksum...")
+                print(f"Checking the script '{script_path}' checksum...")
                 script_text = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_text)
                 if not self.check_if_repeatable_script_installed(sha256sum):
@@ -304,7 +304,7 @@ class UpdateCommand (BaseCommand):
         if len(scripts_to_repeat) == 0:
             print(f"No repeatable scripts found to (re)install.")       
             return
-        print(f"Found {len(scripts_to_repeat)} scripts to repeat")
+        print(f"{len(scripts_to_repeat)} scripts were found to repeat")
         print(f"Apply repeatable scripts...")       
         with self.dbconn.cursor() as cur:
             for script_path in scripts_to_repeat:
@@ -340,7 +340,7 @@ class UpdateCommand (BaseCommand):
         print(f"Updated.")
 
 class VerifyCommand (BaseCommand):
-    """Verifies target schema and lists versioned and repatable scripts to be applied within"""
+    """Verifies target schema and lists versioned and repeatable scripts to be applied within"""
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
     def run(self):
