@@ -246,7 +246,7 @@ class UpdateCommand (BaseCommand):
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path '{baseline_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. Skip running the baseline scripts.")
+            print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. Skip running the baseline scripts.")
             return
         if self.check_if_version_table_include_baseline_version():
             print(f"The target schema already has the baseline version installed. Skip running the baseline scripts.")
@@ -265,7 +265,7 @@ class UpdateCommand (BaseCommand):
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path '{versioned_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory. Skip running the versioned scrips")
+            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory. Skip running the versioned scrips")
             return
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if len(versioned_subdirs) == 0:
@@ -292,7 +292,7 @@ class UpdateCommand (BaseCommand):
     def apply_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path '{repeatable_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory. Skip running the repeatable updates")
+            print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory. Skip running the repeatable updates")
             return
         print(f"Check repeatable scripts...")       
         target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
@@ -377,7 +377,7 @@ class VerifyCommand (BaseCommand):
     def verify_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path '{baseline_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
+            print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
             return
         if self.check_if_version_table_include_baseline_version():
             installed_baseline_version = self.get_baseline_version_installed()
@@ -395,7 +395,7 @@ class VerifyCommand (BaseCommand):
     def verify_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path '{versioned_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
             return
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if len(versioned_subdirs) == 0:
@@ -427,7 +427,7 @@ class VerifyCommand (BaseCommand):
     def verify_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path '{repeatable_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
+            print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
         target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
