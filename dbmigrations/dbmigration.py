@@ -69,6 +69,10 @@ def read_as_trimmed_string(file_path):
         trimmed_str = str.strip()
         return trimmed_str
 
+def escape_str_for_sql(str):
+    # TBD
+    return str
+
 class BaseCommand:
     def dbconn_get_single_value(self, sql, params):
         with self.dbconn.cursor() as cur:
@@ -390,14 +394,42 @@ class VerifyCommand (BaseCommand):
         elif latest_version_in_scripts <= latest_installed_version:
             if target_version != latest_installed_version:
                 raise CommandError(f"The target version '{target_version}' does not match to the latest installed version '{latest_installed_version}'.")
-
+    
+    def check_if_target_script_file_path_accessible_for_write(self, script_path):
+        path = pathlib.Path(script_path)
+        try:
+            path.touch(exist_ok=False)
+            path.unlink()
+        except FileExistsError as e:
+            raise CommandError(f"The specified script file '{script_path}' already exists")
+        except Exception as e:
+            raise CommandError(f"The specified script file '{script_path}' is not accessible for write")
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
+        self.parser.add_argument("--build-update-script", type=str, default=None, help="update script path")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.latest_version_in_scripts = None
 
-    def verify_baseline_scripts(self, scripts_dir):
+    def write_baseline_scripts(self, version, scripts, target_script_path):
+        with pathlib.Path(target_script_path).open("a") as target_file:
+            target_file.write(f"-- Baseline scripts version {version}\n")
+            for script_path in scripts:
+                with script_path.open("r") as source_file:
+                    lines = source_file.readlines()
+                    target_file.write(f"-- {script_path}\n")
+                    target_file.write(f"BEGIN;\n")
+                    target_file.writelines(lines)
+                    target_file.write(f"\n")
+                    target_file.write(f"COMMIT;\n")
+            target_file.write(f"BEGIN;\n")
+            #formatted_sql = psycopg.sql.SQL("INERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)\n").format(version)
+            #formatted_sql_text = formatted_sql.as_string(self.dbconn)
+            formatted_sql_text = f"INERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escape_str_for_sql(version)}', TRUE)\n"
+            target_file.write(formatted_sql_text)
+            target_file.write(f"COMMIT;\n")
+
+    def verify_baseline_scripts(self, scripts_dir, target_script_path):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
@@ -414,6 +446,9 @@ class VerifyCommand (BaseCommand):
         scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
         for item in scripts_sorted:
             print(f"[{item}]")
+        if not target_script_path is None:
+            baseline_version = baseline_version_subdir.name
+            self.write_baseline_scripts(baseline_version, scripts_sorted, target_script_path)
     
     def verify_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
@@ -445,7 +480,7 @@ class VerifyCommand (BaseCommand):
             if len(scripts_sorted) == 0:
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
             for item in scripts_sorted:
-                print(f"[{item}]")
+                print(f"[{item}]")    
             
     def verify_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
@@ -483,9 +518,27 @@ class VerifyCommand (BaseCommand):
     def run(self):
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()
-        self.verify_baseline_scripts(self.scripts_dir)
-        self.verify_versioned_scripts(self.scripts_dir)
-        self.verify_repeatable_scripts(self.scripts_dir)
+
+        script_path = None
+        temp_script_path = None
+        if not self.args.build_update_script is None:
+            self.check_if_target_script_file_path_accessible_for_write(self.args.build_update_script)
+            script_path = pathlib.Path(self.args.build_update_script)
+            temp_script_path = script_path.with_suffix(script_path.suffix + ".tmp")       
+        try:            
+            self.verify_baseline_scripts(self.scripts_dir, temp_script_path)
+            self.verify_versioned_scripts(self.scripts_dir)
+            self.verify_repeatable_scripts(self.scripts_dir)
+
+            # finalize writting update script
+            if not temp_script_path is None and not script_path is None and temp_script_path.exists():
+                temp_script_path.replace(script_path)
+        except Exception:
+            if not script_path is None and script_path.exists():
+                script_path.unlink()
+            if not temp_script_path is None and temp_script_path.exists():
+                temp_script_path.unlink()
+            raise
 
 class InitCommand (BaseCommand):
     """Creates version control tables in an empty database schema."""
