@@ -26,12 +26,15 @@ import hashlib
 import psycopg;
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
+DBCONN_CONFIG_GROUP = 'dbconnection'
+OPTIONS_CONFIG_GROUP = "options"
 
 DBCONN_DEFAULT_HOST = 'localhost'
 DBCONN_DEFAULT_PORT = 5432
 DBCONN_DEFAULT_USER = None
 DBCONN_DEFAULT_DBNAME = 'postgres'
 DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
+
 
 BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
@@ -173,16 +176,14 @@ class BaseCommand:
             raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
 
     def __init__(self, config, subparsers, command_name, command_help):        
-        DBCONNECTION = 'dbconnection'
         try:        
-            self.dbconn_settings = config[DBCONNECTION]
+            self.dbconn_settings = config[DBCONN_CONFIG_GROUP]
         except:
-            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{DBCONNECTION}'")
-        OPTIONS = "options"
+            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{DBCONN_CONFIG_GROUP}'")
         try:        
-            self.options = config[OPTIONS]
+            self.options = config[OPTIONS_CONFIG_GROUP]
         except:
-            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{OPTIONS}'")
+            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{OPTIONS_CONFIG_GROUP}'")
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
         self.parser.add_argument("--host", type=str, default=self.dbconn_settings.get("host", DBCONN_DEFAULT_HOST), help="db server host name")
@@ -225,7 +226,24 @@ class BaseCommand:
 class UpdateCommand (BaseCommand):
     """Applies base, versioned, and repeatable scripts to the target database schema."""
 
-    def run_versioned_scripts_in_tran(self, version, is_baseline, scripts):
+    def run_baseline_scripts_each_in_own_tran(self, version, scripts):
+         with self.dbconn.cursor() as cur:
+            for script_path in scripts:
+                with open(script_path, 'rb') as f:
+                    print(f"Running script: '{script_path}'...")
+                    script_text = f.read()
+                    cur.execute("BEGIN")
+                    print(f"Begin transaction")
+                    cur.execute(script_text)                                  
+                    cur.execute("COMMIT")       
+                    print(f"Committed transaction")
+            print(f"Setting the baseline version '{version}'...")
+            cur.execute("BEGIN")
+            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, True))       
+            cur.execute("COMMIT")       
+            print(f"Committed transaction")
+
+    def run_versioned_scripts_in_tran(self, version, scripts):
          with self.dbconn.cursor() as cur:
             cur.execute("BEGIN")
             print(f"Begin transaction")
@@ -234,7 +252,7 @@ class UpdateCommand (BaseCommand):
                     print(f"Running script: '{script_path}'...")
                     script_text = f.read()
                     cur.execute(script_text)                                  
-            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, is_baseline))       
+            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, False))       
             cur.execute("COMMIT")       
             print(f"Committed transaction")
 
@@ -259,7 +277,7 @@ class UpdateCommand (BaseCommand):
         print(f"The baseline version to install {baseline_version}.")       
         print(f"Apply baseline scripts...")
         scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
-        self.run_versioned_scripts_in_tran(baseline_version, True, scripts_sorted)
+        self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)
         print(f"The baseline scripts were applied.")       
 
     def apply_versioned_scripts(self, scripts_dir):
@@ -286,7 +304,7 @@ class UpdateCommand (BaseCommand):
             scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
             if len(scripts_sorted) == 0:
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
-            self.run_versioned_scripts_in_tran(version_id, False, scripts_sorted)       
+            self.run_versioned_scripts_in_tran(version_id, scripts_sorted)       
         print(f"The versioned scripts were applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
@@ -346,6 +364,11 @@ class UpdateCommand (BaseCommand):
 class VerifyCommand (BaseCommand):
     """Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."""
     
+    def make_dbconn_session_readonly(self):
+        sql = """
+            SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"""
+        self.dbconn_exec_with_no_result(sql, [])
+
     def get_baseline_version_installed(self):
         sql = """
                 SELECT version_id FROM dbmigration_versions WHERE is_baseline IS TRUE ORDER BY version_id DESC LIMIT 1"""
@@ -458,6 +481,7 @@ class VerifyCommand (BaseCommand):
             print(f"[{item}]")
 
     def run(self):
+        self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()
         self.verify_baseline_scripts(self.scripts_dir)
         self.verify_versioned_scripts(self.scripts_dir)
