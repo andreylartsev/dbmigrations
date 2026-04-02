@@ -65,3 +65,14 @@ PS C:\Users\andrey.larcev\Projects\dbmigrations> .\.venv\Scripts\Activate.ps1
 
 ```
 
+## Sample DDL/DML scripts
+
+The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts repositories and you can try the tool with them:
+
+- [test1](./dbmigrations/samples/test1) - included baseline, versioned and repeatable scripts
+  - baseline/V000 - should create the table t1 and insert one record  
+  - versions/V001 - should create the table t2 and insert one record 
+  - repeatable/ - includes the script that should drop/create view on the table t1 
+- [test1_empty_version](./dbmigrations/samples/test1_empty_version) - tests that empty versions are not allowed
+- [test1_only_repeatable](./dbmigrations/samples/test1_only_repeatable) - shows that baseline and versioned scripts are not necessary if you specified target version in the target_version.txt file 
+- and so on 
