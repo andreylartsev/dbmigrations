@@ -41,6 +41,7 @@ VERSIONED_DIR_NAME = "versions"
 REPEATABLE_DIR_NAME = "repeatable"
 REPEATABLE_SCRIPTS_TARGET_VERSION_FILE = "target_version.txt"
 SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
+SCRIPT_LIST_FILE_NAME = "script_list.txt"
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -51,9 +52,26 @@ def walk_through_dir_sorted(dir, rglob_filter):
     start_path = pathlib.Path(dir) 
     if not start_path.exists():
         raise CommandError(f"The folder '{dir}' does not exists")
-    all_items = start_path.rglob(rglob_filter)
-    files = [item for item in all_items if item.is_file()]
-    sorted_files = sorted(files)
+    if not start_path.is_dir():
+        raise CommandError(f"The path '{dir}' is not a directory")        
+    script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
+    sorted_files = []
+    if script_list_file_path.exists():
+        sorted_files = []
+        with script_list_file_path.open("r") as script_list_file:
+            lines = script_list_file.readlines()
+            for line in lines:
+                trimmed_str = line.strip()
+                script_path = start_path.joinpath(trimmed_str)
+                if not script_path.exists():
+                    raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
+                if not script_path.is_file():
+                    raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file") 
+                sorted_files.append(script_path)
+    else:
+        all_items = start_path.rglob(rglob_filter)
+        files = [item for item in all_items if item.is_file()]
+        sorted_files = sorted(files)
     return sorted_files
 
 def get_sha256sum_for_bytes(script_bytes):
@@ -412,8 +430,9 @@ class VerifyCommand (BaseCommand):
         self.latest_version_in_scripts = None
 
     def write_baseline_scripts(self, version, scripts, target_script_path):
+        escaped_version_id = escape_str_for_sql(version)
         with pathlib.Path(target_script_path).open("a") as target_file:
-            target_file.write(f"-- Baseline scripts version {version}\n")
+            target_file.write(f"-- Baseline scripts for version '{escaped_version_id}'\n")
             for script_path in scripts:
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
@@ -425,7 +444,7 @@ class VerifyCommand (BaseCommand):
             target_file.write(f"BEGIN;\n")
             #formatted_sql = psycopg.sql.SQL("INERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)\n").format(version)
             #formatted_sql_text = formatted_sql.as_string(self.dbconn)
-            formatted_sql_text = f"INERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escape_str_for_sql(version)}', TRUE)\n"
+            formatted_sql_text = f"INERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', TRUE)\n"
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
@@ -450,7 +469,22 @@ class VerifyCommand (BaseCommand):
             baseline_version = baseline_version_subdir.name
             self.write_baseline_scripts(baseline_version, scripts_sorted, target_script_path)
     
-    def verify_versioned_scripts(self, scripts_dir):
+    def write_versioned_scripts(self, version, scripts, target_script_path):
+        escaped_version_id = escape_str_for_sql(version)
+        with pathlib.Path(target_script_path).open("a") as target_file:
+            target_file.write(f"-- Versioned scripts for version '{escaped_version_id}'\n")
+            target_file.write(f"BEGIN;\n")
+            for script_path in scripts:
+                with script_path.open("r") as source_file:
+                    lines = source_file.readlines()
+                    target_file.write(f"-- {script_path}\n")
+                    target_file.writelines(lines)
+                    target_file.write(f"\n")
+            formatted_sql_text = f"INERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', TRUE)\n"
+            target_file.write(formatted_sql_text)
+            target_file.write(f"COMMIT;\n")
+
+    def verify_versioned_scripts(self, scripts_dir, taget_script_path):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
@@ -475,12 +509,15 @@ class VerifyCommand (BaseCommand):
         self.latest_version_in_scripts = newer_version_subdirs_sorted[-1].name
         
         print(f"The versioned scripts to install: ")    
-        for script_version_dir in newer_version_subdirs_sorted:        
+        for script_version_dir in newer_version_subdirs_sorted:    
             scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
             if len(scripts_sorted) == 0:
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
             for item in scripts_sorted:
-                print(f"[{item}]")    
+                print(f"[{item}]")
+            if not taget_script_path is None:
+                version_id = script_version_dir.name
+                self.write_versioned_scripts(version_id, scripts_sorted, taget_script_path)   
             
     def verify_repeatable_scripts(self, scripts_dir):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
@@ -527,7 +564,7 @@ class VerifyCommand (BaseCommand):
             temp_script_path = script_path.with_suffix(script_path.suffix + ".tmp")       
         try:            
             self.verify_baseline_scripts(self.scripts_dir, temp_script_path)
-            self.verify_versioned_scripts(self.scripts_dir)
+            self.verify_versioned_scripts(self.scripts_dir, temp_script_path)
             self.verify_repeatable_scripts(self.scripts_dir)
 
             # finalize writting update script

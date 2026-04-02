@@ -1,0 +1,2 @@
+./00_create_t2.sql
+./01_insert_into_t2.sql
