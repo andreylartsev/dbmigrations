@@ -21,8 +21,9 @@
   - explicit transaction management; 
   - database version control code;
   - interception and logging of execution errors;
-  - defined the process of db changes to reduce the likelihood of shooting yourself in the foot.
-- Add additional features: checking which scripts will be applied, generating DDL/DML scripts for DB administrator review.
+- Additional features should simplify the life: 
+  - checking which scripts will be applied, generating DDL/DML scripts for DB administrator review.
+- The defined process of db changes reduce the likelihood of shooting yourself in the foot.
 
 In the end it is a sort of sample implementation that could be forked and customized for your needs
 
