@@ -15,6 +15,8 @@
 - Ability to generate an SQL script for use on a specific database for preliminary code review;
 - Ability to use baseline scripts from the production environment (after anonymization, of course);
 
+More you can find the [docs folder](./doc) 
+
 ## Why we need a tool?
 - Why do you need a tool? Why not just embed the version control into the scripts themselves and deploy scripts them with a .bat/.ps/.sh file?
 - A tool is necessary to simplify DDL/DML scripts themselves and remove from them the boilerplate code like the following: 
@@ -27,7 +29,7 @@
 
 In the end it is a sort of sample implementation that could be forked and customized for your needs
 
-## Supported commands:
+## Supported subcommands:
 ```
 (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py
 usage: dbmigration.py [-h] {update,verify,init} ...
