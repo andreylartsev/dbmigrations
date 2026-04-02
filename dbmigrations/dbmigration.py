@@ -518,8 +518,25 @@ class VerifyCommand (BaseCommand):
             if not taget_script_path is None:
                 version_id = script_version_dir.name
                 self.write_versioned_scripts(version_id, scripts_sorted, taget_script_path)   
-            
-    def verify_repeatable_scripts(self, scripts_dir):
+
+    def write_repeatable_scripts(self, target_version, scripts_dict, target_script_path):
+        escaped_version_id = escape_str_for_sql(target_version)
+        with pathlib.Path(target_script_path).open("a") as target_file:
+            target_file.write(f"-- Repeatable scripts for version '{escaped_version_id}'\n")
+            for sha256sum, script_path in scripts_dict.items():
+                with script_path.open("r") as source_file:
+                    lines = source_file.readlines()
+                    target_file.write(f"-- {script_path}\n")
+                    target_file.write(f"BEGIN;\n")
+                    target_file.writelines(lines)
+                    target_file.write(f"\n")
+                    escaped_relative_path = escape_str_for_sql(script_path)
+                    escpaed_sha256sum = escape_str_for_sql(sha256sum)
+                    formatted_sql_text = f"INERT INTO dbmigration_repatable (sha256sum, relative_path) VALUES ('{escpaed_sha256sum}', '{escaped_relative_path}')\n"
+                    target_file.write(formatted_sql_text)
+                    target_file.write(f"COMMIT;\n")
+
+    def verify_repeatable_scripts(self, scripts_dir, target_script_path):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
@@ -539,18 +556,23 @@ class VerifyCommand (BaseCommand):
         repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
+        scripts_to_repeat_dict = {}
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 script_text = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_text)
                 if not self.check_if_repeatable_script_installed(sha256sum):
                     scripts_to_repeat.append(script_path)
+                    if not target_script_path is None:
+                        scripts_to_repeat_dict[sha256sum] = script_path
         if len(scripts_to_repeat) == 0:
             print(f"No any new repeatable scripts were found for installation")
             return
         print(f"The repeatable scripts to (re)install: ")
         for item in scripts_to_repeat:
             print(f"[{item}]")
+        if not target_script_path is None:
+            self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, target_script_path)
 
     def run(self):
         self.make_dbconn_session_readonly()
@@ -565,11 +587,16 @@ class VerifyCommand (BaseCommand):
         try:            
             self.verify_baseline_scripts(self.scripts_dir, temp_script_path)
             self.verify_versioned_scripts(self.scripts_dir, temp_script_path)
-            self.verify_repeatable_scripts(self.scripts_dir)
+            self.verify_repeatable_scripts(self.scripts_dir, temp_script_path)
 
             # finalize writting update script
-            if not temp_script_path is None and not script_path is None and temp_script_path.exists():
-                temp_script_path.replace(script_path)
+            if not temp_script_path is None:
+                if temp_script_path.exists():
+                    temp_script_path.replace(script_path)
+                    print(f"The update script is written to '{script_path}'.")
+                else:
+                    print(f"Nothing to write to update script '{script_path}'")
+                
         except Exception:
             if not script_path is None and script_path.exists():
                 script_path.unlink()
