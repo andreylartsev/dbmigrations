@@ -429,6 +429,11 @@ class VerifyCommand (BaseCommand):
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.latest_version_in_scripts = None
 
+    def write_search_path(self, schema_name, target_script_path):
+        with pathlib.Path(target_script_path).open("a") as target_file:
+            escaped_schema_name = escape_str_for_sql(schema_name)
+            target_file.write(f"SET search_path TO {escaped_schema_name}, public;\n")    
+
     def write_baseline_scripts(self, version, scripts, target_script_path):
         escaped_version_id = escape_str_for_sql(version)
         with pathlib.Path(target_script_path).open("a") as target_file:
@@ -442,9 +447,9 @@ class VerifyCommand (BaseCommand):
                     target_file.write(f"\n")
                     target_file.write(f"COMMIT;\n")
             target_file.write(f"BEGIN;\n")
-            #formatted_sql = psycopg.sql.SQL("INERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)\n").format(version)
+            #formatted_sql = psycopg.sql.SQL("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)\n").format(version)
             #formatted_sql_text = formatted_sql.as_string(self.dbconn)
-            formatted_sql_text = f"INERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', TRUE)\n"
+            formatted_sql_text = f"INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', TRUE);\n"
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
@@ -480,7 +485,7 @@ class VerifyCommand (BaseCommand):
                     target_file.write(f"-- {script_path}\n")
                     target_file.writelines(lines)
                     target_file.write(f"\n")
-            formatted_sql_text = f"INERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', TRUE)\n"
+            formatted_sql_text = f"INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', FALSE);\n"
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
@@ -532,7 +537,7 @@ class VerifyCommand (BaseCommand):
                     target_file.write(f"\n")
                     escaped_relative_path = escape_str_for_sql(script_path)
                     escpaed_sha256sum = escape_str_for_sql(sha256sum)
-                    formatted_sql_text = f"INERT INTO dbmigration_repatable (sha256sum, relative_path) VALUES ('{escpaed_sha256sum}', '{escaped_relative_path}')\n"
+                    formatted_sql_text = f"INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ('{escpaed_sha256sum}', '{escaped_relative_path}');\n"
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
 
@@ -583,7 +588,8 @@ class VerifyCommand (BaseCommand):
         if not self.args.build_update_script is None:
             self.check_if_target_script_file_path_accessible_for_write(self.args.build_update_script)
             script_path = pathlib.Path(self.args.build_update_script)
-            temp_script_path = script_path.with_suffix(script_path.suffix + ".tmp")       
+            temp_script_path = script_path.with_suffix(script_path.suffix + ".tmp")
+            self.write_search_path(self.args.schema_name, temp_script_path)      
         try:            
             self.verify_baseline_scripts(self.scripts_dir, temp_script_path)
             self.verify_versioned_scripts(self.scripts_dir, temp_script_path)
