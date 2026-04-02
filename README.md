@@ -139,37 +139,38 @@ The first argument is a command name __init__ and second argument is a schema na
 
 4. Now we can try find results of tool working:
 
-  Try connect to database using __psql__ and execute following commands:
-    ```
-    > SET search_path TO test, public;
+Try connect to database using __psql__ and execute following commands:
 
-    > SELECT * FROM dbmigration_versions;
-    version_id|is_baseline|created_at                   |created_by|created_from|
-    ----------+-----------+-----------------------------+----------+------------+
-    V000      |true       |2026-04-03 00:36:58.643 +0300|postgres  |172.17.0.1  |
-    V001      |false      |2026-04-03 00:36:58.651 +0300|postgres  |172.17.0.1  |
+```
+  > SET search_path TO test, public;
 
-    > SELECT * FROM dbmigration_repeatable;
+  > SELECT * FROM dbmigration_versions;
+  version_id|is_baseline|created_at                   |created_by|created_from|
+  ----------+-----------+-----------------------------+----------+------------+
+  V000      |true       |2026-04-03 00:36:58.643 +0300|postgres  |172.17.0.1  |
+  V001      |false      |2026-04-03 00:36:58.651 +0300|postgres  |172.17.0.1  |
 
-    sha256sum                                                       |relative_path                          |created_at                   |created_by|created_from|
-    ----------------------------------------------------------------+---------------------------------------+-----------------------------+----------+------------+
-    90de5d9254461944fab716771b3c6c29fc9b57c924e23dc1e67f2bcb31024a93|repeatable\00_create_view_latest_t1.sql|2026-04-03 00:36:58.681 +0300|postgres  |172.17.0.1  |
+  > SELECT * FROM dbmigration_repeatable;
 
-    > SELECT * FROM t1;
+  sha256sum                                                       |relative_path                          |created_at                   |created_by|created_from|
+  ----------------------------------------------------------------+---------------------------------------+-----------------------------+----------+------------+
+  90de5d9254461944fab716771b3c6c29fc9b57c924e23dc1e67f2bcb31024a93|repeatable\00_create_view_latest_t1.sql|2026-04-03 00:36:58.681 +0300|postgres  |172.17.0.1  |
 
-    v1|
-    --+
-    1|
-    2|
+  > SELECT * FROM t1;
 
-    > SELECT * FROM t2;
+  v1|
+  --+
+  1|
+  2|
 
-    kk|created_at                   |
-    --+-----------------------------+
-    1 |2026-04-03 00:36:58.651 +0300|
-    2 |2026-04-03 00:36:58.651 +0300|
+  > SELECT * FROM t2;
 
-    ```
+  kk|created_at                   |
+  --+-----------------------------+
+  1 |2026-04-03 00:36:58.651 +0300|
+  2 |2026-04-03 00:36:58.651 +0300|
+
+  ```
 
 ## The tool subcommands supported the following additional parameters
 
