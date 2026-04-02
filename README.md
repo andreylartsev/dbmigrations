@@ -15,8 +15,6 @@
 - Ability to generate an SQL script for use on a specific database for preliminary code review;
 - Ability to use baseline scripts from the production environment (after anonymization, of course);
 
-More you can find the [docs folder](./doc) 
-
 ## Why we need a tool?
 - Why do you need a tool? Why not just embed the version control into the scripts themselves and deploy scripts them with a .bat/.ps/.sh file?
 - A tool is necessary to simplify DDL/DML scripts themselves and remove from them the boilerplate code like the following: 
@@ -29,9 +27,11 @@ More you can find the [docs folder](./doc)
 
 In the end it is a sort of sample implementation that could be forked and customized for your needs
 
-## Supported subcommands:
+More you can find the [docs folder](./doc) 
+
+## The best way to learn about the functionality of a tool is to call the embedded "help" subcommand:
 ```
-(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py --help
 usage: dbmigration.py [-h] {update,verify,init} ...
 
 Simple database migrations tool
@@ -47,14 +47,13 @@ options:
   -h, --help            show this help message and exit
 ```
 
+To try use it you'll need install __python 3.11+__ (mostly because of __tomllib__ package using for parsing configuration) + __psycopg__ package with its dependencies.  
+The easiest way to install dependencies w/o affect on the whole system is to create virtual python environment. 
+
 ## How to create local python environment for installing dependencies:
 
-You'll need python 3.11+ (mostly because of tomllib package using for parsing configuration) + psycopg package with its dependencies.  
-
-All required packages are listed in requirements.txt
+Note: All required packages are listed in requirements.txt
  
-To create the local python environment and install required package you can try the following commands:
-
 ```  
 PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.12.exe -m venv .venv
 PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.12.exe -m pip install --upgrade pip
@@ -76,3 +75,126 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
 - [test1_empty_version](./dbmigrations/samples/test1_empty_version) - tests that empty versions are not allowed
 - [test1_only_repeatable](./dbmigrations/samples/test1_only_repeatable) - shows that baseline and versioned scripts are not necessary if you specified target version in the target_version.txt file 
 - and so on 
+
+## Here is sample tool usage:
+
+1. Before of all it is needed create empty schema. Open up console window run __psql__ command line tool and execute the following DDL command: 
+
+  ```
+  CREATE SCHEMA test1;
+  ```
+
+2. Now you have are ready to initialize schema with version control tables:
+  ```
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py init test1
+  Opened db connection
+  Creating the version control tables...
+  Created.
+  Closed db connection
+  ```
+The first argument is a command name __init__ and second argument is a schema name __test1__. 
+Note that we did not specified neither server host nor database name, this is because these parameters could be taken from [dbmigration.toml](./dbmigrations/dbmigration.tomltoml)
+
+3. Now you have are ready to update target schema with scripts:
+  ```
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py update esbdb .\dbmigrations\samples\test1\
+  Opened db connection
+  Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: dbmigrations\samples\test1
+  Completed.
+  Performing updates from scripts repository: 'dbmigrations\samples\test1'
+  The baseline version to install V000.
+  Apply baseline scripts...
+  Running script: 'dbmigrations\samples\test1\baseline\V000\00_create_t1.sql'...
+  Begin transaction
+  Committed transaction
+  Running script: 'dbmigrations\samples\test1\baseline\V000\01_insert_into_t1.sql'...
+  Begin transaction
+  Committed transaction
+  Setting the baseline version 'V000'...
+  Committed transaction
+  The baseline scripts were applied.
+  The latest installed version is V000.
+  1 new versions were found for installation.
+  Apply versioned scripts...
+  Begin transaction
+  Running script: 'dbmigrations\samples\test1\versions\V001\00_create_t2.sql'...
+  Running script: 'dbmigrations\samples\test1\versions\V001\01_insert_into_t2.sql'...
+  Committed transaction
+  The versioned scripts were applied.
+  Check repeatable scripts...
+  Target version matches the latest installed version 'V001'
+  Checking script 'dbmigrations\samples\test1\repeatable\00_create_view_latest_t1.sql' checksum...
+  Script 'dbmigrations\samples\test1\repeatable\00_create_view_latest_t1.sql' with checksum '90de5d9254461944fab716771b3c6c29fc9b57c924e23dc1e67f2bcb31024a93' will be (re)installed
+  1 scripts were found to repeat
+  Apply repeatable scripts...
+  Running script 'dbmigrations\samples\test1\repeatable\00_create_view_latest_t1.sql'...
+  Begin transaction
+  Committed transaction.
+  The repeatable scripts were applied.
+  Updated.
+  Closed db connection
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations>
+  ```
+The first argument is a command name __init__ and second argument is a schema name __test1__
+
+## The tool subcommands supported the following additional parameters
+
+### __Init__ subcommand help:
+
+```
+.(venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py init --help
+usage: dbmigration.py init [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] schema_name
+
+positional arguments:
+  schema_name        the name of target database schema
+
+options:
+  -h, --help         show this help message and exit
+  --host HOST        db server host name
+  --port PORT        db server port
+  --dbname DBNAME    database name
+  --user USER        user name
+  -n, --no-password  dont ask user password
+```
+
+### __Update__ subcommand help:
+
+```
+.(venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py update --help
+usage: dbmigration.py update [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n]
+                             schema_name scripts_path
+
+positional arguments:
+  schema_name        the name of target database schema
+  scripts_path       source scripts repository path
+
+options:
+  -h, --help         show this help message and exit
+  --host HOST        db server host name
+  --port PORT        db server port
+  --dbname DBNAME    database name
+  --user USER        user name
+  -n, --no-password  dont ask user password
+```
+### __Verify__ subcommand help:
+
+```
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py verify --help
+usage: dbmigration.py verify [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n]
+                             [--build-update-script BUILD_UPDATE_SCRIPT]
+                             schema_name scripts_path
+
+positional arguments:
+  schema_name           the name of target database schema
+  scripts_path          source scripts repository path
+
+options:
+  -h, --help            show this help message and exit
+  --host HOST           db server host name
+  --port PORT           db server port
+  --dbname DBNAME       database name
+  --user USER           user name
+  -n, --no-password     dont ask user password
+  --build-update-script BUILD_UPDATE_SCRIPT
+                        the update script path if you want one as an additional result of the verify command
+```
