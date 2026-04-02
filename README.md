@@ -1,6 +1,32 @@
-# Simple database migrations tool
+# Simple PostgreSQL database migrations tool
 
+## Purpose of the tool:
+- Ability to deploy a database from source code stored in a source code management system (Git);
+- Streamline the delivery of changes in source code to test and production environments;
 
+## Basic requirements:
+- Delivery of changes in source code (database scripts/migrations) to the test environment;
+- Delivery of changes in source code to the production environment;
+- Ability to preserve data in existing databases (don't recreate db when you need apply some changes);
+- Support the following types of changes:
+  - Schema changes (tables, views, stored procedures)
+  - Data changes;
+- Ability to check which changes will be applied to a given database instance;
+- Ability to generate an SQL script for use on a specific database for preliminary code review;
+- Ability to use baseline scripts from the production environment (after anonymization, of course);
+
+## Why we need a tool?
+- Why do you need a tool? Why not just deploy scripts as a batch file and embed version control into the scripts themselves?
+- A tool is necessary to simplify DDL/DML scripts themselves and remove from them the boilerplate code like the following: 
+  - explicit transaction management; 
+  - database version control code;
+  - interception and logging of execution errors;
+  - defined the process of db changes to reduce the likelihood of shooting yourself in the foot.
+- Add additional features: checking which scripts will be applied, generating DDL/DML scripts for DB administrator review.
+
+In the end it is sort of sample implementation that could be forked and customized for your needs
+
+## Supported commands:
 ```
 (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py
 usage: dbmigration.py [-h] {update,verify,init} ...
@@ -18,11 +44,13 @@ options:
   -h, --help            show this help message and exit
 ```
 
-## How to create local python environment for installing dependencies
+## How to create local python environment for installing dependencies:
+
+You'll need python 3.11+ (mostly because of tomllib package using for parsing configuration) + psycopg package with its dependencies.  
 
 All required packages are listed in requirements.txt
  
-Create the local python environment and install required package
+To create the local python environment and install required package you can try the following commands:
 
 ```  
 PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.12.exe -m venv .venv
