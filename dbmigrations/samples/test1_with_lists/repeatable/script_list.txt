@@ -1,1 +1,2 @@
 ./00_create_view_latest_t1.sql
+./50_components/create_view_latest_t2.sql
