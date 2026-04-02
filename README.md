@@ -93,7 +93,7 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
   Closed db connection
   ```
 The first argument is a command name __init__ and second argument is a schema name __test1__. 
-Note that we did not specified neither server host nor database name, this is because these parameters could be taken from [dbmigration.toml](./dbmigrations/dbmigration.tomltoml)
+Note that we did not specified neither server host nor database name, this is because these parameters could be taken from [dbmigration.toml](./dbmigrations/dbmigration.toml)
 
 3. Now you have are ready to update target schema with scripts:
   ```
