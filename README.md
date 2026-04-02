@@ -16,7 +16,7 @@
 - Ability to use baseline scripts from the production environment (after anonymization, of course);
 
 ## Why we need a tool?
-- Why do you need a tool? Why not just deploy scripts as a batch file and embed version control into the scripts themselves?
+- Why do you need a tool? Why not just embed the version control into the scripts themselves and deploy scripts them with a .bat/.ps/.sh file?
 - A tool is necessary to simplify DDL/DML scripts themselves and remove from them the boilerplate code like the following: 
   - explicit transaction management; 
   - database version control code;
@@ -24,7 +24,7 @@
   - defined the process of db changes to reduce the likelihood of shooting yourself in the foot.
 - Add additional features: checking which scripts will be applied, generating DDL/DML scripts for DB administrator review.
 
-In the end it is sort of sample implementation that could be forked and customized for your needs
+In the end it is a sort of sample implementation that could be forked and customized for your needs
 
 ## Supported commands:
 ```
