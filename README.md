@@ -86,6 +86,7 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
 
 2. Now you have are ready to initialize schema with version control tables:
   ```
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> $env:USER_PASSWORD=topsecret123
   (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py init test1
   Opened db connection
   Creating the version control tables...
@@ -93,7 +94,8 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
   Closed db connection
   ```
 The first argument is a command name __init__ and second argument is a schema name __test1__. 
-Note that we did not specified neither server host nor database name, this is because these parameters could be taken from [dbmigration.toml](./dbmigrations/dbmigration.toml)
+Note that we did not specified neither server host nor database name, this is because these parameters could be taken from [dbmigration.toml](./dbmigrations/dbmigration.toml) 
+But the user's password must be passed via environment variable "USER_PASSWORD" like in the example above.
 
 3. Now you have are ready to update target schema with scripts:
   ```
