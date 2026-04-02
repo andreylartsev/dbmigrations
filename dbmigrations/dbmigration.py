@@ -489,7 +489,7 @@ class VerifyCommand (BaseCommand):
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
-    def verify_versioned_scripts(self, scripts_dir, taget_script_path):
+    def verify_versioned_scripts(self, scripts_dir, target_script_path):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
@@ -520,9 +520,9 @@ class VerifyCommand (BaseCommand):
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
             for item in scripts_sorted:
                 print(f"[{item}]")
-            if not taget_script_path is None:
+            if not target_script_path is None:
                 version_id = script_version_dir.name
-                self.write_versioned_scripts(version_id, scripts_sorted, taget_script_path)   
+                self.write_versioned_scripts(version_id, scripts_sorted, target_script_path)   
 
     def write_repeatable_scripts(self, target_version, scripts_dict, target_script_path):
         escaped_version_id = escape_str_for_sql(target_version)
@@ -536,8 +536,8 @@ class VerifyCommand (BaseCommand):
                     target_file.writelines(lines)
                     target_file.write(f"\n")
                     escaped_relative_path = escape_str_for_sql(script_path)
-                    escpaed_sha256sum = escape_str_for_sql(sha256sum)
-                    formatted_sql_text = f"INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ('{escpaed_sha256sum}', '{escaped_relative_path}');\n"
+                    escaped_sha256sum = escape_str_for_sql(sha256sum)
+                    formatted_sql_text = f"INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ('{escaped_sha256sum}', '{escaped_relative_path}');\n"
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
 
@@ -595,7 +595,7 @@ class VerifyCommand (BaseCommand):
             self.verify_versioned_scripts(self.scripts_dir, temp_script_path)
             self.verify_repeatable_scripts(self.scripts_dir, temp_script_path)
 
-            # finalize writting update script
+            # finalize writing update script
             if not temp_script_path is None:
                 if temp_script_path.exists():
                     temp_script_path.replace(script_path)
