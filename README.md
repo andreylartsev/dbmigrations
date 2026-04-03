@@ -236,4 +236,5 @@ options:
                         the update script path if you want one as an additional result of the verify command
 ```
 
-For now it is all. Should you have any questions or suggestions post me a word in on the issues board https://github.com/andreylartsev/dbmigrations/issues/1
+For now it is all and good luck dude in your fight. 
+If you have any questions or suggestions, please post me a comment on the issues board  [Discussion](https://github.com/andreylartsev/dbmigrations/issues/1)
