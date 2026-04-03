@@ -656,13 +656,22 @@ class InitCommand (BaseCommand):
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "init", InitCommand.__doc__)
+        self.parser.add_argument("--force-init",  action="store_true", default=False, help="Force create version control tables even on non empty schema")
 
     def run(self):
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
+        self.set_session_search_path()
+        
         if not self.check_if_schema_is_empty():
-            raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
-        self.set_session_search_path()        
+            if not self.args.force_init:
+                raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
+            if self.check_if_version_table_exists("dbmigration_versions"):
+                raise CommandError(f"The version control table 'dbmigration_versions' already exists")
+            if self.check_if_version_table_exists("dbmigration_versions"):
+                raise CommandError(f"The version control table 'dbmigration_repeatable' already exists")
+            print(f"WARNING: Schema is not empty!")
+
         print(f"Creating the version control tables...")
         self.create_version_tracking_tables()
         print(f"Created.")
