@@ -78,13 +78,13 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
 
 ## Here is sample tool usage:
 
-1. Before of all it is needed create empty schema. Open up console window run __psql__ command line tool and execute the following DDL command: 
+1. Before of all it is needed create empty schema. Open up console window, run __psql__ command line tool and execute the following DDL command: 
 
   ```
   CREATE SCHEMA test1;
   ```
 
-2. Now you have are ready to initialize schema with version control tables:
+2. Now you are ready to initialize schema with version control tables:
   ```
   (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> $env:USER_PASSWORD=topsecret123
   (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py init test1
@@ -93,11 +93,11 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
   Created.
   Closed db connection
   ```
-The first argument is a command name __init__ and second argument is a schema name __test1__. 
+The first argument is a command name __"init"__ and second argument is a schema name __"test1"__. 
 Note that we did not specified neither server host nor database name, this is because these parameters could be taken from [dbmigration.toml](./dbmigrations/dbmigration.toml) 
-But the user's password must be passed via environment variable "USER_PASSWORD" like in the example above.
+But the user's password must be passed via environment variable "USER_PASSWORD" (like in the example above) due to security reasons ))
 
-3. Now you are ready to update target schema with scripts:
+3. Now you can update target schema with DDL/DML scripts: 
   ```
   (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py update esbdb .\dbmigrations\samples\test1\
   Opened db connection
@@ -137,9 +137,9 @@ But the user's password must be passed via environment variable "USER_PASSWORD" 
   Closed db connection
   (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations>
   ```
-The first argument is a command name __init__ and second argument is a schema name __test1__
+The first argument is a command name __"update"__ and second argument is a schema name __"test1"__ and third parameter is path to scripts folder __".\dbmigrations\samples\test1\"__ 
 
-4. Now we can try find results of tool working:
+4. And now let's look at the results inside the database:
 
 Try connect to database using __psql__ and execute following commands:
 
@@ -174,7 +174,7 @@ Try connect to database using __psql__ and execute following commands:
 
   ```
 
-## The tool subcommands supported the following additional parameters
+## Now let's take a quick look at the utility's built-in subcommand help:
 
 ### __Init__ subcommand help:
 
@@ -235,3 +235,5 @@ options:
   --build-update-script BUILD_UPDATE_SCRIPT
                         the update script path if you want one as an additional result of the verify command
 ```
+
+For now it is all. Should you have any questions or suggestions post me a word in on the issues board https://github.com/andreylartsev/dbmigrations/issues/1
