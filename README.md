@@ -97,7 +97,7 @@ The first argument is a command name __init__ and second argument is a schema na
 Note that we did not specified neither server host nor database name, this is because these parameters could be taken from [dbmigration.toml](./dbmigrations/dbmigration.toml) 
 But the user's password must be passed via environment variable "USER_PASSWORD" like in the example above.
 
-3. Now you have are ready to update target schema with scripts:
+3. Now you are ready to update target schema with scripts:
   ```
   (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py update esbdb .\dbmigrations\samples\test1\
   Opened db connection
