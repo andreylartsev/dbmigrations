@@ -662,13 +662,13 @@ class InitCommand (BaseCommand):
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
         self.set_session_search_path()
-        
+
         if not self.check_if_schema_is_empty():
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
             if self.check_if_version_table_exists("dbmigration_versions"):
                 raise CommandError(f"The version control table 'dbmigration_versions' already exists")
-            if self.check_if_version_table_exists("dbmigration_versions"):
+            if self.check_if_version_table_exists("dbmigration_repeatable"):
                 raise CommandError(f"The version control table 'dbmigration_repeatable' already exists")
             print(f"WARNING: Schema is not empty!")
 
