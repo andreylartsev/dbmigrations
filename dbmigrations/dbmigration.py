@@ -466,14 +466,18 @@ class VerifyCommand (BaseCommand):
         if len(baseline_subdirs) != 1:
             raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with the baseline scripts but {len(baseline_subdirs)} was found")
         baseline_version_subdir = baseline_subdirs[0]
-        print(f"The baseline scripts to install: ")       
+        baseline_version = baseline_version_subdir.name
+
         scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
+        print(f"The baseline scripts to install: ")       
         for item in scripts_sorted:
             print(f"[{item}]")
         if not target_script_path is None:
-            baseline_version = baseline_version_subdir.name
             self.write_baseline_scripts(baseline_version, scripts_sorted, target_script_path)
-    
+        
+        # remember latest version in scripts for the further use in verify_repeatable()
+        self.latest_version_in_scripts = baseline_version
+
     def write_versioned_scripts(self, version, scripts, target_script_path):
         escaped_version_id = escape_str_for_sql(version)
         with pathlib.Path(target_script_path).open("a") as target_file:
@@ -511,8 +515,15 @@ class VerifyCommand (BaseCommand):
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
         
         # remember latest version in scripts for the further use in verify_repeatable()
-        self.latest_version_in_scripts = newer_version_subdirs_sorted[-1].name
-        
+        latest_version = newer_version_subdirs_sorted[-1].name
+
+        if self.latest_version_in_scripts is None:
+            self.latest_version_in_scripts = latest_version
+        elif latest_version <= self.latest_version_in_scripts:
+            raise CommandError(f"The latest version in versioned subdirectory must be greather that version in baseline scripts.")
+        else:
+            self.latest_version_in_scripts = latest_version
+
         print(f"The versioned scripts to install: ")    
         for script_version_dir in newer_version_subdirs_sorted:    
             scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
