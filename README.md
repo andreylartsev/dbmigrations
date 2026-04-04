@@ -1,4 +1,4 @@
-# Simple PostgreSQL database migrations tool
+# Simple PostgreSQL database migration tool
 
 ## Purpose of the tool:
 - Ability to deploy a database from source code stored in a source code management system (Git);
