@@ -27,7 +27,7 @@
 
 In the end it is a sort of sample implementation that could be forked and customized for your needs
 
-More you can find the [docs folder](./doc) 
+More you can find in the [docs folder](./doc) 
 
 ## The best way to learn about the functionality of a tool is to call the embedded "help" subcommand:
 ```
@@ -76,7 +76,7 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
 - [test1_only_repeatable](./dbmigrations/samples/test1_only_repeatable) - shows that baseline and versioned scripts are not necessary if you specified target version in the target_version.txt file 
 - and so on 
 
-## Here is sample tool usage:
+## Here is sample tool usage how you can update db
 
 1. Before of all it is needed create empty schema. Open up console window, run __psql__ command line tool and execute the following DDL command: 
 
@@ -173,6 +173,108 @@ Try connect to database using __psql__ and execute following commands:
   2 |2026-04-03 00:36:58.651 +0300|
 
   ```
+
+## How can we make script for code review
+
+In additonal to __update__ the tool supports the command __verify__ that verifies considency of scripts directory and lists those of them that that will be applied on db in case __update__ command use. 
+The __verify__ command have the option __--build-update-script__ that instucts the tool to build update script for code review.
+
+```
+(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ python3 ./dbmigrations/dbmigration.py verify esbdb ./dbmigrations/samples/test1 --build-update-script esbdb.sql
+Opened db connection
+Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: dbmigrations/samples/test1
+Completed.
+The baseline scripts to install: 
+[dbmigrations/samples/test1/baseline/V000/00_create_t1.sql]
+[dbmigrations/samples/test1/baseline/V000/01_insert_into_t1.sql]
+The versioned scripts to install: 
+[dbmigrations/samples/test1/versions/V001/00_create_t2.sql]
+[dbmigrations/samples/test1/versions/V001/01_insert_into_t2.sql]
+No any versions are installed in the database schema.
+The target version for repeatable scripts is V001.
+The repeatable scripts to (re)install: 
+[dbmigrations/samples/test1/repeatable/00_create_view_latest_t1.sql]
+The update script is written to 'esbdb.sql'.
+Closed db connection
+```
+
+The resulting script includes all neccessary updates to db, transaction control statements to make it safe and inserts into version control tables. 
+
+It looks like this: 
+
+```
+(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ cat esbdb.sql 
+SET search_path TO esbdb, public;
+-- Baseline scripts for version 'V000'
+-- dbmigrations/samples/test1/baseline/V000/00_create_t1.sql
+BEGIN;
+create table t1 (
+    v1 serial not null primary key
+);
+
+COMMIT;
+-- dbmigrations/samples/test1/baseline/V000/01_insert_into_t1.sql
+BEGIN;
+insert into t1 values (1);
+insert into t1 values (2);
+COMMIT;
+BEGIN;
+INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('V000', TRUE);
+COMMIT;
+-- Versioned scripts for version 'V001'
+BEGIN;
+-- dbmigrations/samples/test1/versions/V001/00_create_t2.sql
+create table t2 (
+    kk varchar(36) not null primary key,
+    created_at timestamp with time zone not null default current_timestamp
+);
+
+-- dbmigrations/samples/test1/versions/V001/01_insert_into_t2.sql
+insert into t2 values ('1');
+insert into t2 values ('2');
+INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('V001', FALSE);
+COMMIT;
+-- Repeatable scripts for version 'V001'
+-- dbmigrations/samples/test1/repeatable/00_create_view_latest_t1.sql
+BEGIN;
+drop view if exists latest_t1;
+
+create view latest_t1 as 
+    select max(v1) as v1 from t1;
+
+INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ('90de5d9254461944fab716771b3c6c29fc9b57c924e23dc1e67f2bcb31024a93', 'dbmigrations/samples/test1/repeatable/00_create_view_latest_t1.sql');
+COMMIT;
+```
+
+And of course after code review you can apply it to db using plain __psql__ tool:
+
+```
+(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ psql postgres < esbdb.sql 
+SET
+BEGIN
+CREATE TABLE
+COMMIT
+BEGIN
+INSERT 0 1
+INSERT 0 1
+COMMIT
+BEGIN
+INSERT 0 1
+COMMIT
+BEGIN
+CREATE TABLE
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+COMMIT
+BEGIN
+NOTICE:  view "latest_t1" does not exist, skipping
+DROP VIEW
+CREATE VIEW
+INSERT 0 1
+COMMIT
+(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ 
+```
 
 ## Now let's take a quick look at the utility's built-in subcommand help:
 
