@@ -170,7 +170,7 @@ class BaseCommand:
                     if latest_version_in_scripts is None:
                         latest_version_in_scripts = latest_version_in_versioned
                     elif latest_version_in_versioned > latest_version_in_scripts:
-                        self.latest_version_in_scripts = latest_version_in_versioned
+                        latest_version_in_scripts = latest_version_in_versioned
                     else:
                         raise CommandError(f"The latest version of the subdirectory with the versions'{latest_version_in_versioned}' must be greater than the version of the baseline scripts '{latest_version_in_scripts}'.")
 
