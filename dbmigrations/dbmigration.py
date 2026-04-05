@@ -155,24 +155,27 @@ class BaseCommand:
 
     def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self, scripts_dir):
         print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
-        latest_version_in_scripts = None
+        latest_version_in_baseline = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
             baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
             if len(baseline_subdirs) == 1:
                 baseline_version_subdir = baseline_subdirs[0]
                 latest_version_in_scripts = baseline_version_subdir.name
+        latest_version_in_versioned = None
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if versioned_dir.exists():
             for item in versioned_dir.iterdir():
                 if item.is_dir():
                     latest_version_in_versioned = item.name
-                    if latest_version_in_scripts is None:
-                        latest_version_in_scripts = latest_version_in_versioned
-                    elif latest_version_in_versioned > latest_version_in_scripts:
-                        latest_version_in_scripts = latest_version_in_versioned
-                    else:
-                        raise CommandError(f"The latest version of the subdirectory with the versions'{latest_version_in_versioned}' must be greater than the version of the baseline scripts '{latest_version_in_scripts}'.")
+
+        latest_version_in_scripts = None
+        if latest_version_in_baseline is None:
+            latest_version_in_scripts = latest_version_in_versioned
+        elif latest_version_in_versioned > latest_version_in_baseline:
+            latest_version_in_scripts = latest_version_in_versioned
+        else:
+            raise CommandError(f"The latest version of the subdirectory with the versions'{latest_version_in_versioned}' must be greater than the version of the baseline scripts '{latest_version_in_scripts}'.")
 
         if latest_version_in_scripts is None:
             print(f"No either baseline or versioned script updates were found in scripts dir: '{scripts_dir}'")
@@ -207,11 +210,11 @@ class BaseCommand:
         try:        
             self.dbconn_settings = config[DBCONN_CONFIG_GROUP]
         except:
-            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{DBCONN_CONFIG_GROUP}'")
+            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration group '{DBCONN_CONFIG_GROUP}'")
         try:        
             self.options = config[OPTIONS_CONFIG_GROUP]
         except:
-            raise ValueError(f"config file {TOML_CONFIG_FILE} does not include configuration group '{OPTIONS_CONFIG_GROUP}'")
+            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration group '{OPTIONS_CONFIG_GROUP}'")
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
         self.parser.add_argument("--host", type=str, default=self.dbconn_settings.get("host", DBCONN_DEFAULT_HOST), help="db server host name")
@@ -232,7 +235,7 @@ class BaseCommand:
         if not self.args.no_password:
             password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
             if password is None:
-                raise ValueError(f"db user password must be provided via environment variable {DBCONN_USER_PASSWORD_ENVVAR_NAME}")
+                raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
             self.dbconn_settings["password"]=password
         self.dbconn = psycopg.connect(**self.dbconn_settings)
         print(f"Opened db connection")
