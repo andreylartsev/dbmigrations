@@ -1,4 +1,4 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.1.5 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" modified="2026-03-04T15:28:00.686Z" etag="BpEUHGn2ePhJ4JYrJmvl" version="23.1.5" type="device">
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.1 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36" version="29.6.1" pages="2">
   <diagram name="Page-1" id="rtFIpebMG_Z5_Oi20TYY">
     <mxGraphModel dx="3434" dy="2689" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -89,6 +89,65 @@
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="410" y="-140" as="sourcePoint" />
             <mxPoint x="410" y="70" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="Changes Flow" id="qmaU5OSppMQ_OSlzwl8R">
+    <mxGraphModel dx="1823" dy="1818" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-0" />
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-1" parent="II1-8Ineo-d5LIe00Kzh-0" />
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-2" parent="II1-8Ineo-d5LIe00Kzh-1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="160" width="320" x="680" y="-152" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-3" edge="1" parent="II1-8Ineo-d5LIe00Kzh-1" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="-265" y="-226" as="sourcePoint" />
+            <mxPoint x="895" y="-226" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-4" parent="II1-8Ineo-d5LIe00Kzh-1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b&gt;PROM &lt;/b&gt;- Release 3 gitlab.../Release3 support branch" vertex="1">
+          <mxGeometry height="30" width="306" x="687" y="-142" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-5" parent="II1-8Ineo-d5LIe00Kzh-1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="V302" vertex="1">
+          <mxGeometry height="77" width="90" x="700" y="-97" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-7" parent="II1-8Ineo-d5LIe00Kzh-1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="162" width="305" x="240" y="-152" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-8" parent="II1-8Ineo-d5LIe00Kzh-1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="&lt;b&gt;V403.sql&lt;/b&gt;" vertex="1">
+          <mxGeometry height="85" width="90" x="250" y="-97" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-10" parent="II1-8Ineo-d5LIe00Kzh-1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="140" width="300" x="240" y="-410" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-11" parent="II1-8Ineo-d5LIe00Kzh-1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="V502" vertex="1">
+          <mxGeometry height="80" width="90" x="270" y="-370" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-13" parent="II1-8Ineo-d5LIe00Kzh-1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b style=&quot;border-color: var(--border-color);&quot;&gt;UAT&amp;nbsp;&lt;/b&gt;- Release 4 gitlab../Release4&amp;nbsp;support branch" vertex="1">
+          <mxGeometry height="30" width="310" x="232" y="-142" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-14" parent="II1-8Ineo-d5LIe00Kzh-1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b style=&quot;border-color: var(--border-color);&quot;&gt;TEST5&lt;/b&gt;- Release 5 git../Release5 support branch" vertex="1">
+          <mxGeometry height="30" width="306" x="232" y="-400" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-19" parent="II1-8Ineo-d5LIe00Kzh-1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;" value="Customer side" vertex="1">
+          <mxGeometry height="30" width="120" x="94" y="-200" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-20" parent="II1-8Ineo-d5LIe00Kzh-1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;" value="Vendor side" vertex="1">
+          <mxGeometry height="30" width="110" x="94" y="-410" as="geometry" />
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-25" edge="1" parent="II1-8Ineo-d5LIe00Kzh-1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="570" y="-72.24000000000001" as="sourcePoint" />
+            <mxPoint x="670" y="-72.24000000000001" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="II1-8Ineo-d5LIe00Kzh-26" edge="1" parent="II1-8Ineo-d5LIe00Kzh-1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;exitX=0.566;exitY=1.003;exitDx=0;exitDy=0;exitPerimeter=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="387.9999999999999" y="-249.99999999999997" as="sourcePoint" />
+            <mxPoint x="388" y="-160" as="targetPoint" />
           </mxGeometry>
         </mxCell>
       </root>
