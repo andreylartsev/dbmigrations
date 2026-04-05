@@ -1,92 +1,92 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.1 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36" version="29.6.1" pages="2">
   <diagram name="Page-1" id="rtFIpebMG_Z5_Oi20TYY">
-    <mxGraphModel dx="3434" dy="2689" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1878" dy="1840" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="uEi7MeoUAV18RL49fz-3-5" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="600" y="410" width="340" height="250" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="250" width="340" x="600" y="410" as="geometry" />
         </mxCell>
-        <mxCell id="5VmnPtzSzJ9YGw713L6j-4" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" parent="1" edge="1">
-          <mxGeometry width="50" height="50" relative="1" as="geometry">
+        <mxCell id="5VmnPtzSzJ9YGw713L6j-4" edge="1" parent="1" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=2;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
             <mxPoint x="-260" y="50" as="sourcePoint" />
             <mxPoint x="900" y="50" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-1" value="&lt;b&gt;PROM &lt;/b&gt;- Release 3 gitlab.../Release3 support branch" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="604" y="410" width="306" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-1" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b&gt;PROM &lt;/b&gt;- Release 3 gitlab.../Release3 support branch" vertex="1">
+          <mxGeometry height="30" width="306" x="604" y="410" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-2" value="baseline299.sql&lt;br&gt;V301.sql&lt;br&gt;V302.sql" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" parent="1" vertex="1">
-          <mxGeometry x="620" y="465" width="90" height="140" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-2" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="baseline299.sql&lt;br&gt;V301.sql&lt;br&gt;V302.sql" vertex="1">
+          <mxGeometry height="140" width="90" x="620" y="465" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-3" value="ИШ&lt;br&gt;Release 3" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="754" y="465" width="120" height="110" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Release 3" vertex="1">
+          <mxGeometry height="110" width="120" x="754" y="465" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-6" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="240" y="90" width="340" height="250" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="250" width="340" x="240" y="90" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-7" value="baseline299.sql&lt;br&gt;V301.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V302.sql&lt;br&gt;V401.sql&lt;br&gt;V402.sql&lt;br&gt;&lt;b&gt;V403.sql&lt;/b&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" parent="1" vertex="1">
-          <mxGeometry x="270" y="130" width="90" height="140" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-7" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="baseline299.sql&lt;br&gt;V301.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V302.sql&lt;br&gt;V401.sql&lt;br&gt;V402.sql&lt;br&gt;&lt;b&gt;V403.sql&lt;/b&gt;" vertex="1">
+          <mxGeometry height="140" width="90" x="270" y="130" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-8" value="ИШ &lt;br&gt;Release 4" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="404" y="130" width="120" height="110" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Release 4" vertex="1">
+          <mxGeometry height="110" width="120" x="404" y="130" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-9" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="240" y="-410" width="340" height="250" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="250" width="340" x="240" y="-410" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-10" value="baseline299.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V301.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V302.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V401.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V402.sql&lt;br&gt;V501.sql&lt;br&gt;&lt;b&gt;V502.sql&lt;/b&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" parent="1" vertex="1">
-          <mxGeometry x="270" y="-370" width="90" height="140" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-10" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="baseline299.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V301.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V302.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V401.sql&lt;br style=&quot;border-color: var(--border-color);&quot;&gt;V402.sql&lt;br&gt;V501.sql&lt;br&gt;&lt;b&gt;V502.sql&lt;/b&gt;" vertex="1">
+          <mxGeometry height="140" width="90" x="270" y="-370" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-11" value="ИШ &lt;br&gt;Release 5" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="404" y="-370" width="120" height="110" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-11" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Release 5" vertex="1">
+          <mxGeometry height="110" width="120" x="404" y="-370" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-12" value="&lt;b style=&quot;border-color: var(--border-color);&quot;&gt;TEST&lt;/b&gt;- Release 4 gitlab../Release4&amp;nbsp;support branch" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="240" y="90" width="310" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-12" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b style=&quot;border-color: var(--border-color);&quot;&gt;TEST&lt;/b&gt;- Release 4 gitlab../Release4&amp;nbsp;support branch" vertex="1">
+          <mxGeometry height="30" width="310" x="240" y="90" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-13" value="&lt;b style=&quot;border-color: var(--border-color);&quot;&gt;TEST5&lt;/b&gt;- Release 5 gitlab../Release5 support branch" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="244" y="-410" width="306" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-13" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b style=&quot;border-color: var(--border-color);&quot;&gt;TEST5&lt;/b&gt;- Release 5 gitlab../Release5 support branch" vertex="1">
+          <mxGeometry height="30" width="306" x="244" y="-410" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-14" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="-136" y="420" width="340" height="250" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="250" width="340" x="-136" y="420" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-15" value="&lt;b&gt;UAT &lt;/b&gt;- Release 3.1 gitlab.../Release3 support branch" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="-136" y="420" width="306" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-15" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b&gt;UAT &lt;/b&gt;- Release 3.1 gitlab.../Release3 support branch" vertex="1">
+          <mxGeometry height="30" width="306" x="-136" y="420" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-17" value="ИШ &lt;br&gt;Release 3.1" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="24" y="480" width="120" height="110" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-17" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Release 3.1" vertex="1">
+          <mxGeometry height="110" width="120" x="24" y="480" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-18" value="baseline299.sql&lt;br&gt;V301.sql&lt;br&gt;V302.sql&lt;br&gt;&lt;b&gt;V303.sql&lt;/b&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" parent="1" vertex="1">
-          <mxGeometry x="-100" y="485" width="90" height="140" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-18" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="baseline299.sql&lt;br&gt;V301.sql&lt;br&gt;V302.sql&lt;br&gt;&lt;b&gt;V303.sql&lt;/b&gt;" vertex="1">
+          <mxGeometry height="140" width="90" x="-100" y="485" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-19" value="Customer Environments" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;" parent="1" vertex="1">
-          <mxGeometry x="-136" y="90" width="120" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-19" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;" value="Customer Environments" vertex="1">
+          <mxGeometry height="30" width="120" x="-136" y="90" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-21" value="Vendor&lt;br&gt;Environments" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;" parent="1" vertex="1">
-          <mxGeometry x="-140" y="-390" width="110" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-21" parent="1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=17;" value="Vendor&lt;br&gt;Environments" vertex="1">
+          <mxGeometry height="30" width="110" x="-140" y="-390" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-24" value="V403.sql - same changes as V303.sql in Release 4 branch&lt;br&gt;checks for the presence of V403 and skips its execution." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="256" y="300" width="324" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-24" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="V403.sql - same changes as V303.sql in Release 4 branch&lt;br&gt;checks for the presence of V403 and skips its execution." vertex="1">
+          <mxGeometry height="30" width="324" x="256" y="300" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-25" value="V303.sql - hot fix" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="-140" y="630" width="204" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-25" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="V303.sql - hot fix" vertex="1">
+          <mxGeometry height="30" width="204" x="-140" y="630" as="geometry" />
         </mxCell>
-        <mxCell id="uEi7MeoUAV18RL49fz-3-26" value="V502.sql - same changes as V403.sql in Release 5 branch&lt;br&gt;checks for the presence of V403 and V303 and skips its execution." style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
-          <mxGeometry x="240" y="-200" width="336" height="30" as="geometry" />
+        <mxCell id="uEi7MeoUAV18RL49fz-3-26" parent="1" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="V502.sql - same changes as V403.sql in Release 5 branch&lt;br&gt;checks for the presence of V403 and V303 and skips its execution." vertex="1">
+          <mxGeometry height="30" width="336" x="240" y="-200" as="geometry" />
         </mxCell>
-        <mxCell id="6_IqjVtxspS2g4KB4Uac-4" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" parent="1" edge="1">
-          <mxGeometry width="50" height="50" relative="1" as="geometry">
+        <mxCell id="6_IqjVtxspS2g4KB4Uac-4" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
             <mxPoint x="190" y="220" as="sourcePoint" />
             <mxPoint x="40" y="370" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="6_IqjVtxspS2g4KB4Uac-5" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" parent="1" edge="1">
-          <mxGeometry width="50" height="50" relative="1" as="geometry">
+        <mxCell id="6_IqjVtxspS2g4KB4Uac-5" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
             <mxPoint x="220" y="550" as="sourcePoint" />
             <mxPoint x="565" y="550" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="6_IqjVtxspS2g4KB4Uac-6" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" parent="1" edge="1">
-          <mxGeometry width="50" height="50" relative="1" as="geometry">
+        <mxCell id="6_IqjVtxspS2g4KB4Uac-6" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
             <mxPoint x="410" y="-140" as="sourcePoint" />
             <mxPoint x="410" y="70" as="targetPoint" />
           </mxGeometry>
@@ -95,7 +95,7 @@
     </mxGraphModel>
   </diagram>
   <diagram name="Changes Flow" id="qmaU5OSppMQ_OSlzwl8R">
-    <mxGraphModel dx="1823" dy="1818" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1773" dy="1786" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="II1-8Ineo-d5LIe00Kzh-0" />
         <mxCell id="II1-8Ineo-d5LIe00Kzh-1" parent="II1-8Ineo-d5LIe00Kzh-0" />
