@@ -2,27 +2,16 @@
 Simple database migrations tool
 """
 
+#
+# prerequire packages listed in requirements.txt
+# 
+
 import sys
 import argparse
 import tomllib
 import os
 import pathlib 
 import hashlib
-
-#
-# prerequire packages listed in requirements.txt
-# 
-# Use pip to install all required packages
-#  
-# $ python3 -m venv .venv
-# $ source .venv/bin/activate
-#
-# $ python3 -m pip install --upgrade pip
-# $ python3 -m pip install -r requirements.txt
-
-#  brew services start postgresql@18
-#
-# LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@18/bin/postgres -D /opt/homebrew/var/postgresql@18
 import psycopg;
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
@@ -87,11 +76,15 @@ def read_as_trimmed_string(file_path):
         trimmed_str = str.strip()
         return trimmed_str
 
-def escape_str_for_sql(str):
-    # TBD
-    return str
-
 class BaseCommand:
+
+    def format_sql(self, sql, **params):
+        if self.dbconn is None:
+            raise CommandError(f"DB connection is not initialized yet")
+        formatted_sql = psycopg.sql.SQL(sql).format(**params)
+        formatted_text = formatted_sql.as_string(self.dbconn)
+        return formatted_text        
+
     def dbconn_get_single_value(self, sql, params):
         with self.dbconn.cursor() as cur:
             cur.execute(sql, params)
@@ -440,25 +433,24 @@ class VerifyCommand (BaseCommand):
 
     def write_search_path(self, schema_name, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
-            escaped_schema_name = escape_str_for_sql(schema_name)
-            target_file.write(f"SET search_path TO {escaped_schema_name}, public;\n")    
+            formatted_sql_text = self.format_sql("SET search_path TO {schema_name}, public;\n", schema_name=psycopg.sql.Identifier(schema_name))
+            target_file.write(formatted_sql_text)
 
     def write_baseline_scripts(self, version, scripts, target_script_path):
-        escaped_version_id = escape_str_for_sql(version)
         with pathlib.Path(target_script_path).open("a") as target_file:
-            target_file.write(f"-- Baseline scripts for version '{escaped_version_id}'\n")
+            formatted_sql_text = self.format_sql("-- Baseline scripts for version {version_id}\n", version_id=version)
+            target_file.write(formatted_sql_text)
             for script_path in scripts:
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
-                    target_file.write(f"-- {script_path}\n")
+                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(script_path))
+                    target_file.write(formatted_sql_text)
                     target_file.write(f"BEGIN;\n")
                     target_file.writelines(lines)
                     target_file.write(f"\n")
                     target_file.write(f"COMMIT;\n")
             target_file.write(f"BEGIN;\n")
-            #formatted_sql = psycopg.sql.SQL("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)\n").format(version)
-            #formatted_sql_text = formatted_sql.as_string(self.dbconn)
-            formatted_sql_text = f"INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', TRUE);\n"
+            formatted_sql_text = self.format_sql("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", version_id=version)
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
@@ -488,17 +480,18 @@ class VerifyCommand (BaseCommand):
         self.latest_version_in_scripts = baseline_version
 
     def write_versioned_scripts(self, version, scripts, target_script_path):
-        escaped_version_id = escape_str_for_sql(version)
         with pathlib.Path(target_script_path).open("a") as target_file:
-            target_file.write(f"-- Versioned scripts for version '{escaped_version_id}'\n")
+            formatted_sql_text = self.format_sql("-- Versioned scripts for version {version_id}\n", version_id=version)
+            target_file.write(formatted_sql_text)
             target_file.write(f"BEGIN;\n")
             for script_path in scripts:
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
-                    target_file.write(f"-- {script_path}\n")
+                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(script_path))
+                    target_file.write(formatted_sql_text)
                     target_file.writelines(lines)
                     target_file.write(f"\n")
-            formatted_sql_text = f"INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('{escaped_version_id}', FALSE);\n"
+            formatted_sql_text = self.format_sql("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", version_id=version)
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
@@ -545,19 +538,17 @@ class VerifyCommand (BaseCommand):
                 self.write_versioned_scripts(version_id, scripts_sorted, target_script_path)   
 
     def write_repeatable_scripts(self, target_version, scripts_dict, target_script_path):
-        escaped_version_id = escape_str_for_sql(target_version)
         with pathlib.Path(target_script_path).open("a") as target_file:
-            target_file.write(f"-- Repeatable scripts for version '{escaped_version_id}'\n")
+            formatted_sql_text = self.format_sql("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
             for sha256sum, script_path in scripts_dict.items():
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
-                    target_file.write(f"-- {script_path}\n")
+                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(script_path))
+                    target_file.write(formatted_sql_text)
                     target_file.write(f"BEGIN;\n")
                     target_file.writelines(lines)
                     target_file.write(f"\n")
-                    escaped_relative_path = escape_str_for_sql(script_path)
-                    escaped_sha256sum = escape_str_for_sql(sha256sum)
-                    formatted_sql_text = f"INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ('{escaped_sha256sum}', '{escaped_relative_path}');\n"
+                    formatted_sql_text = self.format_sql("INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ({sha256sum}, {relative_path});\n", sha256sum=sha256sum, relative_path=str(script_path))
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
 
