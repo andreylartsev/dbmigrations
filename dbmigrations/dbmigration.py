@@ -540,6 +540,7 @@ class VerifyCommand (BaseCommand):
     def write_repeatable_scripts(self, target_version, scripts_dict, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
             formatted_sql_text = self.format_sql("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
+            target_file.write(formatted_sql_text)
             for sha256sum, script_path in scripts_dict.items():
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
