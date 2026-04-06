@@ -2,9 +2,9 @@
 
 This folder includes sample DML/DDL scripts repositories and you can try the tool with them:
 
-- [test1](./test1) - In this folder included baseline, versioned and repeatable scripts:
-  - baseline/V000 - should create the table t1 and insert one record;  
-  - versions/V001 - should create the table t2 and insert one record; 
+- [test1](./test1) - In this folder included all flowers of possible script types i.e. baseline, versioned and repeatable scripts
+  - baseline/V000 - creates the table t1 and inserts one record;  
+  - versions/V001 - creates the table t2 and inserts one record; 
   - repeatable/ - includes the script that should drop/create view on the table t1; 
 - [test1_empty_baseline_and_repeatable](./test1_empty_baseline_and_repeatable) - The dummy baseline script + repeatable script(s). Demonstration of extending other`s system schema i.e. integration via DB. Yes, well known anti-pattern;
 - [test1_empty_version](./test1_empty_version) - Tests that "empty" versions are not allowed;
