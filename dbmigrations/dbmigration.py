@@ -105,7 +105,7 @@ class BaseCommand:
     
     def set_session_search_path(self):
         sql = f"""
-            SET search_path TO {self.args.schema_name}, public"""
+            SET search_path TO {self.args.schema_name}"""
         self.dbconn_exec_with_no_result(sql, [])
 
     def check_if_version_table_exists(self, table_name):
@@ -433,7 +433,7 @@ class VerifyCommand (BaseCommand):
 
     def write_search_path(self, schema_name, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
-            formatted_sql_text = self.format_sql("SET search_path TO {schema_name}, public;\n", schema_name=psycopg.sql.Identifier(schema_name))
+            formatted_sql_text = self.format_sql("SET search_path TO {schema_name};\n", schema_name=psycopg.sql.Identifier(schema_name))
             target_file.write(formatted_sql_text)
 
     def write_baseline_scripts(self, version, scripts, target_script_path):
