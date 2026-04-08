@@ -72,7 +72,7 @@ def get_sha256sum_for_bytes(script_bytes):
 def read_as_trimmed_string(file_path):
     with open(file_path, 'rb') as f:
         bytes = f.read()
-        str = bytes.decode("utf-8")
+        str = bytes.decode("utf-8", "ignore")
         trimmed_str = str.strip()
         return trimmed_str
 
