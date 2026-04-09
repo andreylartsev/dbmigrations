@@ -72,7 +72,7 @@ def get_sha256sum_for_bytes(script_bytes):
 def read_as_trimmed_string(file_path):
     with open(file_path, 'rb') as f:
         bytes = f.read()
-        str = bytes.decode("utf-8")
+        str = bytes.decode("utf-8", "ignore")
         trimmed_str = str.strip()
         return trimmed_str
 
@@ -230,6 +230,8 @@ class BaseCommand:
             if password is None:
                 raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
             self.dbconn_settings["password"]=password
+        else:
+            self.dbconn_settings.pop("password", None)
         self.dbconn = psycopg.connect(**self.dbconn_settings)
         print(f"Opened db connection")
     def __exit__(self, exc_type, exc_value, traceback):
