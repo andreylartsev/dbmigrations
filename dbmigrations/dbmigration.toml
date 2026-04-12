@@ -6,11 +6,22 @@
 [dbconnection]
 host = "localhost"
 port = 5432
-dbname = "esbdb"
-user = "postgres"
+# dbname = "esbdb"
+dbname = "postgres"
+# user = "postgres"
 # connect_timeout = 30
 # sslmode = "prefer"
 
 # command options
 [options]
-no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
+no_password = true # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
+
+# external tools to apply scripts
+[tools.psql]
+exec = "/opt/homebrew/bin/psql"
+# args = ["-h", "${host}", "-p", "${port}", "-h", "${host}, "-d", "${dbname}", "-f", "${script_path}"]
+args = ["-f", "${script_path}", "${dbname}"]
+
+[tools.pg_restore] 
+exec = "/opt/homebrew/bin/pg_restore"
+args = ["-h", "${host}", "-u", "${user}", "-p", "${port}", "-d", "${dbname}", "${script_path}"]

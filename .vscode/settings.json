@@ -6,7 +6,20 @@
         "dbmigration",
         "dbname",
         "esbdb",
+        "Liquibase",
         "nspname",
-        "sslmode"
-    ]
+        "PGPASSWORD",
+        "psql",
+        "sslmode",
+        "topsecret",
+        "xzvf",
+        "версионированного",
+        "Версионные",
+        "логирует",
+        "смоук",
+        "фидбэк",
+        "хотфикс",
+        "хотфиксов"
+    ],
+    "cSpell.language": "en,ru"
 }

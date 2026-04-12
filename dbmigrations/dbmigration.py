@@ -13,6 +13,7 @@ import os
 import pathlib 
 import hashlib
 import psycopg;
+import subprocess;
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 DBCONN_CONFIG_GROUP = 'dbconnection'
@@ -31,6 +32,8 @@ REPEATABLE_DIR_NAME = "repeatable"
 REPEATABLE_SCRIPTS_TARGET_VERSION_FILE = "target_version.txt"
 SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
 SCRIPT_LIST_FILE_NAME = "script_list.txt"
+TOOLS_CONFIG_GROUP = "tools"
+EXEC_TOOL_NAME_FILE_NAME = "exec_tool.txt"
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -75,6 +78,78 @@ def read_as_trimmed_string(file_path):
         str = bytes.decode("utf-8", "ignore")
         trimmed_str = str.strip()
         return trimmed_str
+
+class ExternalToolConfig:
+    pass
+
+class ExternalTools:
+    def make_variables_dict_from_config_and_script_path(self, dbconnection_config, script_path):
+        result = {}
+        for key, value in dbconnection_config.items():
+            variable_key = "${" + key.strip() + "}"  
+            result[variable_key] = value
+        result["${script_path}"] = script_path
+        return result
+
+    def match_variables_to_args(self, variables, args):
+        result = []
+        for arg in args:
+            variable_key = arg.strip() 
+            if variable_key in variables:
+                value_str = str(variables[variable_key])
+                result.append(value_str)
+            else:
+                result.append(arg)
+        return result
+
+    def __init__(self, toml_config):
+        if not DBCONN_CONFIG_GROUP in toml_config:
+            raise CommandError(f"There is no configuration group '{DBCONN_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
+        self.dbconn_config = toml_config[DBCONN_CONFIG_GROUP]
+        if not TOOLS_CONFIG_GROUP in toml_config:
+            raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
+        self.tools_config = toml_config[TOOLS_CONFIG_GROUP]
+        tools = {}
+        for tool_name, tool_config in self.tools_config.items():
+            tool = ExternalToolConfig()
+            TOOL_EXEC_ATTRIBUTE = "exec"
+            if not TOOL_EXEC_ATTRIBUTE in tool_config:
+                raise CommandError(f"There is no attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+            exec_attribute = tool_config[TOOL_EXEC_ATTRIBUTE]
+            exec_path = pathlib.Path(exec_attribute)
+            if not exec_path.exists():
+                raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' does not exists.")
+            if not exec_path.is_file():
+                raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' is not a file.")
+            tool.exec_path = exec_path
+            TOOL_ARGS_ATTRIBUTE = "args"
+            if not TOOL_ARGS_ATTRIBUTE in tool_config:
+                raise CommandError(f"There is no attribute '{TOOL_ARGS_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+            tool.args = tool_config[TOOL_ARGS_ATTRIBUTE]
+            tools[tool_name] = tool
+        self.tools = tools
+
+
+    def run(self, tool_name, script_path):
+        if not tool_name in self.tools:
+            raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
+        tool = self.tools[tool_name]
+        tool_absolute_path = tool.exec_path.absolute()
+        tool_args = tool.args
+        variables = self.make_variables_dict_from_config_and_script_path(self.dbconn_config, script_path)
+        tool_args_with_matched_variables = self.match_variables_to_args(variables, tool_args)
+        command_line = [str(tool_absolute_path), *tool_args_with_matched_variables]
+        process = subprocess.Popen(
+            args=command_line, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True)
+
+        # Read and print output line by line as it happens
+        for line in iter(process.stdout.readline, ''):
+            print(line, end='')  # Print directly to console
+        result = process.wait() # Ensure process finishes
+        return result
 
 class BaseCommand:
 
@@ -700,6 +775,10 @@ def read_toml_config():
 def main():
     try:
         config = read_toml_config()
+
+        tool = ExternalTools(config)
+        tool.run("psql", "/tmp/1.sql")
+
         parser = argparse.ArgumentParser(description=__doc__)    
         subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
 
