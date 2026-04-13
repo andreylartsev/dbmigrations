@@ -19,9 +19,9 @@ TOML_CONFIG_FILE = 'dbmigration.toml'
 DBCONN_CONFIG_GROUP = 'dbconnection'
 OPTIONS_CONFIG_GROUP = "options"
 
-OPTIONS_FILE_GLOB_FILTERS = "file_glob_filters"
-OPTIONS_FILE_READ_ENCODING = "file_read_encoding"
-OPTIONS_FILE_READ_ENCODING_ERRORS = "file_read_encoding_errors"
+OPTIONS_DEFAULT_FILE_GLOB_FILTERS = ["*.sql", "*.dump"]
+OPTIONS_DEFAULT_FILE_READ_ENCODING = "utf-8"
+OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS = "ignore"
 
 DBCONN_DEFAULT_HOST = 'localhost'
 DBCONN_DEFAULT_PORT = 5432
@@ -34,7 +34,6 @@ BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
 REPEATABLE_DIR_NAME = "repeatable"
 REPEATABLE_SCRIPTS_TARGET_VERSION_FILE = "target_version.txt"
-#SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
 SCRIPT_LIST_FILE_NAME = "script_list.txt"
 
 TOOLS_CONFIG_GROUP = "tools"
@@ -62,12 +61,13 @@ def read_as_trimmed_string(file_path):
         return trimmed_str
 
 class ExternalTool:
-    def make_variables_dict_from_config_and_script_path(self, dbconnection_config, script_path):
+    def make_variables_dict_from_config_and_script_path(self, script_path):
         result = {}
-        for key, value in dbconnection_config.items():
+        for key, value in self.dbconn_config.items():
             variable_key = "${" + key.strip() + "}"  
             result[variable_key] = value
         result["${file}"] = script_path
+        result["${schema_name}"] = self.schema_name
         return result
 
     def match_variables_to_args(self, variables, args):
@@ -81,8 +81,9 @@ class ExternalTool:
                 result.append(arg)
         return result
 
-    def __init__(self, tool_name, toml_config):
+    def __init__(self, tool_name, schema_name, toml_config):
         self.tool_name = tool_name
+        self.schema_name = schema_name
         if not DBCONN_CONFIG_GROUP in toml_config:
             raise CommandError(f"There is no configuration group '{DBCONN_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
         self.dbconn_config = toml_config[DBCONN_CONFIG_GROUP]
@@ -116,7 +117,7 @@ class ExternalTool:
     def run(self, script_path):
         tool_absolute_path = self.exec_path.absolute()
         tool_args = self.args
-        variables = self.make_variables_dict_from_config_and_script_path(self.dbconn_config, script_path)
+        variables = self.make_variables_dict_from_config_and_script_path(script_path)
         tool_args_with_matched_variables = self.match_variables_to_args(variables, tool_args)
         command_line = [str(tool_absolute_path), *tool_args_with_matched_variables]
         process = subprocess.Popen(
@@ -124,12 +125,9 @@ class ExternalTool:
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT, 
             text=True)
-
         # Read and print output line by line as it happens
-        for line in process.stdout:
-            print(line, end='')
-        #for line in iter(process.stdout.readline, ''):
-        #    print(line, end='')  # Print directly to console
+        for line in iter(process.stdout.readline, ''):
+            print(line, end='') 
         result_code = process.wait() # Ensure process finishes
 
         if result_code != self.success_result_code:
@@ -315,18 +313,10 @@ class BaseCommand:
             self.options = config[OPTIONS_CONFIG_GROUP]
         except:
             raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration group '{OPTIONS_CONFIG_GROUP}'")  
-        try:        
-            self.file_read_encoding =  self.options[OPTIONS_FILE_READ_ENCODING]
-        except:
-            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration parameter {OPTIONS_FILE_READ_ENCODING} in group '{OPTIONS_CONFIG_GROUP}'")
-        try:        
-            self.file_read_encoding_errors =  self.options[OPTIONS_FILE_READ_ENCODING_ERRORS]
-        except:
-            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration parameter {OPTIONS_FILE_READ_ENCODING_ERRORS} in group '{OPTIONS_CONFIG_GROUP}'")
-        try:        
-            self.file_glob_filters =  self.options[OPTIONS_FILE_GLOB_FILTERS]
-        except:
-            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration parameter {OPTIONS_FILE_GLOB_FILTERS} in group '{OPTIONS_CONFIG_GROUP}'")
+    
+        self.file_read_encoding =  self.options.get("file_read_encoding", OPTIONS_DEFAULT_FILE_READ_ENCODING)
+        self.file_read_encoding_errors =  self.options.get("file_read_encoding_errors", OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS)
+        self.file_glob_filters =  self.options.get("file_glob_filters", OPTIONS_DEFAULT_FILE_GLOB_FILTERS)
         
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
@@ -438,7 +428,7 @@ class UpdateCommand (BaseCommand):
         
         external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
         if not external_tool_name is None:
-            tool = ExternalTool(external_tool_name, self.config)
+            tool = ExternalTool(external_tool_name, self.args.schema_name, self.config)
             self.run_baseline_scripts_with_external_tool(baseline_version, scripts_sorted, tool)
         else:
             self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)

@@ -6,7 +6,7 @@
 [dbconnection]
 host = "localhost"
 port = 5432
-dbname = "esbdb5"
+dbname = "esbdb6"
 # dbname = "postgres"
 # user = "postgres"
 # connect_timeout = 30
