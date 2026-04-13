@@ -438,6 +438,28 @@ class UpdateCommand (BaseCommand):
             self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)
         print(f"The baseline scripts were applied.")       
 
+    def try_reapply_the_latest_version(self, versioned_subdirs, latest_installed_version):
+        newer_version_subdirs = [x for x in versioned_subdirs if x.name == latest_installed_version]
+        if len(newer_version_subdirs) != 1:
+            raise CommandError(f"There is no subdirectory with scripts that matched to the latest installed version '{latest_installed_version}'")
+        latest_version_dir = newer_version_subdirs[0]
+        clean_version_file_path = latest_version_dir.joinpath(CLEAN_VERSION_FILE_NAME)
+        if not clean_version_file_path.exists():
+            raise CommandError(f"The version cleanup file '{CLEAN_VERSION_FILE_NAME}' does not exists in folder {str(latest_version_dir)}")
+        if not clean_version_file_path.is_file():
+            raise CommandError(f"The version cleanup file '{CLEAN_VERSION_FILE_NAME}' is not a file")
+        print(f"The version '{latest_installed_version}' will be reinstalled.")      
+        print(f"Reapply versioned scripts...")
+        version_id = latest_version_dir.name
+        scripts_sorted = self.walk_through_dir_sorted(latest_version_dir)
+        if len(scripts_sorted) == 0:
+            filters_str = ",".join(self.file_glob_filters)
+            raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
+        cleanup_and_reapply_scripts = [clean_version_file_path, *scripts_sorted]
+        self.run_versioned_scripts_in_tran(version_id, cleanup_and_reapply_scripts)       
+        print(f"The versioned scripts were reapplied.")
+
+
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
@@ -452,7 +474,10 @@ class UpdateCommand (BaseCommand):
         print(f"The latest installed version is {latest_installed_version}.")       
         newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
         if len(newer_version_subdirs) == 0:
-            print(f"No newer versions were found for installation.")       
+            if not self.args.force_reapply_latest_version:
+                print(f"No newer versions were found for installation.")       
+                return
+            self.try_reapply_the_latest_version(versioned_subdirs, latest_installed_version)
             return
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
         print(f"{len(newer_version_subdirs)} new versions were found for installation.")       

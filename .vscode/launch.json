@@ -9,7 +9,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "update", "esbdb", "./dbmigrations/samples/test1_baseline_with_dump"
+                "update", "--force-reapply-latest-version", "esbdb", "./dbmigrations/samples/test1_reapply_latest"
             ],
         }
     ]
