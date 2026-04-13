@@ -9,7 +9,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "verify", "esbdb", "./dbmigrations/samples/test1"
+                "update", "esbdb", "./dbmigrations/samples/test1_baseline_with_dump"
             ],
         }
     ]
