@@ -42,7 +42,7 @@ TOOL_ARGS_ATTRIBUTE = "args"
 TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE = "success_result_code"
 USE_TOOL_NAME_FILE_NAME = "use_tool.txt"
 
-CLEAN_VERSION_FILE_NAME = "clean_version.txt"
+VERSION_CLEANUP_FILE_NAME = "_cleanup.sql"
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -155,6 +155,11 @@ class BaseCommand:
         return tool_name
 
     def walk_through_dir_sorted(self, dir):
+        exclusions = [
+            VERSION_CLEANUP_FILE_NAME, 
+            USE_TOOL_NAME_FILE_NAME, 
+            REPEATABLE_SCRIPTS_TARGET_VERSION_FILE]
+        exclusions_set = set(exclusions)
         start_path = pathlib.Path(dir) 
         if not start_path.exists():
             raise CommandError(f"The folder '{dir}' does not exists")
@@ -179,7 +184,7 @@ class BaseCommand:
             for glob_filter in self.file_glob_filters:
                 all_items = start_path.rglob(glob_filter)
                 for item in all_items: 
-                    if item.is_file():
+                    if item.is_file() and not item.name in exclusions_set:
                         all_files.append(item)
             sorted_files = sorted(all_files)
         return sorted_files
@@ -296,7 +301,6 @@ class BaseCommand:
         self.scripts_dir = pathlib.Path(self.args.scripts_path)        
         if not self.scripts_dir.exists():
             raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
-        self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
         self.set_session_search_path()     
@@ -393,6 +397,20 @@ class UpdateCommand (BaseCommand):
             cur.execute("COMMIT")       
             print(f"Committed transaction")
 
+    def rerun_versioned_scripts(self, version, scripts):
+        with self.dbconn.cursor() as cur:
+            cur.execute("BEGIN")
+            print(f"Begin transaction")
+            cur.execute("DELETE FROM dbmigration_versions WHERE version_id=%s", (version,))    
+            for script_path in scripts:
+                with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
+                    print(f"Running script: '{script_path}'...")
+                    script_text = f.read()
+                    cur.execute(script_text)                                  
+            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, False))       
+            cur.execute("COMMIT")       
+            print(f"Committed transaction")
+
     def run_versioned_scripts_in_tran(self, version, scripts):
         with self.dbconn.cursor() as cur:
             cur.execute("BEGIN")
@@ -438,26 +456,28 @@ class UpdateCommand (BaseCommand):
             self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)
         print(f"The baseline scripts were applied.")       
 
-    def try_reapply_the_latest_version(self, versioned_subdirs, latest_installed_version):
-        newer_version_subdirs = [x for x in versioned_subdirs if x.name == latest_installed_version]
-        if len(newer_version_subdirs) != 1:
+    def reapply_the_latest_version(self, scripts_dir):
+        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
+        if not versioned_dir.exists():
+            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
+            return
+        latest_installed_version = self.get_latest_version_installed()
+        print(f"The latest installed version is {latest_installed_version}.")
+        version_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir() and item.name == latest_installed_version]
+        if len(version_subdirs) != 1:
             raise CommandError(f"There is no subdirectory with scripts that matched to the latest installed version '{latest_installed_version}'")
-        latest_version_dir = newer_version_subdirs[0]
-        clean_version_file_path = latest_version_dir.joinpath(CLEAN_VERSION_FILE_NAME)
+        latest_version_dir = version_subdirs[0]
+        clean_version_file_path = latest_version_dir.joinpath(VERSION_CLEANUP_FILE_NAME)
         if not clean_version_file_path.exists():
-            raise CommandError(f"The version cleanup file '{CLEAN_VERSION_FILE_NAME}' does not exists in folder {str(latest_version_dir)}")
+            raise CommandError(f"The version cleanup file '{VERSION_CLEANUP_FILE_NAME}' does not exists in folder {str(latest_version_dir)}")
         if not clean_version_file_path.is_file():
-            raise CommandError(f"The version cleanup file '{CLEAN_VERSION_FILE_NAME}' is not a file")
-        print(f"The version '{latest_installed_version}' will be reinstalled.")      
-        print(f"Reapply versioned scripts...")
-        version_id = latest_version_dir.name
+            raise CommandError(f"The version cleanup file '{VERSION_CLEANUP_FILE_NAME}' is not a file")
         scripts_sorted = self.walk_through_dir_sorted(latest_version_dir)
         if len(scripts_sorted) == 0:
             filters_str = ",".join(self.file_glob_filters)
             raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
         cleanup_and_reapply_scripts = [clean_version_file_path, *scripts_sorted]
-        self.run_versioned_scripts_in_tran(version_id, cleanup_and_reapply_scripts)       
-        print(f"The versioned scripts were reapplied.")
+        self.rerun_versioned_scripts(latest_installed_version, cleanup_and_reapply_scripts)       
 
 
     def apply_versioned_scripts(self, scripts_dir):
@@ -474,10 +494,7 @@ class UpdateCommand (BaseCommand):
         print(f"The latest installed version is {latest_installed_version}.")       
         newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
         if len(newer_version_subdirs) == 0:
-            if not self.args.force_reapply_latest_version:
-                print(f"No newer versions were found for installation.")       
-                return
-            self.try_reapply_the_latest_version(versioned_subdirs, latest_installed_version)
+            print(f"No newer versions were found for installation.")       
             return
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
         print(f"{len(newer_version_subdirs)} new versions were found for installation.")       
@@ -542,11 +559,17 @@ class UpdateCommand (BaseCommand):
 
     def run(self):
         self.do_initial_cross_checks()
-        print(f"Performing updates from scripts repository: '{self.scripts_dir}'")
-        self.apply_baseline_scripts(self.scripts_dir)
-        self.apply_versioned_scripts(self.scripts_dir)
-        self.apply_repeatable_scripts(self.scripts_dir)
-        print(f"Updated.")
+        if self.args.force_reapply_latest_version:
+            print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
+            self.reapply_the_latest_version(self.scripts_dir)
+            print(f"Reapplied.")
+        else:
+            print(f"Performing updates from scripts repository: '{self.scripts_dir}'")
+            self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
+            self.apply_baseline_scripts(self.scripts_dir)
+            self.apply_versioned_scripts(self.scripts_dir)
+            self.apply_repeatable_scripts(self.scripts_dir)
+            print(f"Updated.")
 
 class VerifyCommand (BaseCommand):
     """Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."""
@@ -758,6 +781,7 @@ class VerifyCommand (BaseCommand):
     def run(self):
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()
+        self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
         script_path = None
         temp_script_path = None
