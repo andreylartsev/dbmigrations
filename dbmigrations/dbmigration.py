@@ -42,6 +42,8 @@ TOOL_ARGS_ATTRIBUTE = "args"
 TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE = "success_result_code"
 USE_TOOL_NAME_FILE_NAME = "use_tool.txt"
 
+CLEAN_VERSION_FILE_NAME = "clean_version.txt"
+
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
     def __init__(self, message):
@@ -407,7 +409,9 @@ class UpdateCommand (BaseCommand):
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
+        self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="cleanup the latest version within database and reapply the included *.sql scripts")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
+
 
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
