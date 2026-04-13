@@ -6,8 +6,8 @@
 [dbconnection]
 host = "localhost"
 port = 5432
-# dbname = "esbdb"
-dbname = "postgres"
+dbname = "esbdb"
+# dbname = "postgres"
 # user = "postgres"
 # connect_timeout = 30
 # sslmode = "prefer"
@@ -15,13 +15,20 @@ dbname = "postgres"
 # command options
 [options]
 no_password = true # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
+file_glob_filters = ["*.sql", "*.dump"]
+file_read_encoding = "utf-8"
+file_read_encoding_errors = "ignore"
+
 
 # external tools to apply scripts
 [tools.psql]
-exec = "/opt/homebrew/bin/psql"
-# args = ["-h", "${host}", "-p", "${port}", "-h", "${host}, "-d", "${dbname}", "-f", "${script_path}"]
-args = ["-f", "${script_path}", "${dbname}"]
+executable = "/opt/homebrew/bin/psql"
+# args = ["-h", "${host}", "-p", "${port}", "-U", "${user}, "-d", "${dbname}", "-f", "${file}"]
+args = ["-f", "${file}", "${dbname}"]
+success_result_code = 0
 
 [tools.pg_restore] 
-exec = "/opt/homebrew/bin/pg_restore"
-args = ["-h", "${host}", "-u", "${user}", "-p", "${port}", "-d", "${dbname}", "${script_path}"]
+executable = "/opt/homebrew/bin/pg_restore"
+# args = ["-h", "${host}", "-U", "${user}", "-p", "${port}", "-d", "${dbname}", "${file}"]
+args = ["${dbname}", "${file}"]
+success_result_code = 0

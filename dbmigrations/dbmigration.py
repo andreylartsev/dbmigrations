@@ -19,6 +19,10 @@ TOML_CONFIG_FILE = 'dbmigration.toml'
 DBCONN_CONFIG_GROUP = 'dbconnection'
 OPTIONS_CONFIG_GROUP = "options"
 
+OPTIONS_FILE_GLOB_FILTERS = "file_glob_filters"
+OPTIONS_FILE_READ_ENCODING = "file_read_encoding"
+OPTIONS_FILE_READ_ENCODING_ERRORS = "file_read_encoding_errors"
+
 DBCONN_DEFAULT_HOST = 'localhost'
 DBCONN_DEFAULT_PORT = 5432
 DBCONN_DEFAULT_USER = None
@@ -30,41 +34,19 @@ BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
 REPEATABLE_DIR_NAME = "repeatable"
 REPEATABLE_SCRIPTS_TARGET_VERSION_FILE = "target_version.txt"
-SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
+#SQL_SCRIPTS_RGLOB_FILTER = "*.sql"
 SCRIPT_LIST_FILE_NAME = "script_list.txt"
+
 TOOLS_CONFIG_GROUP = "tools"
-EXEC_TOOL_NAME_FILE_NAME = "exec_tool.txt"
+TOOL_EXEC_ATTRIBUTE = "executable"
+TOOL_ARGS_ATTRIBUTE = "args"
+TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE = "success_result_code"
+USE_TOOL_NAME_FILE_NAME = "use_tool.txt"
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
     def __init__(self, message):
         super().__init__(message)
-
-def walk_through_dir_sorted(dir, rglob_filter):
-    start_path = pathlib.Path(dir) 
-    if not start_path.exists():
-        raise CommandError(f"The folder '{dir}' does not exists")
-    if not start_path.is_dir():
-        raise CommandError(f"The path '{dir}' is not a directory")        
-    script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
-    sorted_files = []
-    if script_list_file_path.exists():
-        sorted_files = []
-        with script_list_file_path.open("r") as script_list_file:
-            lines = script_list_file.readlines()
-            for line in lines:
-                trimmed_str = line.strip()
-                script_path = start_path.joinpath(trimmed_str)
-                if not script_path.exists():
-                    raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
-                if not script_path.is_file():
-                    raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file") 
-                sorted_files.append(script_path)
-    else:
-        all_items = start_path.rglob(rglob_filter)
-        files = [item for item in all_items if item.is_file()]
-        sorted_files = sorted(files)
-    return sorted_files
 
 def get_sha256sum_for_bytes(script_bytes):
     hash_object = hashlib.sha256(script_bytes)
@@ -79,16 +61,13 @@ def read_as_trimmed_string(file_path):
         trimmed_str = str.strip()
         return trimmed_str
 
-class ExternalToolConfig:
-    pass
-
-class ExternalTools:
+class ExternalTool:
     def make_variables_dict_from_config_and_script_path(self, dbconnection_config, script_path):
         result = {}
         for key, value in dbconnection_config.items():
             variable_key = "${" + key.strip() + "}"  
             result[variable_key] = value
-        result["${script_path}"] = script_path
+        result["${file}"] = script_path
         return result
 
     def match_variables_to_args(self, variables, args):
@@ -102,40 +81,41 @@ class ExternalTools:
                 result.append(arg)
         return result
 
-    def __init__(self, toml_config):
+    def __init__(self, tool_name, toml_config):
+        self.tool_name = tool_name
         if not DBCONN_CONFIG_GROUP in toml_config:
             raise CommandError(f"There is no configuration group '{DBCONN_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
         self.dbconn_config = toml_config[DBCONN_CONFIG_GROUP]
+        
         if not TOOLS_CONFIG_GROUP in toml_config:
             raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
-        self.tools_config = toml_config[TOOLS_CONFIG_GROUP]
-        tools = {}
-        for tool_name, tool_config in self.tools_config.items():
-            tool = ExternalToolConfig()
-            TOOL_EXEC_ATTRIBUTE = "exec"
-            if not TOOL_EXEC_ATTRIBUTE in tool_config:
-                raise CommandError(f"There is no attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
-            exec_attribute = tool_config[TOOL_EXEC_ATTRIBUTE]
-            exec_path = pathlib.Path(exec_attribute)
-            if not exec_path.exists():
-                raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' does not exists.")
-            if not exec_path.is_file():
-                raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' is not a file.")
-            tool.exec_path = exec_path
-            TOOL_ARGS_ATTRIBUTE = "args"
-            if not TOOL_ARGS_ATTRIBUTE in tool_config:
-                raise CommandError(f"There is no attribute '{TOOL_ARGS_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
-            tool.args = tool_config[TOOL_ARGS_ATTRIBUTE]
-            tools[tool_name] = tool
-        self.tools = tools
-
-
-    def run(self, tool_name, script_path):
-        if not tool_name in self.tools:
+        tools_config = toml_config[TOOLS_CONFIG_GROUP]
+        
+        if not tool_name in tools_config:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
-        tool = self.tools[tool_name]
-        tool_absolute_path = tool.exec_path.absolute()
-        tool_args = tool.args
+        tool_config = tools_config[tool_name]
+
+        if not TOOL_EXEC_ATTRIBUTE in tool_config:
+            raise CommandError(f"There is no attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+        exec_attribute = tool_config[TOOL_EXEC_ATTRIBUTE]
+        exec_path = pathlib.Path(exec_attribute)
+        if not exec_path.exists():
+            raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' does not exists.")
+        if not exec_path.is_file():
+            raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' is not a file.")
+        self.exec_path = exec_path
+
+        if not TOOL_ARGS_ATTRIBUTE in tool_config:
+            raise CommandError(f"There is no attribute '{TOOL_ARGS_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+        self.args = tool_config[TOOL_ARGS_ATTRIBUTE]
+
+        if not TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE in tool_config:
+            raise CommandError(f"There is no attribute '{TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+        self.success_result_code = tool_config[TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE]
+
+    def run(self, script_path):
+        tool_absolute_path = self.exec_path.absolute()
+        tool_args = self.args
         variables = self.make_variables_dict_from_config_and_script_path(self.dbconn_config, script_path)
         tool_args_with_matched_variables = self.match_variables_to_args(variables, tool_args)
         command_line = [str(tool_absolute_path), *tool_args_with_matched_variables]
@@ -148,10 +128,42 @@ class ExternalTools:
         # Read and print output line by line as it happens
         for line in iter(process.stdout.readline, ''):
             print(line, end='')  # Print directly to console
-        result = process.wait() # Ensure process finishes
-        return result
+        result_code = process.wait() # Ensure process finishes
+
+        if result_code != self.success_result_code:
+            raise CommandError(f"The tool '{self.tool_name}' returned unsuccessful result code {result_code}!")
 
 class BaseCommand:
+
+    def walk_through_dir_sorted(self, dir):
+        start_path = pathlib.Path(dir) 
+        if not start_path.exists():
+            raise CommandError(f"The folder '{dir}' does not exists")
+        if not start_path.is_dir():
+            raise CommandError(f"The path '{dir}' is not a directory")        
+        script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
+        sorted_files = []
+        if script_list_file_path.exists():
+            sorted_files = []
+            with script_list_file_path.open("r") as script_list_file:
+                lines = script_list_file.readlines()
+                for line in lines:
+                    trimmed_str = line.strip()
+                    script_path = start_path.joinpath(trimmed_str)
+                    if not script_path.exists():
+                        raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
+                    if not script_path.is_file():
+                        raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file") 
+                    sorted_files.append(script_path)
+        else:
+            all_files = []
+            for glob_filter in self.file_glob_filters:
+                all_items = start_path.rglob(glob_filter)
+                for item in all_items: 
+                    if item.is_file():
+                        all_files.append(item)
+            sorted_files = sorted(all_files)
+        return sorted_files
 
     def format_sql(self, sql, **params):
         if self.dbconn is None:
@@ -282,7 +294,20 @@ class BaseCommand:
         try:        
             self.options = config[OPTIONS_CONFIG_GROUP]
         except:
-            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration group '{OPTIONS_CONFIG_GROUP}'")
+            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration group '{OPTIONS_CONFIG_GROUP}'")  
+        try:        
+            self.file_read_encoding =  self.options[OPTIONS_FILE_READ_ENCODING]
+        except:
+            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration parameter {OPTIONS_FILE_READ_ENCODING} in group '{OPTIONS_CONFIG_GROUP}'")
+        try:        
+            self.file_read_encoding_errors =  self.options[OPTIONS_FILE_READ_ENCODING_ERRORS]
+        except:
+            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration parameter {OPTIONS_FILE_READ_ENCODING_ERRORS} in group '{OPTIONS_CONFIG_GROUP}'")
+        try:        
+            self.file_glob_filters =  self.options[OPTIONS_FILE_GLOB_FILTERS]
+        except:
+            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration parameter {OPTIONS_FILE_GLOB_FILTERS} in group '{OPTIONS_CONFIG_GROUP}'")
+        
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
         self.parser.add_argument("--host", type=str, default=self.dbconn_settings.get("host", DBCONN_DEFAULT_HOST), help="db server host name")
@@ -330,7 +355,7 @@ class UpdateCommand (BaseCommand):
     def run_baseline_scripts_each_in_own_tran(self, version, scripts):
          with self.dbconn.cursor() as cur:
             for script_path in scripts:
-                with open(script_path, 'rb') as f:
+                with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     print(f"Running script: '{script_path}'...")
                     script_text = f.read()
                     cur.execute("BEGIN")
@@ -345,11 +370,11 @@ class UpdateCommand (BaseCommand):
             print(f"Committed transaction")
 
     def run_versioned_scripts_in_tran(self, version, scripts):
-         with self.dbconn.cursor() as cur:
+        with self.dbconn.cursor() as cur:
             cur.execute("BEGIN")
             print(f"Begin transaction")
             for script_path in scripts:
-                with open(script_path, 'rb') as f:
+                with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     print(f"Running script: '{script_path}'...")
                     script_text = f.read()
                     cur.execute(script_text)                                  
@@ -377,7 +402,7 @@ class UpdateCommand (BaseCommand):
         baseline_version = baseline_version_subdir.name
         print(f"The baseline version to install {baseline_version}.")       
         print(f"Apply baseline scripts...")
-        scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
+        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir)
         self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)
         print(f"The baseline scripts were applied.")       
 
@@ -402,13 +427,15 @@ class UpdateCommand (BaseCommand):
         print(f"Apply versioned scripts...")
         for script_version_dir in newer_version_subdirs_sorted:        
             version_id = script_version_dir.name
-            scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
+            scripts_sorted = self.walk_through_dir_sorted(script_version_dir)
             if len(scripts_sorted) == 0:
-                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
+                filters_str = ",".join(self.file_glob_filters)
+                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any '{filters_str}' scripts")
             self.run_versioned_scripts_in_tran(version_id, scripts_sorted)       
         print(f"The versioned scripts were applied.")
 
     def apply_repeatable_scripts(self, scripts_dir):
+        
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory. Skip running the repeatable updates")
@@ -422,13 +449,14 @@ class UpdateCommand (BaseCommand):
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version {latest_installed_version}.")                  
         print(f"Target version matches the latest installed version '{target_version}'")
-        repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
+        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir)
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 print(f"Checking script '{script_path}' checksum...")
-                script_text = f.read()
-                sha256sum = get_sha256sum_for_bytes(script_text)
+                script_bytes = f.read()
+                sha256sum = get_sha256sum_for_bytes(script_bytes)
+                script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                 if not self.check_if_repeatable_script_installed(sha256sum):
                     scripts_to_repeat.append(script_path)
                     print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
@@ -442,8 +470,9 @@ class UpdateCommand (BaseCommand):
         with self.dbconn.cursor() as cur:
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
-                    script_text = f.read()
-                    sha256sum = get_sha256sum_for_bytes(script_text)
+                    script_bytes = f.read()
+                    sha256sum = get_sha256sum_for_bytes(script_bytes)
+                    script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                     relative_script_path = script_path.relative_to(scripts_dir)
                     print(f"Running script '{script_path}'...")
                     cur.execute("BEGIN")
@@ -546,7 +575,7 @@ class VerifyCommand (BaseCommand):
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
 
-        scripts_sorted = walk_through_dir_sorted(baseline_version_subdir, SQL_SCRIPTS_RGLOB_FILTER)
+        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir)
         print(f"The baseline scripts to install: ")       
         for item in scripts_sorted:
             print(f"[{item}]")
@@ -605,9 +634,10 @@ class VerifyCommand (BaseCommand):
 
         print(f"The versioned scripts to install: ")    
         for script_version_dir in newer_version_subdirs_sorted:    
-            scripts_sorted = walk_through_dir_sorted(script_version_dir, SQL_SCRIPTS_RGLOB_FILTER)
+            scripts_sorted = self.walk_through_dir_sorted(script_version_dir)
             if len(scripts_sorted) == 0:
-                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {SQL_SCRIPTS_RGLOB_FILTER} scripts")
+                filters_str = ",".join(self.file_glob_filters)
+                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
             for item in scripts_sorted:
                 print(f"[{item}]")
             if not target_script_path is None:
@@ -647,14 +677,14 @@ class VerifyCommand (BaseCommand):
 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
-        repeatable_scripts_sorted = walk_through_dir_sorted(repeatable_dir, SQL_SCRIPTS_RGLOB_FILTER)
+        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir)
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
         scripts_to_repeat_dict = {}
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
-                script_text = f.read()
-                sha256sum = get_sha256sum_for_bytes(script_text)
+                script_bytes = f.read()
+                sha256sum = get_sha256sum_for_bytes(script_bytes)
                 if not self.check_if_repeatable_script_installed(sha256sum):
                     scripts_to_repeat.append(script_path)
                     if not target_script_path is None:
@@ -776,8 +806,8 @@ def main():
     try:
         config = read_toml_config()
 
-        tool = ExternalTools(config)
-        tool.run("psql", "/tmp/1.sql")
+        #tool = ExternalTool("psql", config)
+        #tool.run("/tmp/1.sql")
 
         parser = argparse.ArgumentParser(description=__doc__)    
         subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
