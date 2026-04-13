@@ -126,14 +126,33 @@ class ExternalTool:
             text=True)
 
         # Read and print output line by line as it happens
-        for line in iter(process.stdout.readline, ''):
-            print(line, end='')  # Print directly to console
+        for line in process.stdout:
+            print(line, end='')
+        #for line in iter(process.stdout.readline, ''):
+        #    print(line, end='')  # Print directly to console
         result_code = process.wait() # Ensure process finishes
 
         if result_code != self.success_result_code:
             raise CommandError(f"The tool '{self.tool_name}' returned unsuccessful result code {result_code}!")
 
 class BaseCommand:
+
+    def try_get_external_tool_name(self, dir):
+        start_path = pathlib.Path(dir) 
+        if not start_path.exists():
+            raise CommandError(f"The folder '{dir}' does not exists")
+        if not start_path.is_dir():
+            raise CommandError(f"The path '{dir}' is not a directory")        
+        use_tool_file_name = start_path.joinpath(USE_TOOL_NAME_FILE_NAME)
+        if not use_tool_file_name.exists():
+            return None
+        tool_name = read_as_trimmed_string(use_tool_file_name)
+        if not TOOLS_CONFIG_GROUP in self.config:
+            raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
+        tools_config = self.config[TOOLS_CONFIG_GROUP]        
+        if not tool_name in tools_config:
+            raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
+        return tool_name
 
     def walk_through_dir_sorted(self, dir):
         start_path = pathlib.Path(dir) 
@@ -286,7 +305,8 @@ class BaseCommand:
         if not self.check_if_version_table_exists("dbmigration_repeatable"):
             raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
 
-    def __init__(self, config, subparsers, command_name, command_help):        
+    def __init__(self, config, subparsers, command_name, command_help):
+        self.config = config        
         try:        
             self.dbconn_settings = config[DBCONN_CONFIG_GROUP]
         except:
@@ -352,6 +372,18 @@ class BaseCommand:
 class UpdateCommand (BaseCommand):
     """Applies base, versioned, and repeatable scripts to the target database schema."""
 
+    def run_baseline_scripts_with_external_tool(self, version, scripts, tool):
+         print(f"Running baseline scripts with external tool '{tool.exec_path}'")
+         with self.dbconn.cursor() as cur:
+            for script_path in scripts:
+                print(f"Running script: '{script_path}'...")
+                tool.run(script_path)
+            print(f"Setting the baseline version '{version}'...")
+            cur.execute("BEGIN")
+            cur.execute("INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", (version, True))       
+            cur.execute("COMMIT")       
+            print(f"Committed transaction")
+
     def run_baseline_scripts_each_in_own_tran(self, version, scripts):
          with self.dbconn.cursor() as cur:
             for script_path in scripts:
@@ -403,7 +435,13 @@ class UpdateCommand (BaseCommand):
         print(f"The baseline version to install {baseline_version}.")       
         print(f"Apply baseline scripts...")
         scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir)
-        self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)
+        
+        external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
+        if not external_tool_name is None:
+            tool = ExternalTool(external_tool_name, self.config)
+            self.run_baseline_scripts_with_external_tool(baseline_version, scripts_sorted, tool)
+        else:
+            self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)
         print(f"The baseline scripts were applied.")       
 
     def apply_versioned_scripts(self, scripts_dir):

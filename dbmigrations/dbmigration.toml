@@ -6,7 +6,7 @@
 [dbconnection]
 host = "localhost"
 port = 5432
-dbname = "esbdb"
+dbname = "esbdb5"
 # dbname = "postgres"
 # user = "postgres"
 # connect_timeout = 30
@@ -30,5 +30,5 @@ success_result_code = 0
 [tools.pg_restore] 
 executable = "/opt/homebrew/bin/pg_restore"
 # args = ["-h", "${host}", "-U", "${user}", "-p", "${port}", "-d", "${dbname}", "${file}"]
-args = ["${dbname}", "${file}"]
+args = ["-d", "${dbname}", "${file}"]
 success_result_code = 0
