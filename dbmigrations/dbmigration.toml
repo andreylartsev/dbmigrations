@@ -6,11 +6,29 @@
 [dbconnection]
 host = "localhost"
 port = 5432
-dbname = "esbdb"
-user = "postgres"
+dbname = "esbdb6"
+# dbname = "postgres"
+# user = "postgres"
 # connect_timeout = 30
 # sslmode = "prefer"
 
 # command options
 [options]
-no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
+no_password = true # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
+file_glob_filters = ["*.sql", "*.dump"]
+file_read_encoding = "utf-8"
+file_read_encoding_errors = "ignore"
+
+
+# external tools to apply baseline
+[tools.psql]
+executable = "/opt/homebrew/bin/psql"
+# args = ["-h", "${host}", "-p", "${port}", "-U", "${user}, "-d", "${dbname}", "-f", "${file}"]
+args = ["-f", "${file}", "${dbname}"]
+success_result_code = 0
+
+[tools.pg_restore] 
+executable = "/opt/homebrew/bin/pg_restore"
+# args = ["-h", "${host}", "-U", "${user}", "-p", "${port}", "-d", "${dbname}", "${file}"]
+args = ["-d", "${dbname}", "${file}"]
+success_result_code = 0

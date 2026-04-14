@@ -1,12 +1,37 @@
 {
     "cSpell.words": [
+        "Andrey",
+        "andreylartsev",
         "anonymization",
         "DBCONN",
         "dbconnection",
         "dbmigration",
+        "dbmigrations",
         "dbname",
         "esbdb",
+        "larcev",
+        "Liquibase",
+        "nextval",
         "nspname",
-        "sslmode"
-    ]
+        "PGPASSWORD",
+        "pkey",
+        "psql",
+        "psycopg",
+        "regclass",
+        "sslmode",
+        "tomllib",
+        "topsecret",
+        "varchar",
+        "venv",
+        "xmloption",
+        "xzvf",
+        "версионированного",
+        "Версионные",
+        "логирует",
+        "смоук",
+        "фидбэк",
+        "хотфикс",
+        "хотфиксов"
+    ],
+    "cSpell.language": "en,ru"
 }

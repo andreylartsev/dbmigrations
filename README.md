@@ -176,8 +176,8 @@ Try connect to database using __psql__ and execute following commands:
 
 ## How can we make script for code review
 
-In additonal to __update__ the tool supports the command __verify__ that verifies considency of scripts directory and lists those of them that that will be applied on db in case __update__ command use. 
-The __verify__ command have the option __--build-update-script__ that instucts the tool to build update script for code review.
+In additional to __update__ the tool supports the command __verify__ that verifies consistency of scripts directory and lists those of them that that will be applied on db in case __update__ command use. 
+The __verify__ command have the option __--build-update-script__ that instructs the tool to build update script for code review.
 
 ```
 (.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ python3 ./dbmigrations/dbmigration.py verify esbdb ./dbmigrations/samples/test1 --build-update-script esbdb.sql
@@ -198,7 +198,7 @@ The update script is written to 'esbdb.sql'.
 Closed db connection
 ```
 
-The resulting script includes all neccessary updates to db, transaction control statements to make it safe and inserts into version control tables. 
+The resulting script includes all necessary updates to db, transaction control statements to make it safe and inserts into version control tables. 
 
 It looks like this: 
 
@@ -293,7 +293,7 @@ options:
   --port PORT        db server port
   --dbname DBNAME    database name
   --user USER        user name
-  -n, --no-password  dont ask user password
+  -n, --no-password  don't ask user password
 ```
 
 ### __Update__ subcommand help:
@@ -313,7 +313,7 @@ options:
   --port PORT        db server port
   --dbname DBNAME    database name
   --user USER        user name
-  -n, --no-password  dont ask user password
+  -n, --no-password  don't ask user password
 ```
 ### __Verify__ subcommand help:
 
@@ -333,7 +333,7 @@ options:
   --port PORT           db server port
   --dbname DBNAME       database name
   --user USER           user name
-  -n, --no-password     dont ask user password
+  -n, --no-password     don't ask user password
   --build-update-script BUILD_UPDATE_SCRIPT
                         the update script path if you want one as an additional result of the verify command
 ```

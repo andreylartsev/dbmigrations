@@ -8,11 +8,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "env": {
-                "USER_PASSWORD": "1234561",
-            },
             "args": [
-                "update", "public", "dbmigrations/samples/test1_just_baseline"
+                "update", "--force-reapply-latest-version", "esbdb", "./dbmigrations/samples/test1_reapply_latest"
             ],
         }
     ]
