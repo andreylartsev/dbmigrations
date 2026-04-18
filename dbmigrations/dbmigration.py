@@ -44,6 +44,8 @@ USE_TOOL_NAME_FILE_NAME = "use_tool.txt"
 
 VERSION_CLEANUP_FILE_NAME = "_cleanup.sql"
 
+SEARCH_PATH_FILE_NAME = "set_search_path.txt"
+
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
     def __init__(self, message):
@@ -221,10 +223,24 @@ class BaseCommand:
             raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return value
     
-    def set_session_search_path(self):
+    def get_search_path_for_scripts(self):
+        scripts_dir = pathlib.Path(self.args.scripts_path)
+        set_search_path_file = scripts_dir.joinpath(SEARCH_PATH_FILE_NAME)
+        if not set_search_path_file.exists():
+            print(f"No file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{self.args.scripts_path}', using current schema name '{self.args.schema_name}'")
+            return self.args.schema_name
+        if not set_search_path_file.is_file():
+            raise CommandError(f"The search path file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{self.args.scripts_path}' is not a file")
+        trimmed_str = read_as_trimmed_string(set_search_path_file)
+        print(f"Using '{trimmed_str}' as a session 'search_path'")
+        return trimmed_str
+    
+    def set_session_search_path(self, search_path):
         sql = f"""
-            SET search_path TO {self.args.schema_name}"""
-        self.dbconn_exec_with_no_result(sql, [])
+            SELECT pg_catalog.set_config('search_path', %s, false)"""
+        result = self.dbconn_get_single_value(sql, (search_path,))
+        if result != search_path:
+            raise CommandError(f"Unexpected value '{result}' returned on attempt to set the search path")
 
     def check_if_version_table_exists(self, table_name):
         sql = """
@@ -313,7 +329,8 @@ class BaseCommand:
             raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
-        self.set_session_search_path()     
+        search_path = self.get_search_path_for_scripts()
+        self.set_session_search_path(search_path)     
         if not self.check_if_version_table_exists("dbmigration_versions"):
             raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
         if not self.check_if_version_table_exists("dbmigration_repeatable"):
@@ -639,9 +656,9 @@ class VerifyCommand (BaseCommand):
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.latest_version_in_scripts = None
 
-    def write_search_path(self, schema_name, target_script_path):
+    def write_search_path(self, search_path, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
-            formatted_sql_text = self.format_sql("SET search_path TO {schema_name};\n", schema_name=self.get_schema_name())
+            formatted_sql_text = self.format_sql("SELECT pg_catalog.set_config('search_path', {search_path}, false);\n", search_path=search_path)
             target_file.write(formatted_sql_text)
 
     def write_baseline_scripts(self, version, scripts, target_script_path):
@@ -814,7 +831,8 @@ class VerifyCommand (BaseCommand):
             self.check_if_target_script_file_path_accessible_for_write(self.args.build_update_script)
             script_path = pathlib.Path(self.args.build_update_script)
             temp_script_path = script_path.with_suffix(script_path.suffix + ".tmp")
-            self.write_search_path(self.args.schema_name, temp_script_path)      
+            search_path = self.get_search_path_for_scripts()
+            self.write_search_path(search_path, temp_script_path)      
         try:            
             self.verify_baseline_scripts(self.scripts_dir, temp_script_path)
             self.verify_versioned_scripts(self.scripts_dir, temp_script_path)
