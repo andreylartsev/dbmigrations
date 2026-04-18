@@ -64,6 +64,9 @@ def read_as_trimmed_string(file_path):
         trimmed_str = str.strip()
         return trimmed_str
 
+def log_server_messages(diag):
+    print(f"Server message: {diag.severity} - {diag.message_primary}")
+
 class ExternalTool:
     def make_variables_dict_from_config_and_script_path(self, script_path):
         result = {}
@@ -377,6 +380,8 @@ class BaseCommand:
             self.dbconn_settings.pop("password", None)
         self.dbconn = psycopg.connect(**self.dbconn_settings)
         print(f"Opened db connection")
+        self.dbconn.add_notice_handler(log_server_messages)
+
     def __exit__(self, exc_type, exc_value, traceback):
         if not exc_type is None:
             self.dbconn.rollback()
