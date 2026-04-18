@@ -285,19 +285,19 @@ class BaseCommand:
 
     def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self, scripts_dir):
         print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
+        
         latest_version_in_baseline = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
             baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
             if len(baseline_subdirs) == 1:
                 baseline_version_subdir = baseline_subdirs[0]
-                latest_version_in_scripts = baseline_version_subdir.name
+                latest_version_in_baseline = baseline_version_subdir.name
+
         latest_version_in_versioned = None
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if versioned_dir.exists():
-            for item in versioned_dir.iterdir():
-                if item.is_dir():
-                    latest_version_in_versioned = item.name
+            latest_version_in_versioned = max((item.name for item in versioned_dir.iterdir() if item.is_dir()), default=None)
 
         latest_version_in_scripts = None
         if latest_version_in_baseline is None:
