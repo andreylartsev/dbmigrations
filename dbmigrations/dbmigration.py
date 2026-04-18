@@ -204,7 +204,14 @@ class BaseCommand:
     def dbconn_exec_with_no_result(self, sql, params):
         with self.dbconn.cursor() as cur:
             cur.execute(sql, params)
-        
+
+    def get_schema_name(self):
+         if self.args is None:
+             raise CommandError(f"The attribute self.args must not be None")
+         if self.args.schema_name is None:
+             raise CommandError(f"The attribute self.args.schema_name must not be None")
+         return psycopg.sql.Identifier(self.args.schema_name)
+
     def check_if_schema_exists(self):
         sql = """
             SELECT EXISTS (
@@ -233,7 +240,7 @@ class BaseCommand:
                 SELECT 1
                 FROM {schema_name}.dbmigration_versions
                 WHERE is_baseline IS TRUE)"""
-        formatted_sql = self.format_sql(sql, schema_name=psycopg.sql.Identifier(self.args.schema_name))
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
         value = self.dbconn_get_single_value(formatted_sql, [])
         if value is None:
             raise CommandError(f"Unable to check whether the baseline scripts were applied in the target schema")
@@ -242,7 +249,7 @@ class BaseCommand:
     def get_latest_version_installed(self):
         sql = """
             SELECT MAX(version_id) FROM {schema_name}.dbmigration_versions"""
-        formatted_sql = self.format_sql(sql, schema_name=psycopg.sql.Identifier(self.args.schema_name))
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
         value = self.dbconn_get_single_value(formatted_sql, [])
         if value is None:
             raise CommandError(f"Unable to get latest installed version")
@@ -254,7 +261,7 @@ class BaseCommand:
                 SELECT 1
                 FROM {schema_name}.dbmigration_repeatable
                 WHERE sha256sum = %s)"""        
-        formatted_sql = self.format_sql(sql, schema_name=psycopg.sql.Identifier(self.args.schema_name))
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
         value = self.dbconn_get_single_value(formatted_sql, (sha256sum,))
         if value is None:
             raise CommandError(f"Unable to check if repeatable script was installed")
@@ -379,7 +386,8 @@ class UpdateCommand (BaseCommand):
                 tool.run(script_path)
             print(f"Setting the baseline version '{version}'...")
             cur.execute("BEGIN")
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", schema_name=psycopg.sql.Identifier(self.args.schema_name))                                  
+            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
+                                            schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, True))       
             cur.execute("COMMIT")       
             print(f"Committed transaction")
@@ -397,7 +405,8 @@ class UpdateCommand (BaseCommand):
                     print(f"Committed transaction")
             print(f"Setting the baseline version '{version}'...")
             cur.execute("BEGIN")
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", schema_name=psycopg.sql.Identifier(self.args.schema_name))                                  
+            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
+                                            schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, True))       
             cur.execute("COMMIT")       
             print(f"Committed transaction")
@@ -406,14 +415,15 @@ class UpdateCommand (BaseCommand):
         with self.dbconn.cursor() as cur:
             cur.execute("BEGIN")
             print(f"Begin transaction")
-            formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=psycopg.sql.Identifier(self.args.schema_name))
+            formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=self.get_schema_name())
             cur.execute(formatted_sql, (version,))    
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     print(f"Running script: '{script_path}'...")
                     script_text = f.read()
                     cur.execute(script_text)                                  
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", schema_name=psycopg.sql.Identifier(self.args.schema_name))                                  
+            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
+                                            schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, False))       
             cur.execute("COMMIT")       
             print(f"Committed transaction")
@@ -427,7 +437,8 @@ class UpdateCommand (BaseCommand):
                     print(f"Running script: '{script_path}'...")
                     script_text = f.read()
                     cur.execute(script_text)
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", schema_name=psycopg.sql.Identifier(self.args.schema_name))                                  
+            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
+                                            schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, False))       
             cur.execute("COMMIT")       
             print(f"Committed transaction")
@@ -560,7 +571,8 @@ class UpdateCommand (BaseCommand):
                     cur.execute("BEGIN")
                     print(f"Begin transaction")
                     cur.execute(script_text)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", schema_name=psycopg.sql.Identifier(self.args.schema_name))                                  
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", 
+                                                    schema_name=self.get_schema_name())                                  
                     cur.execute(formatted_sql, (sha256sum, str(relative_script_path)))       
                     cur.execute("COMMIT")
                     print(f"Committed transaction.")
@@ -591,7 +603,7 @@ class VerifyCommand (BaseCommand):
     def get_baseline_version_installed(self):
         sql = """
                 SELECT version_id FROM {schema_name}.dbmigration_versions WHERE is_baseline IS TRUE ORDER BY version_id DESC LIMIT 1"""
-        formatted_sql = self.format_sql(sql, schema_name=psycopg.sql.Identifier(self.args.schema_name))
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
         value = self.dbconn_get_single_value(formatted_sql, [])
         return value
 
@@ -629,7 +641,7 @@ class VerifyCommand (BaseCommand):
 
     def write_search_path(self, schema_name, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
-            formatted_sql_text = self.format_sql("SET search_path TO {schema_name};\n", schema_name=psycopg.sql.Identifier(schema_name))
+            formatted_sql_text = self.format_sql("SET search_path TO {schema_name};\n", schema_name=self.get_schema_name())
             target_file.write(formatted_sql_text)
 
     def write_baseline_scripts(self, version, scripts, target_script_path):
@@ -647,7 +659,7 @@ class VerifyCommand (BaseCommand):
                     target_file.write(f"COMMIT;\n")
             target_file.write(f"BEGIN;\n")
             formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", 
-                                                 schema_name=psycopg.sql.Identifier(self.args.schema_name),version_id=version)
+                                                 schema_name=self.get_schema_name(), version_id=version)
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
@@ -689,7 +701,7 @@ class VerifyCommand (BaseCommand):
                     target_file.writelines(lines)
                     target_file.write(f"\n")
             formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, FALSE);\n", 
-                                                 schema_name=psycopg.sql.Identifier(self.args.schema_name), version_id=version)
+                                                 schema_name=self.get_schema_name(), version_id=version)
             target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
@@ -749,7 +761,7 @@ class VerifyCommand (BaseCommand):
                     target_file.writelines(lines)
                     target_file.write(f"\n")
                     formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, relative_path) VALUES ({sha256sum}, {relative_path});\n", 
-                                                         schema_name=psycopg.sql.Identifier(self.args.schema_name), sha256sum=sha256sum, relative_path=str(script_path))
+                                                         schema_name=self.get_schema_name(), sha256sum=sha256sum, relative_path=str(script_path))
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
 
@@ -865,8 +877,8 @@ class InitCommand (BaseCommand):
             COMMIT;
         """        
         with self.dbconn.cursor() as cur:
-            formatted_sql = self.format_sql(sql_script, schema_name=psycopg.sql.Identifier(self.args.schema_name))
-            cur.execute(formatted_sql);
+            formatted_sql = self.format_sql(sql_script, schema_name=self.get_schema_name())
+            cur.execute(formatted_sql)
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "init", InitCommand.__doc__)
