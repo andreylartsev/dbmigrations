@@ -937,9 +937,6 @@ def main():
     try:
         config = read_toml_config()
 
-        #tool = ExternalTool("psql", config)
-        #tool.run("/tmp/1.sql")
-
         parser = argparse.ArgumentParser(description=__doc__)    
         subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
 
