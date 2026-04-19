@@ -4,17 +4,21 @@
 # - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 #
 [dbconnection]
+# host = "10.70.41.240"
+# port = 5433
+# dbname = "ish_import_zapk_smft"
+# user = "dbinstall"
 host = "localhost"
 port = 5432
-dbname = "esbdb6"
-# dbname = "postgres"
-# user = "postgres"
+dbname = "test1"
+user = "postgres"
+
 # connect_timeout = 30
 # sslmode = "prefer"
 
 # command options
 [options]
-no_password = true # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
+no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
 file_glob_filters = ["*.sql", "*.dump"]
 file_read_encoding = "utf-8"
 file_read_encoding_errors = "ignore"
