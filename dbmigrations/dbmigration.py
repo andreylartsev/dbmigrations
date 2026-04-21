@@ -142,6 +142,51 @@ class ExternalTool:
 
 class BaseCommand:
 
+    def check_if_migration_to_add_version_id_to_repeatable_table_is_required(self):
+        sql = """
+            SELECT NOT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_schema = %s 
+                AND table_name   = 'dbmigration_repeatable' 
+                AND column_name  = 'version_id' 
+            ); 
+        """
+        result = self.dbconn_get_single_value(sql, (self.args.schema_name,))
+        return result
+
+
+    def migration_to_add_version_id_to_repeatable_table(self):
+        sql = """
+            DO $$
+            DECLARE 
+                pk_name VARCHAR(128);
+            BEGIN
+                RAISE NOTICE 'Start migration of table dbmigration_repeatable to add column version_id.';
+
+                ALTER TABLE {schema_name_identity}.dbmigration_repeatable ADD COLUMN version_id VARCHAR(64) NOT NULL DEFAULT '0';
+                
+                UPDATE {schema_name_identity}.dbmigration_repeatable SET version_id = (SELECT MAX(version_id) FROM {schema_name_identity}.dbmigration_versions);
+                
+                SELECT constraint_name INTO pk_name
+                FROM information_schema.table_constraints 
+                WHERE table_schema = {schema_name_str}
+                    AND table_name = 'dbmigration_repeatable' 
+                    AND constraint_type = 'PRIMARY KEY';
+
+                IF pk_name IS NOT NULL THEN
+                    EXECUTE 'ALTER TABLE {schema_name_identity}.dbmigration_repeatable DROP CONSTRAINT ' || quote_ident(pk_name);
+                END IF;
+
+                ALTER TABLE {schema_name_identity}.dbmigration_repeatable ADD PRIMARY KEY (sha256sum, version_id);
+                
+                RAISE NOTICE 'The column version_id has been added.';
+            END
+            $$;
+        """
+        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
+        self.dbconn_exec_with_no_result(formatted_sql, [])
+
     def try_get_external_tool_name(self, dir):
         start_path = pathlib.Path(dir) 
         if not start_path.exists():
@@ -274,14 +319,15 @@ class BaseCommand:
             raise CommandError(f"Unable to get latest installed version")
         return value
 
-    def check_if_repeatable_script_installed(self, sha256sum):
+    def check_if_repeatable_script_installed(self, sha256sum, version):
         sql = """
             SELECT EXISTS (
                 SELECT 1
                 FROM {schema_name}.dbmigration_repeatable
-                WHERE sha256sum = %s)"""        
+                WHERE sha256sum = %s 
+                  AND version_id = %s)"""        
         formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
-        value = self.dbconn_get_single_value(formatted_sql, (sha256sum,))
+        value = self.dbconn_get_single_value(formatted_sql, (sha256sum, version))
         if value is None:
             raise CommandError(f"Unable to check if repeatable script was installed")
         return value
@@ -303,7 +349,9 @@ class BaseCommand:
             latest_version_in_versioned = max((item.name for item in versioned_dir.iterdir() if item.is_dir()), default=None)
 
         latest_version_in_scripts = None
-        if latest_version_in_baseline is None:
+        if latest_version_in_versioned is None:
+            latest_version_in_scripts = latest_version_in_baseline
+        elif latest_version_in_baseline is None:
             latest_version_in_scripts = latest_version_in_versioned
         elif latest_version_in_versioned > latest_version_in_baseline:
             latest_version_in_scripts = latest_version_in_versioned
@@ -573,7 +621,7 @@ class UpdateCommand (BaseCommand):
                 script_bytes = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_bytes)
                 script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
-                if not self.check_if_repeatable_script_installed(sha256sum):
+                if not self.check_if_repeatable_script_installed(sha256sum, target_version):
                     scripts_to_repeat.append(script_path)
                     print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
                 else:
@@ -594,15 +642,17 @@ class UpdateCommand (BaseCommand):
                     cur.execute("BEGIN")
                     print(f"Begin transaction")
                     cur.execute(script_text)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, relative_path) VALUES (%s, %s)", 
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, version_id, relative_path) VALUES (%s, %s, %s)", 
                                                     schema_name=self.get_schema_name())                                  
-                    cur.execute(formatted_sql, (sha256sum, str(relative_script_path)))       
+                    cur.execute(formatted_sql, (sha256sum, target_version, str(relative_script_path)))     
                     cur.execute("COMMIT")
                     print(f"Committed transaction.")
         print(f"The repeatable scripts were applied.")       
 
     def run(self):
         self.do_initial_cross_checks()
+        if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+            self.migration_to_add_version_id_to_repeatable_table()
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
             self.reapply_the_latest_version(self.scripts_dir)
@@ -783,8 +833,8 @@ class VerifyCommand (BaseCommand):
                     target_file.write(f"BEGIN;\n")
                     target_file.writelines(lines)
                     target_file.write(f"\n")
-                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, relative_path) VALUES ({sha256sum}, {relative_path});\n", 
-                                                         schema_name=self.get_schema_name(), sha256sum=sha256sum, relative_path=str(script_path))
+                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, version_id, relative_path) VALUES ({sha256sum}, {version_id}, {relative_path});\n", 
+                                                         schema_name=self.get_schema_name(), sha256sum=sha256sum, version_id=target_version, relative_path=str(script_path))
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
 
@@ -813,7 +863,7 @@ class VerifyCommand (BaseCommand):
             with open(script_path, 'rb') as f:
                 script_bytes = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_bytes)
-                if not self.check_if_repeatable_script_installed(sha256sum):
+                if not self.check_if_repeatable_script_installed(sha256sum, target_version):
                     scripts_to_repeat.append(script_path)
                     if not target_script_path is None:
                         scripts_to_repeat_dict[sha256sum] = script_path
@@ -829,6 +879,8 @@ class VerifyCommand (BaseCommand):
     def run(self):
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()
+        if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
         script_path = None
@@ -881,23 +933,26 @@ class InitCommand (BaseCommand):
         sql_script = """
             BEGIN;            
             CREATE TABLE {schema_name}.dbmigration_versions (
-                version_id VARCHAR(64) NOT NULL PRIMARY KEY,
+                version_id VARCHAR(64) NOT NULL,
                 is_baseline BOOL NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
-                created_from INET DEFAULT INET_CLIENT_ADDR()
+                created_from INET DEFAULT INET_CLIENT_ADDR(),
+                CONSTRAINT dbmigration_versions_primary_key PRIMARY KEY(version_id) 
             );
             INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ('0', true);
             DELETE FROM {schema_name}.dbmigration_versions WHERE version_id = '0';
             CREATE TABLE {schema_name}.dbmigration_repeatable (
-                sha256sum VARCHAR(128) NOT NULL PRIMARY KEY,
+                sha256sum VARCHAR(128) NOT NULL,
+                version_id VARCHAR(64) NOT NULL,
                 relative_path VARCHAR(2048) NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
-                created_from INET DEFAULT INET_CLIENT_ADDR()
+                created_from INET DEFAULT INET_CLIENT_ADDR(),
+                CONSTRAINT dbmigration_repeatable_primary_key PRIMARY KEY(sha256sum, version_id)
             );
-            INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, relative_path) VALUES ('0', 'test.sql');
-            DELETE FROM {schema_name}.dbmigration_repeatable WHERE sha256sum = '0';
+            INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, version_id, relative_path) VALUES ('0', '0', 'test.sql');
+            DELETE FROM {schema_name}.dbmigration_repeatable WHERE sha256sum = '0' and version_id = '0';
             COMMIT;
         """        
         with self.dbconn.cursor() as cur:
@@ -911,9 +966,11 @@ class InitCommand (BaseCommand):
     def run(self):
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
-        self.set_session_search_path()
+        self.set_session_search_path(self.args.schema_name)
 
         if not self.check_if_schema_is_empty():
+            if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+                self.migration_to_add_version_id_to_repeatable_table()
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
             if self.check_if_version_table_exists("dbmigration_versions"):
