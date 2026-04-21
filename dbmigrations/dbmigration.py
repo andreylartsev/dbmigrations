@@ -969,7 +969,7 @@ class InitCommand (BaseCommand):
         self.set_session_search_path(self.args.schema_name)
 
         if not self.check_if_schema_is_empty():
-            if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
                 self.migration_to_add_version_id_to_repeatable_table()
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
