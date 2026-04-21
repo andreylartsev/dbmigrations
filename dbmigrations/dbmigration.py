@@ -142,7 +142,7 @@ class ExternalTool:
 
 class BaseCommand:
 
-    def check_if_migration_to_add_version_id_to_repeatable_table_is_required(self):
+    def check_if_version_id_column_is_missing_in_repeatable_table(self):
         sql = """
             SELECT NOT EXISTS (
                 SELECT 1 
@@ -651,7 +651,7 @@ class UpdateCommand (BaseCommand):
 
     def run(self):
         self.do_initial_cross_checks()
-        if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+        if self.check_if_version_id_column_is_missing_in_repeatable_table():
             self.migration_to_add_version_id_to_repeatable_table()
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
@@ -879,7 +879,7 @@ class VerifyCommand (BaseCommand):
     def run(self):
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()
-        if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+        if self.check_if_version_id_column_is_missing_in_repeatable_table():
             raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
@@ -969,7 +969,7 @@ class InitCommand (BaseCommand):
         self.set_session_search_path(self.args.schema_name)
 
         if not self.check_if_schema_is_empty():
-            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_version_id_column_is_missing_in_repeatable_table():
                 self.migration_to_add_version_id_to_repeatable_table()
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
