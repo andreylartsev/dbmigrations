@@ -598,7 +598,7 @@ class UpdateCommand (BaseCommand):
             self.run_versioned_scripts_in_tran(version_id, scripts_sorted)       
         print(f"The versioned scripts were applied.")
 
-    def apply_repeatable_scripts(self, scripts_dir):
+    def apply_repeatable_scripts(self, scripts_dir, force_reapply = False):
         
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
@@ -621,7 +621,10 @@ class UpdateCommand (BaseCommand):
                 script_bytes = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_bytes)
                 script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
-                if not self.check_if_repeatable_script_installed(sha256sum, target_version):
+                if force_reapply:
+                    scripts_to_repeat.append(script_path)
+                    print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
+                elif not self.check_if_repeatable_script_installed(sha256sum, target_version):
                     scripts_to_repeat.append(script_path)
                     print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
                 else:
@@ -641,6 +644,10 @@ class UpdateCommand (BaseCommand):
                     print(f"Running script '{script_path}'...")
                     cur.execute("BEGIN")
                     print(f"Begin transaction")
+                    if force_reapply:
+                        formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_repeatable WHERE sha256sum = %s AND version_id = %s", 
+                                                        schema_name=self.get_schema_name())                                  
+                        cur.execute(formatted_sql, (sha256sum, target_version))     
                     cur.execute(script_text)
                     formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, version_id, relative_path) VALUES (%s, %s, %s)", 
                                                     schema_name=self.get_schema_name())                                  
@@ -656,13 +663,14 @@ class UpdateCommand (BaseCommand):
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
             self.reapply_the_latest_version(self.scripts_dir)
+            self.apply_repeatable_scripts(self.scripts_dir, force_reapply=True)
             print(f"Reapplied.")
         else:
             print(f"Performing updates from scripts repository: '{self.scripts_dir}'")
             self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
             self.apply_baseline_scripts(self.scripts_dir)
             self.apply_versioned_scripts(self.scripts_dir)
-            self.apply_repeatable_scripts(self.scripts_dir)
+            self.apply_repeatable_scripts(self.scripts_dir, force_reapply=False)
             print(f"Updated.")
 
 class VerifyCommand (BaseCommand):
