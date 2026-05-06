@@ -1022,7 +1022,7 @@ class RunTestsCommand (BaseCommand):
             cursor.execute(script_text)
             if cursor.rowcount > 0:
                 columns = [desc[0] for desc in cursor.description]
-                print("Returned following:")
+                print("Returned the following:")
                 print(";".join(columns))
                 for row in cursor:
                     print(";".join(map(str, row)))
