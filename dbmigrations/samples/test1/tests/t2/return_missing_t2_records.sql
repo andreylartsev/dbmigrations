@@ -7,4 +7,4 @@ WITH required_keys(id) AS (
 SELECT id
   FROM required_keys i
   WHERE NOT EXISTS (
- 	SELECT kk FROM t2 t where i.id = t.kk);
+ 	SELECT kk FROM t2 t where i.id = t.kk); 

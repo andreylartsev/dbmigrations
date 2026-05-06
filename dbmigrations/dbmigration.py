@@ -19,6 +19,9 @@ TOML_CONFIG_FILE = 'dbmigration.toml'
 DBCONN_CONFIG_GROUP = 'dbconnection'
 OPTIONS_CONFIG_GROUP = "options"
 
+RUN_TESTS_BY_ATTRIBUTE = "run_tests_by"
+DBCONN_CONFIG_USER_ATTRIBUTE = "user"
+
 OPTIONS_DEFAULT_FILE_GLOB_FILTERS = ["*.sql", "*.dump"]
 OPTIONS_DEFAULT_FILE_READ_ENCODING = "utf-8"
 OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS = "ignore"
@@ -33,7 +36,8 @@ DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
 BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
 REPEATABLE_DIR_NAME = "repeatable"
-REPEATABLE_SCRIPTS_TARGET_VERSION_FILE = "target_version.txt"
+TESTS_DIR_NAME = "tests"
+TARGET_VERSION_FILE = "target_version.txt"
 SCRIPT_LIST_FILE_NAME = "script_list.txt"
 
 TOOLS_CONFIG_GROUP = "tools"
@@ -208,7 +212,7 @@ class BaseCommand:
         exclusions = [
             VERSION_CLEANUP_FILE_NAME, 
             USE_TOOL_NAME_FILE_NAME, 
-            REPEATABLE_SCRIPTS_TARGET_VERSION_FILE]
+            TARGET_VERSION_FILE]
         exclusions_set = set(exclusions)
         start_path = pathlib.Path(dir) 
         if not start_path.exists():
@@ -364,7 +368,7 @@ class BaseCommand:
         target_version_in_repeatable = None
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if repeatable_dir.exists():
-            target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
+            target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
             if target_version_file_path.exists():
                 target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
         if target_version_in_repeatable is None:
@@ -427,7 +431,8 @@ class BaseCommand:
         else:
             self.dbconn_settings.pop("password", None)
         self.dbconn = psycopg.connect(**self.dbconn_settings)
-        print(f"Opened db connection")
+        connected_by = self.dbconn_settings["user"]
+        print(f"Opened db connection by role '{connected_by}'")
         self.dbconn.add_notice_handler(log_server_notices)
         self.dbconn.autocommit = True 
 
@@ -605,9 +610,9 @@ class UpdateCommand (BaseCommand):
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory. Skip running the repeatable updates")
             return
         print(f"Check repeatable scripts...")       
-        target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
+        target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
-            raise CommandError(f"The file with target version '{REPEATABLE_SCRIPTS_TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
+            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
         latest_installed_version = self.get_latest_version_installed() 
         if latest_installed_version != target_version:
@@ -851,9 +856,9 @@ class VerifyCommand (BaseCommand):
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
-        target_version_file_path = repeatable_dir.joinpath(REPEATABLE_SCRIPTS_TARGET_VERSION_FILE)
+        target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
-            raise CommandError(f"The file with target version '{REPEATABLE_SCRIPTS_TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
+            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
         latest_installed_version = None 
         try:
@@ -991,6 +996,94 @@ class InitCommand (BaseCommand):
         self.create_version_tracking_tables()
         print(f"Created.")
 
+class TestError(Exception):
+    """A unit test error."""
+    def __init__(self, message):
+        super().__init__(message)
+
+class RunTestsCommand (BaseCommand):
+    """Runs db unit test scripts to the target database schema."""
+
+    IS_TRUE_THAT_TEST_PREFIX = "is_true_that_"
+    RETURN_MISSING_TEST_PREFIX = "return_missing_"
+    ASSURE_THAT_TEST_PREFIX = "assure_that_"
+
+    def run_conditional(self, cursor, script_path, script_text):
+        path = pathlib.Path(script_path)
+        file_name = path.name
+        print(f"Run: '{script_path}'...", end="", flush=True)
+        if file_name.startswith(self.IS_TRUE_THAT_TEST_PREFIX):
+            cursor.execute(script_text)
+            row = cursor.fetchone()
+            value = row[0] if not row is None else False
+            if not value:
+                raise TestError(f"The returned value is {value}") 
+        elif file_name.startswith(self.RETURN_MISSING_TEST_PREFIX):
+            cursor.execute(script_text)
+            if cursor.rowcount > 0:
+                columns = [desc[0] for desc in cursor.description]
+                print("Returned following:")
+                print(";".join(columns))
+                for row in cursor:
+                    print(";".join(map(str, row)))
+                raise TestError(f"The result set must be empty!")
+        else:
+            cursor.execute(script_text)
+        print(f"Ok")
+
+    def run_test_scripts_each_in_own_tran(self, scripts):
+        error_count = 0
+        with self.dbconn.cursor() as cur:
+            for script_path in scripts:
+                with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
+                    script_text = f.read()
+                    cur.execute("BEGIN")
+                    try:
+                        self.run_conditional(cur, script_path, script_text)
+                    except Exception as e:
+                        error_count += 1
+                        error_type_name = type(e).__name__ 
+                        print(f"Error: {error_type_name}:", e)
+                    cur.execute("ROLLBACK")
+        return error_count      
+
+    def __init__(self, config, subparsers):
+
+        if OPTIONS_CONFIG_GROUP in config:
+            options = config[OPTIONS_CONFIG_GROUP]
+            if RUN_TESTS_BY_ATTRIBUTE in options:
+                run_tests_by = options[RUN_TESTS_BY_ATTRIBUTE]
+                if DBCONN_CONFIG_GROUP in config:
+                    if DBCONN_CONFIG_USER_ATTRIBUTE in config[DBCONN_CONFIG_GROUP]:
+                        config[DBCONN_CONFIG_GROUP][DBCONN_CONFIG_USER_ATTRIBUTE] = run_tests_by          
+        super().__init__(config, subparsers, "run-tests", RunTestsCommand.__doc__)
+        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
+
+    def run_unit_test_scripts(self, scripts_dir):
+        unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
+        if not unit_tests_dir.exists():
+            raise CommandError(f"The scripts path '{scripts_dir}' does not include '{TESTS_DIR_NAME}' subdirectory.")
+        target_version_file_path = unit_tests_dir.joinpath(TARGET_VERSION_FILE)
+        if not target_version_file_path.exists():
+            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in unit tests scripts subdirectory '{unit_tests_dir}'.")
+        target_version = read_as_trimmed_string(target_version_file_path)
+        latest_installed_version = self.get_latest_version_installed() 
+        if latest_installed_version != target_version:
+            raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
+        print(f"Target version matches the latest installed version '{target_version}'")    
+        scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir)        
+        error_count = self.run_test_scripts_each_in_own_tran(scripts_sorted)
+        if error_count > 0:
+            raise CommandError(f"The total error count is: {error_count}")
+
+    def run(self):
+        self.do_initial_cross_checks()
+        if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+            self.migration_to_add_version_id_to_repeatable_table()
+        print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
+        self.run_unit_test_scripts(self.scripts_dir)
+        print(f"All right, everything is ok.")
+
 def read_toml_config():
     script_dir = pathlib.Path(__file__).absolute().parent
     target_path = script_dir.joinpath(TOML_CONFIG_FILE)
@@ -1008,6 +1101,7 @@ def main():
         UpdateCommand(config, subparsers)
         VerifyCommand(config, subparsers)
         InitCommand(config, subparsers)
+        RunTestsCommand(config, subparsers)
 
         # Parse arguments
         args = parser.parse_args()
