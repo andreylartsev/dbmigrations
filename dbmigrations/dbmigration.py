@@ -1005,7 +1005,7 @@ class RunTestsCommand (BaseCommand):
     """Runs db unit test scripts to the target database schema."""
 
     IS_TRUE_THAT_TEST_PREFIX = "is_true_that_"
-    RETURN_MISSING_TEST_PREFIX = "return_missing_"
+    ANY_MISSING_TEST_PREFIX = "any_missing_"
     ASSURE_THAT_TEST_PREFIX = "assure_that_"
 
     def run_conditional(self, cursor, script_path, script_text):
@@ -1017,12 +1017,12 @@ class RunTestsCommand (BaseCommand):
             row = cursor.fetchone()
             value = row[0] if not row is None else False
             if not value:
-                raise TestError(f"The returned value is {value}") 
-        elif file_name.startswith(self.RETURN_MISSING_TEST_PREFIX):
+                raise TestError(f"The result value must be true but {value} was returned!") 
+        elif file_name.startswith(self.ANY_MISSING_TEST_PREFIX):
             cursor.execute(script_text)
             if cursor.rowcount > 0:
                 columns = [desc[0] for desc in cursor.description]
-                print("Returned the following:")
+                print("Failed. We miss these:")
                 print(";".join(columns))
                 for row in cursor:
                     print(";".join(map(str, row)))
@@ -1043,7 +1043,7 @@ class RunTestsCommand (BaseCommand):
                     except Exception as e:
                         error_count += 1
                         error_type_name = type(e).__name__ 
-                        print(f"Error: {error_type_name}:", e)
+                        print(f"Fail: {error_type_name}:", e)
                     cur.execute("ROLLBACK")
         return error_count      
 
@@ -1074,7 +1074,7 @@ class RunTestsCommand (BaseCommand):
         scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir)        
         error_count = self.run_test_scripts_each_in_own_tran(scripts_sorted)
         if error_count > 0:
-            raise CommandError(f"The total error count is: {error_count}")
+            raise CommandError(f"Some of tests were failed! The total fail count is: {error_count}")
 
     def run(self):
         self.do_initial_cross_checks()

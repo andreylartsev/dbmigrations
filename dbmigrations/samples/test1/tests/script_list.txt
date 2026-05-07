@@ -1,7 +1,7 @@
 ./t1/assure_that_t1_exists.sql
 ./t1/assure_that_t1_fields_are_present.sql
-./t1/return_missing_t1_records.sql
+./t1/any_missing_t1_records.sql
 ./t2/assure_that_t2_is_ok.sql
-./t2/return_missing_t2_records.sql
+./t2/any_missing_t2_records.sql
 ./latest_t1/assure_that_latest_t1_exists.sql
 ./latest_t1/is_true_that_latest_t1_returns_max_value.sql
