@@ -3,7 +3,8 @@ WITH required_keys(id) AS (
 	VALUES 
 		(1), 
 		(2),
-		(3)
+		(3),
+		(5)
 )
 SELECT id
   FROM required_keys i

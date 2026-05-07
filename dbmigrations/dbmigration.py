@@ -622,18 +622,19 @@ class UpdateCommand (BaseCommand):
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
-                print(f"Checking script '{script_path}' checksum...")
+                #print(f"Checking script '{script_path}' checksum...")
                 script_bytes = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_bytes)
                 script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                 if force_reapply:
                     scripts_to_repeat.append(script_path)
-                    print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
+                    #print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
                 elif not self.check_if_repeatable_script_installed(sha256sum, target_version):
                     scripts_to_repeat.append(script_path)
-                    print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
+                    #print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
                 else:
-                    print(f"Script with checksum '{sha256sum}' is already installed")        
+                    None
+                    #print(f"Script with checksum '{sha256sum}' is already installed")        
         if len(scripts_to_repeat) == 0:
             print(f"No any repeatable scripts found for (re)installation")       
             return
@@ -996,7 +997,7 @@ class InitCommand (BaseCommand):
         self.create_version_tracking_tables()
         print(f"Created.")
 
-class TestError(Exception):
+class TestFailed(Exception):
     """A unit test error."""
     def __init__(self, message):
         super().__init__(message)
@@ -1005,7 +1006,7 @@ class RunTestsCommand (BaseCommand):
     """Runs db unit test scripts to the target database schema."""
 
     IS_TRUE_THAT_TEST_PREFIX = "is_true_that_"
-    ANY_MISSING_TEST_PREFIX = "any_missing_"
+    DETECT_MISSING_TEST_PREFIX = "detect_missing_"
     ASSURE_THAT_TEST_PREFIX = "assure_that_"
 
     def run_conditional(self, cursor, script_path, script_text):
@@ -1017,16 +1018,18 @@ class RunTestsCommand (BaseCommand):
             row = cursor.fetchone()
             value = row[0] if not row is None else False
             if not value:
-                raise TestError(f"The result value must be true but {value} was returned!") 
-        elif file_name.startswith(self.ANY_MISSING_TEST_PREFIX):
+                raise TestFailed(f"Expected true, got {value}!") 
+        elif file_name.startswith(self.DETECT_MISSING_TEST_PREFIX):
             cursor.execute(script_text)
             if cursor.rowcount > 0:
                 columns = [desc[0] for desc in cursor.description]
-                print("Failed. We miss these:")
-                print(";".join(columns))
+                print("Failed. Missing records:")
+                print("=================================")
                 for row in cursor:
-                    print(";".join(map(str, row)))
-                raise TestError(f"The result set must be empty!")
+                    items = [f"{k}: {v}" for k, v in zip(columns, row)]
+                    line = ", ".join(items)
+                    print(line)
+                raise TestFailed(f"Expected no results!")
         else:
             cursor.execute(script_text)
         print(f"Ok")
@@ -1074,7 +1077,7 @@ class RunTestsCommand (BaseCommand):
         scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir)        
         error_count = self.run_test_scripts_each_in_own_tran(scripts_sorted)
         if error_count > 0:
-            raise CommandError(f"Some of tests were failed! The total fail count is: {error_count}")
+            raise CommandError(f"Tests failed: {error_count} total.")
 
     def run(self):
         self.do_initial_cross_checks()
