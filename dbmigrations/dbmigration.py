@@ -471,7 +471,7 @@ class UpdateCommand (BaseCommand):
                                             schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, True))       
             cur.execute("COMMIT")       
-            print(f"Committed transaction")
+            print(f"Committed.")
 
     def run_baseline_scripts_each_in_own_tran(self, version, scripts):
          with self.dbconn.cursor() as cur:
@@ -480,22 +480,21 @@ class UpdateCommand (BaseCommand):
                     print(f"Running script: '{script_path}'...")
                     script_text = f.read()
                     cur.execute("BEGIN")
-                    print(f"Begin transaction")
                     cur.execute(script_text)                                  
                     cur.execute("COMMIT")       
-                    print(f"Committed transaction")
-            print(f"Setting the baseline version '{version}'...")
+                    print(f"Committed.")
+            print(f"Setting the baseline version as '{version}'.")
             cur.execute("BEGIN")
             formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
                                             schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, True))       
             cur.execute("COMMIT")       
-            print(f"Committed transaction")
+            print(f"Committed.")
 
     def rerun_versioned_scripts(self, version, scripts):
         with self.dbconn.cursor() as cur:
+            print(f"Reapply version {version}...")
             cur.execute("BEGIN")
-            print(f"Begin transaction")
             formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=self.get_schema_name())
             cur.execute(formatted_sql, (version,))    
             for script_path in scripts:
@@ -507,12 +506,12 @@ class UpdateCommand (BaseCommand):
                                             schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, False))       
             cur.execute("COMMIT")       
-            print(f"Committed transaction")
+            print(f"Committed.")
 
     def run_versioned_scripts_in_tran(self, version, scripts):
         with self.dbconn.cursor() as cur:
+            print(f"Apply version {version}...")
             cur.execute("BEGIN")
-            print(f"Begin transaction")
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     print(f"Running script: '{script_path}'...")
@@ -522,7 +521,7 @@ class UpdateCommand (BaseCommand):
                                             schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, False))       
             cur.execute("COMMIT")       
-            print(f"Committed transaction")
+            print(f"Committed.")
 
 
     def __init__(self, config, subparsers): 
@@ -627,19 +626,13 @@ class UpdateCommand (BaseCommand):
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
-                #print(f"Checking script '{script_path}' checksum...")
                 script_bytes = f.read()
                 sha256sum = get_sha256sum_for_bytes(script_bytes)
                 script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                 if force_reapply:
                     scripts_to_repeat.append(script_path)
-                    #print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
                 elif not self.check_if_repeatable_script_installed(sha256sum, target_version):
                     scripts_to_repeat.append(script_path)
-                    #print(f"Script '{script_path}' with checksum '{sha256sum}' will be (re)installed")
-                else:
-                    None
-                    #print(f"Script with checksum '{sha256sum}' is already installed")        
         if len(scripts_to_repeat) == 0:
             print(f"No any repeatable scripts found for (re)installation")       
             return
@@ -654,7 +647,6 @@ class UpdateCommand (BaseCommand):
                     relative_script_path = script_path.relative_to(scripts_dir)
                     print(f"Running script: '{script_path}'...")
                     cur.execute("BEGIN")
-                    print(f"Begin transaction")
                     if force_reapply:
                         formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_repeatable WHERE sha256sum = %s AND version_id = %s", 
                                                         schema_name=self.get_schema_name())                                  
@@ -664,7 +656,7 @@ class UpdateCommand (BaseCommand):
                                                     schema_name=self.get_schema_name())                                  
                     cur.execute(formatted_sql, (sha256sum, target_version, str(relative_script_path)))     
                     cur.execute("COMMIT")
-                    print(f"Committed transaction.")
+                    print(f"Committed.")
         print(f"The repeatable scripts were applied.")       
 
     def run(self):
