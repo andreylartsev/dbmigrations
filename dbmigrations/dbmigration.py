@@ -1020,20 +1020,30 @@ class RunTestsCommand (BaseCommand):
         print(f"Running test: '{script_path}'...", end="", flush=True)
         if file_name.startswith(self.IS_TRUE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
-            row = cursor.fetchone()
-            value = row[0] if not row is None else False
-            if not value:
-                raise TestFailed(f"Expected true, got {value}!") 
+            result_number = 0
+            for results in cursor.results():
+                result_number += 1
+                if cursor.rowcount > 0:
+                    row = cursor.fetchone()
+                    value = row[0] if not row is None else False
+                    if not value:
+                        raise TestFailed(f"({result_number}) Expected true, got {value}!") 
         elif file_name.startswith(self.DETECT_MISSING_TEST_PREFIX):
+            has_failed = False
             cursor.execute(script_text)
-            if cursor.rowcount > 0:
-                columns = [desc[0] for desc in cursor.description]
-                print("FAIL. Missing records:")
-                print("=================================")
-                for row in cursor:
-                    items = [f"{k}: {v}" for k, v in zip(columns, row)]
-                    line = ", ".join(items)
-                    print(line)
+            result_number = 0
+            for results in cursor.results():
+                result_number += 1
+                if cursor.rowcount > 0:
+                    columns = [desc[0] for desc in cursor.description]
+                    print(f"FAIL. ({result_number}) Missing records:")
+                    print("=================================")
+                    for row in cursor:
+                        items = [f"{k}: {v}" for k, v in zip(columns, row)]
+                        line = ", ".join(items)
+                        print(line)
+                    has_failed = True
+            if has_failed:
                 raise TestFailed(f"Expected no results!")
         else:
             cursor.execute(script_text)
