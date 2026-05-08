@@ -1,6 +1,6 @@
 # setup of the test data
 ./00/_setup.sql
-./00/is_true_that_setup_data_available.sql
+./00/is_true_that_setup_data_is_available.sql
 
 # tests of t1 table
 ./t1/assure_that_t1_exists.sql
