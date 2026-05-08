@@ -227,6 +227,11 @@ class BaseCommand:
                 lines = script_list_file.readlines()
                 for line in lines:
                     trimmed_str = line.strip()
+                    if len(trimmed_str) == 0 or trimmed_str.startswith("#"):
+                        continue;              
+                    if trimmed_str.startswith("!"):
+                        print(f"Skipping: {trimmed_str}")
+                        continue;
                     script_path = start_path.joinpath(trimmed_str)
                     if not script_path.exists():
                         raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
@@ -431,7 +436,7 @@ class BaseCommand:
         else:
             self.dbconn_settings.pop("password", None)
         self.dbconn = psycopg.connect(**self.dbconn_settings)
-        connected_by = self.dbconn_settings["user"]
+        connected_by = self.dbconn_settings.get("user", "No user")
         print(f"Opened db connection by role '{connected_by}'")
         self.dbconn.add_notice_handler(log_server_notices)
         self.dbconn.autocommit = True 
@@ -647,7 +652,7 @@ class UpdateCommand (BaseCommand):
                     sha256sum = get_sha256sum_for_bytes(script_bytes)
                     script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                     relative_script_path = script_path.relative_to(scripts_dir)
-                    print(f"Running script '{script_path}'...")
+                    print(f"Running script: '{script_path}'...")
                     cur.execute("BEGIN")
                     print(f"Begin transaction")
                     if force_reapply:
@@ -1012,7 +1017,7 @@ class RunTestsCommand (BaseCommand):
     def run_conditional(self, cursor, script_path, script_text):
         path = pathlib.Path(script_path)
         file_name = path.name
-        print(f"Run: '{script_path}'...", end="", flush=True)
+        print(f"Running test: '{script_path}'...", end="", flush=True)
         if file_name.startswith(self.IS_TRUE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
             row = cursor.fetchone()
@@ -1023,7 +1028,7 @@ class RunTestsCommand (BaseCommand):
             cursor.execute(script_text)
             if cursor.rowcount > 0:
                 columns = [desc[0] for desc in cursor.description]
-                print("Failed. Missing records:")
+                print("FAIL. Missing records:")
                 print("=================================")
                 for row in cursor:
                     items = [f"{k}: {v}" for k, v in zip(columns, row)]
@@ -1032,22 +1037,27 @@ class RunTestsCommand (BaseCommand):
                 raise TestFailed(f"Expected no results!")
         else:
             cursor.execute(script_text)
-        print(f"Ok")
+        print(f"PASS")
 
     def run_test_scripts_each_in_own_tran(self, scripts):
         error_count = 0
         with self.dbconn.cursor() as cur:
+            cur.execute("BEGIN") # start global tran for tests
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     script_text = f.read()
-                    cur.execute("BEGIN")
+                    cur.execute("SAVEPOINT test_boundary")
                     try:
                         self.run_conditional(cur, script_path, script_text)
+                    except TestFailed as e:
+                        error_count += 1
+                        print(f"FAIL.", e)
                     except Exception as e:
                         error_count += 1
                         error_type_name = type(e).__name__ 
-                        print(f"Fail: {error_type_name}:", e)
-                    cur.execute("ROLLBACK")
+                        print(f"FAIL. {error_type_name}:", e)
+                    cur.execute("ROLLBACK TO SAVEPOINT test_boundary")
+            cur.execute("ROLLBACK") # rollback global tran for tests
         return error_count      
 
     def __init__(self, config, subparsers):
@@ -1081,7 +1091,7 @@ class RunTestsCommand (BaseCommand):
 
     def run(self):
         self.do_initial_cross_checks()
-        if self.check_if_migration_to_add_version_id_to_repeatable_table_is_required():
+        if self.check_if_version_id_column_is_missing_in_repeatable_table():
             self.migration_to_add_version_id_to_repeatable_table()
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
