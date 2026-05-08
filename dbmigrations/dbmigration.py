@@ -230,7 +230,7 @@ class BaseCommand:
                     if len(trimmed_str) == 0 or trimmed_str.startswith("#"):
                         continue;              
                     if trimmed_str.startswith("!"):
-                        print(f"Skipping: {trimmed_str}")
+                        print(f"Skip: {trimmed_str}")
                         continue;
                     script_path = start_path.joinpath(trimmed_str)
                     if not script_path.exists():
