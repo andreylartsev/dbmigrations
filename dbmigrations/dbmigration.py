@@ -1014,6 +1014,8 @@ class RunTestsCommand (BaseCommand):
     DETECT_MISSING_TEST_PREFIX = "detect_missing_"
     ASSURE_THAT_TEST_PREFIX = "assure_that_"
 
+    SETUP_TESTS_FILE_NAME = "_setup.sql"
+
     def run_conditional(self, cursor, script_path, script_text):
         path = pathlib.Path(script_path)
         file_name = path.name
@@ -1053,9 +1055,17 @@ class RunTestsCommand (BaseCommand):
         error_count = 0
         with self.dbconn.cursor() as cur:
             cur.execute("BEGIN") # start global tran for tests
+            setup_completed = False
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     script_text = f.read()
+                    script_name = script_path.name
+                    if not setup_completed and script_name == self.SETUP_TESTS_FILE_NAME:
+                        print(f"Running setup: '{script_path}'...", end="", flush=True)
+                        cur.execute(script_text)
+                        print(f"DONE")
+                        setup_completed = True
+                        continue
                     cur.execute("SAVEPOINT test_boundary")
                     try:
                         self.run_conditional(cur, script_path, script_text)

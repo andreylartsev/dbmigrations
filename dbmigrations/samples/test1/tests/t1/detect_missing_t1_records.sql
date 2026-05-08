@@ -3,7 +3,16 @@ WITH required_keys(id) AS (
 	VALUES 
 		(1), 
 		(2),
-		(3),
+		(3)
+)
+SELECT id
+  FROM required_keys i
+  WHERE NOT EXISTS (
+ 	SELECT v1 FROM t1 where i.id = t1.v1);
+
+-- second tests with result set
+WITH required_keys(id) AS (
+	VALUES 
 		(5)
 )
 SELECT id
