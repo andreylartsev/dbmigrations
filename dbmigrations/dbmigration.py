@@ -1044,7 +1044,8 @@ class RunTestsCommand (BaseCommand):
         print(f"PASS")
 
     def run_test_scripts_each_in_own_tran(self, scripts):
-        error_count = 0
+        self.fail_count = 0
+        self.pass_count = 0
         with self.dbconn.cursor() as cur:
             cur.execute("BEGIN") # start global tran for tests
             setup_completed = False
@@ -1061,16 +1062,16 @@ class RunTestsCommand (BaseCommand):
                     cur.execute("SAVEPOINT test_boundary")
                     try:
                         self.run_conditional(cur, script_path, script_text)
+                        self.pass_count += 1
                     except TestFailed as e:
-                        error_count += 1
+                        self.fail_count += 1
                         print(f"FAIL.", e)
                     except Exception as e:
-                        error_count += 1
+                        self.fail_count += 1
                         error_type_name = type(e).__name__ 
                         print(f"FAIL. {error_type_name}:", e)
                     cur.execute("ROLLBACK TO SAVEPOINT test_boundary")
             cur.execute("ROLLBACK") # rollback global tran for tests
-        return error_count      
 
     def __init__(self, config, subparsers):
 
@@ -1097,9 +1098,12 @@ class RunTestsCommand (BaseCommand):
             raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
         print(f"Target version matches the latest installed version '{target_version}'")    
         scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir)        
-        error_count = self.run_test_scripts_each_in_own_tran(scripts_sorted)
-        if error_count > 0:
-            raise CommandError(f"Tests failed: {error_count} total.")
+        self.run_test_scripts_each_in_own_tran(scripts_sorted)
+        if self.fail_count > 0:
+            raise CommandError(f"Tests failed: {self.fail_count}, passed: {self.pass_count}.")
+        else:
+            print(f"All {self.pass_count} tests passed.")
+            
 
     def run(self):
         self.do_initial_cross_checks()
@@ -1107,7 +1111,6 @@ class RunTestsCommand (BaseCommand):
             self.migration_to_add_version_id_to_repeatable_table()
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
-        print(f"All right, everything is ok.")
 
 def read_toml_config():
     script_dir = pathlib.Path(__file__).absolute().parent
@@ -1138,6 +1141,10 @@ def main():
             # If no subcommand is given, print help (or handle as needed)
             parser.print_help()
         return 0
+    except CommandError as e:    
+        error_type_name = type(e).__name__ 
+        print(f"Command error:", e)
+        return 1
     except Exception as e:
         error_type_name = type(e).__name__ 
         print(f"Error: {error_type_name}:", e)
