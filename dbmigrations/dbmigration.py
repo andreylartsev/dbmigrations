@@ -444,10 +444,10 @@ class BaseCommand:
     def __exit__(self, exc_type, exc_value, traceback):
         if not exc_type is None:
             self.dbconn.rollback()
-            print(f"Rolled back transaction")
+            print(f"Rolled back transaction.")
         if not self.dbconn is None:
             self.dbconn.close()
-            print(f"Closed db connection")
+            print(f"Closed db connection.")
         return False # propagate the exception
     def run(self):
         pass
@@ -1070,7 +1070,7 @@ class RunTestsCommand (BaseCommand):
                             savepoint_id = self.make_savepoint_identifier(setup_folder)
                             formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
                             cur.execute(formatted_sql)
-                            print(f"Rolled back to savepoint")
+                            print(f"Rolled back to savepoint.")
                     
                     if script_name == self.SETUP_TESTS_FILE_NAME:
                         setup_folder = str(script_path.absolute().parent)
@@ -1084,7 +1084,7 @@ class RunTestsCommand (BaseCommand):
                         print(f"DONE")
                         continue
                     else:
-                        cur.execute("SAVEPOINT test_boundary")
+                        cur.execute("SAVEPOINT savepoint_test_boundary")
                         try:
                             self.run_conditional(cur, script_path, script_text)
                             self.pass_count += 1
@@ -1095,7 +1095,7 @@ class RunTestsCommand (BaseCommand):
                             self.fail_count += 1
                             error_type_name = type(e).__name__ 
                             print(f"FAIL. {error_type_name}:", e)
-                        cur.execute("ROLLBACK TO SAVEPOINT test_boundary")
+                        cur.execute("ROLLBACK TO SAVEPOINT savepoint_test_boundary")
 
             cur.execute("ROLLBACK") # rollback global tran for tests
 
