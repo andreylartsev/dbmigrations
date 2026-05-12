@@ -1,8 +1,11 @@
 # setup of the test data
+./_setup.sql
 ./00/_setup.sql
 ./00/is_true_that_setup_data_is_populated.sql
 
 # tests of t1 table
+./t1/_setup.sql
+./t1/is_true_that_setup_data_is_populated.sql
 ./t1/assure_that_t1_exists.sql
 ./t1/assure_that_t1_fields_are_present.sql
 ./t1/detect_missing_t1_records.sql
@@ -15,3 +18,4 @@
 ./latest_t1/assure_that_latest_t1_exists.sql
 ./latest_t1/is_true_that_latest_t1_returns_max_value.sql
 
+./is_true_that_setup_data_is_populated.sql

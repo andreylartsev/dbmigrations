@@ -1043,34 +1043,60 @@ class RunTestsCommand (BaseCommand):
             cursor.execute(script_text)
         print(f"PASS")
 
+    def is_subpath_of(self, child, parent):
+        child_parts = pathlib.Path(child).absolute().parts
+        parent_parts = pathlib.Path(parent).absolute().parts        
+        return child_parts[:len(parent_parts)] == parent_parts
+    
+    def make_savepoint_identifier(self, folder):
+        return psycopg.sql.Identifier("savepoint_" + str(hash(folder)))
+
     def run_test_scripts_each_in_own_tran(self, scripts):
         self.fail_count = 0
         self.pass_count = 0
         with self.dbconn.cursor() as cur:
             cur.execute("BEGIN") # start global tran for tests
-            setup_completed = False
+            setup_folder_stack = []            
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     script_text = f.read()
                     script_name = script_path.name
-                    if not setup_completed and script_name == self.SETUP_TESTS_FILE_NAME:
+
+                    if len(setup_folder_stack) > 0:
+                        script_folder = str(script_path.absolute().parent)
+                        latest_item = setup_folder_stack[-1]
+                        if not self.is_subpath_of(script_folder, latest_item):
+                            setup_folder_stack.pop()
+                            savepoint_id = self.make_savepoint_identifier(setup_folder)
+                            formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
+                            cur.execute(formatted_sql)
+                            print(f"Rolled back to savepoint")
+                    
+                    if script_name == self.SETUP_TESTS_FILE_NAME:
+                        setup_folder = str(script_path.absolute().parent)
+                        setup_folder_stack.append(setup_folder)
+                        savepoint_id = self.make_savepoint_identifier(setup_folder)
+                        formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
+                        print(f"Make savepoint...")
+                        cur.execute(formatted_sql)
                         print(f"Running setup: '{script_path}'...", end="", flush=True)
                         cur.execute(script_text)
                         print(f"DONE")
-                        setup_completed = True
                         continue
-                    cur.execute("SAVEPOINT test_boundary")
-                    try:
-                        self.run_conditional(cur, script_path, script_text)
-                        self.pass_count += 1
-                    except TestFailed as e:
-                        self.fail_count += 1
-                        print(f"FAIL.", e)
-                    except Exception as e:
-                        self.fail_count += 1
-                        error_type_name = type(e).__name__ 
-                        print(f"FAIL. {error_type_name}:", e)
-                    cur.execute("ROLLBACK TO SAVEPOINT test_boundary")
+                    else:
+                        cur.execute("SAVEPOINT test_boundary")
+                        try:
+                            self.run_conditional(cur, script_path, script_text)
+                            self.pass_count += 1
+                        except TestFailed as e:
+                            self.fail_count += 1
+                            print(f"FAIL.", e)
+                        except Exception as e:
+                            self.fail_count += 1
+                            error_type_name = type(e).__name__ 
+                            print(f"FAIL. {error_type_name}:", e)
+                        cur.execute("ROLLBACK TO SAVEPOINT test_boundary")
+
             cur.execute("ROLLBACK") # rollback global tran for tests
 
     def __init__(self, config, subparsers):
