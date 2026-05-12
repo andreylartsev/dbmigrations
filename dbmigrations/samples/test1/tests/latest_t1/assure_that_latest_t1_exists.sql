@@ -1,1 +1,6 @@
-select 1 from latest_t1 where 2=1;
+SELECT
+  1
+FROM
+  latest_t1
+WHERE
+  2 = 1;

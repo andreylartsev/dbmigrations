@@ -1006,26 +1006,38 @@ class RunTestsCommand (BaseCommand):
     DETECT_MISSING_TEST_PREFIX = "detect_missing_"
     ASSURE_THAT_TEST_PREFIX = "assure_that_"
 
+    SETUP_TESTS_FILE_NAME = "_setup.sql"
+
     def run_conditional(self, cursor, script_path, script_text):
         path = pathlib.Path(script_path)
         file_name = path.name
         print(f"Running test: '{script_path}'...", end="", flush=True)
         if file_name.startswith(self.IS_TRUE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
-            row = cursor.fetchone()
-            value = row[0] if not row is None else False
-            if not value:
-                raise TestFailed(f"Expected true, got {value}!") 
+            result_number = 0
+            for results in cursor.results():
+                result_number += 1
+                if cursor.rowcount > 0:
+                    row = cursor.fetchone()
+                    value = row[0] if not row is None else False
+                    if not value:
+                        raise TestFailed(f"({result_number}) Expected true, got {value}!") 
         elif file_name.startswith(self.DETECT_MISSING_TEST_PREFIX):
+            has_failed = False
             cursor.execute(script_text)
-            if cursor.rowcount > 0:
-                columns = [desc[0] for desc in cursor.description]
-                print("FAIL. Missing records:")
-                print("=================================")
-                for row in cursor:
-                    items = [f"{k}: {v}" for k, v in zip(columns, row)]
-                    line = ", ".join(items)
-                    print(line)
+            result_number = 0
+            for results in cursor.results():
+                result_number += 1
+                if cursor.rowcount > 0:
+                    columns = [desc[0] for desc in cursor.description]
+                    print(f"FAIL. ({result_number}) Missing records:")
+                    print("=================================")
+                    for row in cursor:
+                        items = [f"{k}: {v}" for k, v in zip(columns, row)]
+                        line = ", ".join(items)
+                        print(line)
+                    has_failed = True
+            if has_failed:
                 raise TestFailed(f"Expected no results!")
         else:
             cursor.execute(script_text)
@@ -1035,9 +1047,17 @@ class RunTestsCommand (BaseCommand):
         error_count = 0
         with self.dbconn.cursor() as cur:
             cur.execute("BEGIN") # start global tran for tests
+            setup_completed = False
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     script_text = f.read()
+                    script_name = script_path.name
+                    if not setup_completed and script_name == self.SETUP_TESTS_FILE_NAME:
+                        print(f"Running setup: '{script_path}'...", end="", flush=True)
+                        cur.execute(script_text)
+                        print(f"DONE")
+                        setup_completed = True
+                        continue
                     cur.execute("SAVEPOINT test_boundary")
                     try:
                         self.run_conditional(cur, script_path, script_text)
