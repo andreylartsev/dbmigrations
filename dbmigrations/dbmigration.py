@@ -208,7 +208,7 @@ class BaseCommand:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
         return tool_name
 
-    def walk_through_dir_sorted(self, dir):
+    def walk_through_dir_sorted(self, dir, force_add_cleanup = False):
         exclusions = [
             VERSION_CLEANUP_FILE_NAME, 
             USE_TOOL_NAME_FILE_NAME, 
@@ -246,6 +246,13 @@ class BaseCommand:
                     if item.is_file() and not item.name in exclusions_set:
                         all_files.append(item)
             sorted_files = sorted(all_files)
+        if force_add_cleanup:
+            cleanup_file_path = start_path.joinpath(VERSION_CLEANUP_FILE_NAME)
+            if not cleanup_file_path.exists():
+                raise CommandError(f"The file '{cleanup_file_path}' does not exists")
+            if not cleanup_file_path.is_file():
+                raise CommandError(f"The path '{cleanup_file_path}' is not a file")
+            sorted_files.insert(0, cleanup_file_path)
         return sorted_files
 
     def format_sql(self, sql, **params):
@@ -1048,8 +1055,9 @@ class RunTestsCommand (BaseCommand):
         parent_parts = pathlib.Path(parent).absolute().parts        
         return child_parts[:len(parent_parts)] == parent_parts
     
-    def make_savepoint_identifier(self, folder):
-        return psycopg.sql.Identifier("savepoint_" + str(hash(folder)))
+    def make_savepoint_id(self, folder):
+        hash_str = str(hash(folder))
+        return psycopg.sql.Identifier("savepoint_" + hash_str)
 
     def run_test_scripts_each_in_own_tran(self, scripts):
         self.fail_count = 0
@@ -1067,7 +1075,7 @@ class RunTestsCommand (BaseCommand):
                         latest_item = setup_folder_stack[-1]
                         if not self.is_subpath_of(script_folder, latest_item):
                             setup_folder_stack.pop()
-                            savepoint_id = self.make_savepoint_identifier(setup_folder)
+                            savepoint_id = self.make_savepoint_id(setup_folder)
                             formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
                             cur.execute(formatted_sql)
                             print(f"Rolled back to savepoint.")
@@ -1075,7 +1083,7 @@ class RunTestsCommand (BaseCommand):
                     if script_name == self.SETUP_TESTS_FILE_NAME:
                         setup_folder = str(script_path.absolute().parent)
                         setup_folder_stack.append(setup_folder)
-                        savepoint_id = self.make_savepoint_identifier(setup_folder)
+                        savepoint_id = self.make_savepoint_id(setup_folder)
                         formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
                         print(f"Make savepoint...")
                         cur.execute(formatted_sql)
