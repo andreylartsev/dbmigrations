@@ -208,7 +208,7 @@ class BaseCommand:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
         return tool_name
 
-    def walk_through_dir_sorted(self, dir, force_add_cleanup = False):
+    def walk_through_dir_sorted(self, dir, force_run_cleanup = False):
         exclusions = [
             VERSION_CLEANUP_FILE_NAME, 
             USE_TOOL_NAME_FILE_NAME, 
@@ -246,7 +246,7 @@ class BaseCommand:
                     if item.is_file() and not item.name in exclusions_set:
                         all_files.append(item)
             sorted_files = sorted(all_files)
-        if force_add_cleanup:
+        if force_run_cleanup:
             cleanup_file_path = start_path.joinpath(VERSION_CLEANUP_FILE_NAME)
             if not cleanup_file_path.exists():
                 raise CommandError(f"The file '{cleanup_file_path}' does not exists")
@@ -534,6 +534,7 @@ class UpdateCommand (BaseCommand):
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
         self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="cleanup the latest version within database and reapply the included *.sql scripts")
+        self.parser.add_argument("--force-run-cleanup",  action="store_true", default=False, help="run the cleanup script before applying scripts for each version.")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
 
 
@@ -552,7 +553,7 @@ class UpdateCommand (BaseCommand):
         baseline_version = baseline_version_subdir.name
         print(f"The baseline version to install {baseline_version}.")       
         print(f"Apply baseline scripts...")
-        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir)
+        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir, force_run_cleanup = self.args.force_run_cleanup)
         
         external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
         if not external_tool_name is None:
@@ -607,7 +608,7 @@ class UpdateCommand (BaseCommand):
         print(f"Apply versioned scripts...")
         for script_version_dir in newer_version_subdirs_sorted:        
             version_id = script_version_dir.name
-            scripts_sorted = self.walk_through_dir_sorted(script_version_dir)
+            scripts_sorted = self.walk_through_dir_sorted(script_version_dir, force_run_cleanup = self.args.force_run_cleanup)
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any '{filters_str}' scripts")
