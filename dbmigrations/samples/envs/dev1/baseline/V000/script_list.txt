@@ -1,0 +1,4 @@
+./init_environment_id.sql
+../../../../test1/baseline/V000/_cleanup.sql
+../../../../test1/baseline/V000/00_create_t1.sql
+../../../../test1/baseline/V000/01_insert_into_t1.sql

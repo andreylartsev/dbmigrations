@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS environment AS SELECT 'dev1' as id;
