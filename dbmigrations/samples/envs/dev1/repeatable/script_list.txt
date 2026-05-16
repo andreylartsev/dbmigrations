@@ -1,1 +1,2 @@
-../../../test1/repeatable/00_create_view_latest_t1.sql
+./00_fn_get_environment_name.sql
+../../common/repeatable/01_create_view_latest_t1.sql
