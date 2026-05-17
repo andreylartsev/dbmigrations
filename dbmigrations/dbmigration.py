@@ -212,6 +212,15 @@ class BaseCommand:
         if not tool_name in tools_config:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
         return tool_name
+    
+    def script_path_for_log(self, scripts_dir, script_path):
+        dir = pathlib.Path(scripts_dir).parent
+        file = pathlib.Path(script_path)
+        if file.is_relative_to(dir):
+            result = file.relative_to(dir)
+        else:
+            result = script_path
+        return result
 
     def resolve_relative_script_path(self, start_path, depth_within_base_dir, path_str):
         if not path_str.startswith("@"):
@@ -225,19 +234,18 @@ class BaseCommand:
                 raise CommandError(f"No path separator found after environment name in path '{path_str}' specified in file '{script_list_file_path}'.")
         env_name = path_str[start:end]
         script_sub_path = path_str[end + 1:]
-        absolute = start_path.absolute()
-        parts = absolute.parts
-        if len(parts) < depth_within_base_dir + 1:
-            raise CommandError(f"Relative depth '{depth_within_base_dir}' within the base dir '{absolute}' exceeds the limit.")
-        envs_root_path = pathlib.Path(parts[0])
-        for part in parts[1:-(depth_within_base_dir+1)]:
-            envs_root_path = envs_root_path.joinpath(part)
-        new_env_root_path = envs_root_path.joinpath(env_name)       
-        new_start_path = new_env_root_path
-        last_parts = parts[-depth_within_base_dir:]
+        result = start_path
+        # walk back
+        for i in range(depth_within_base_dir + 1):
+            result = result.joinpath("..")
+        # add a referencing env name
+        result = result.joinpath(env_name)
+        # walk forward
+        last_parts = start_path.parts[-depth_within_base_dir:]
         for part in last_parts:
-            new_start_path = new_start_path.joinpath(part)
-        result = new_start_path.joinpath(script_sub_path)
+            result = result.joinpath(part)
+        # add extra path specified after env name
+        result = result.joinpath(script_sub_path)
         return result
 
     def walk_through_dir_sorted(self, base_dir, depth_within_base_dir, force_run_cleanup = False):
@@ -687,8 +695,8 @@ class UpdateCommand (BaseCommand):
                     script_bytes = f.read()
                     sha256sum = get_sha256sum_for_bytes(script_bytes)
                     script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
-                    relative_script_path = script_path
-                    print(f"Running script: '{script_path}'...")
+                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+                    print(f"Running script: '{relative_script_path}'...")
                     cur.execute("BEGIN")
                     if force_reapply:
                         formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_repeatable WHERE sha256sum = %s AND version_id = %s", 
