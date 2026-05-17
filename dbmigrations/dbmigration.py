@@ -427,7 +427,7 @@ class BaseCommand:
             if target_version_file_path.exists():
                 target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
         if target_version_in_repeatable is None:
-            print(f"No any repeatable scripts were found in scripts dir: '{scripts_dir}'")
+            print(f"No repeatable scripts were found in scripts dir: '{scripts_dir}'")
             return 
         if latest_version_in_scripts != target_version_in_repeatable:
             raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not match the latest version in versioned scripts '{latest_version_in_scripts}'")
@@ -509,11 +509,12 @@ class BaseCommand:
 class UpdateCommand (BaseCommand):
     """Applies base, versioned, and repeatable scripts to the target database schema."""
 
-    def run_baseline_scripts_with_external_tool(self, version, scripts, tool):
+    def run_baseline_scripts_with_external_tool(self, version, scripts_dir, scripts, tool):
          print(f"Running baseline scripts with external tool '{tool.exec_path}'")
          with self.dbconn.cursor() as cur:
             for script_path in scripts:
-                print(f"Running script: '{script_path}'...")
+                script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                print(f"Running script: [{script_path_for_log}]...")
                 tool.run(script_path)
             print(f"Setting the baseline version '{version}'...")
             cur.execute("BEGIN")
@@ -523,11 +524,12 @@ class UpdateCommand (BaseCommand):
             cur.execute("COMMIT")       
             print(f"Committed.")
 
-    def run_baseline_scripts_each_in_own_tran(self, version, scripts):
+    def run_baseline_scripts_each_in_own_tran(self, version, scripts_dir, scripts):
          with self.dbconn.cursor() as cur:
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    print(f"Running script: '{script_path}'...")
+                    script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                    print(f"Running script: [{script_path_for_log}]...")
                     script_text = f.read()
                     cur.execute("BEGIN")
                     cur.execute(script_text)                                  
@@ -541,7 +543,7 @@ class UpdateCommand (BaseCommand):
             cur.execute("COMMIT")       
             print(f"Committed.")
 
-    def rerun_versioned_scripts(self, version, scripts):
+    def rerun_versioned_scripts(self, version, scripts_dir, scripts):
         with self.dbconn.cursor() as cur:
             print(f"Reapply version {version}...")
             cur.execute("BEGIN")
@@ -549,7 +551,8 @@ class UpdateCommand (BaseCommand):
             cur.execute(formatted_sql, (version,))    
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    print(f"Running script: '{script_path}'...")
+                    script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                    print(f"Running script: [{script_path_for_log}]...")
                     script_text = f.read()
                     cur.execute(script_text)                                  
             formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
@@ -558,13 +561,14 @@ class UpdateCommand (BaseCommand):
             cur.execute("COMMIT")       
             print(f"Committed.")
 
-    def run_versioned_scripts_in_tran(self, version, scripts):
+    def run_versioned_scripts_in_tran(self, version, scripts_dir, scripts):
         with self.dbconn.cursor() as cur:
             print(f"Apply version {version}...")
             cur.execute("BEGIN")
             for script_path in scripts:
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    print(f"Running script: '{script_path}'...")
+                    script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                    print(f"Running script: [{script_path_for_log}]...")
                     script_text = f.read()
                     cur.execute(script_text)
             formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
@@ -601,9 +605,9 @@ class UpdateCommand (BaseCommand):
         external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
         if not external_tool_name is None:
             tool = ExternalTool(external_tool_name, self.args.schema_name, self.config)
-            self.run_baseline_scripts_with_external_tool(baseline_version, scripts_sorted, tool)
+            self.run_baseline_scripts_with_external_tool(baseline_version, scripts_dir, scripts_sorted, tool)
         else:
-            self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_sorted)
+            self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_dir, scripts_sorted)
         print(f"The baseline scripts were applied.")       
 
     def reapply_the_latest_version(self, scripts_dir):
@@ -627,7 +631,7 @@ class UpdateCommand (BaseCommand):
             filters_str = ",".join(self.file_glob_filters)
             raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
         cleanup_and_reapply_scripts = [clean_version_file_path, *scripts_sorted]
-        self.rerun_versioned_scripts(latest_installed_version, cleanup_and_reapply_scripts)       
+        self.rerun_versioned_scripts(latest_installed_version, scripts_dir, cleanup_and_reapply_scripts)       
 
 
     def apply_versioned_scripts(self, scripts_dir):
@@ -644,10 +648,10 @@ class UpdateCommand (BaseCommand):
         print(f"The latest installed version is {latest_installed_version}.")       
         newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
         if len(newer_version_subdirs) == 0:
-            print(f"No newer versions were found for installation.")       
+            print(f"No newer versions found for installation.")       
             return
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
-        print(f"{len(newer_version_subdirs)} new versions were found for installation.")       
+        print(f"Found {len(newer_version_subdirs)} new versions for installation.")       
         print(f"Apply versioned scripts...")
         for script_version_dir in newer_version_subdirs_sorted:        
             version_id = script_version_dir.name
@@ -655,7 +659,7 @@ class UpdateCommand (BaseCommand):
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any '{filters_str}' scripts")
-            self.run_versioned_scripts_in_tran(version_id, scripts_sorted)       
+            self.run_versioned_scripts_in_tran(version_id, scripts_dir, scripts_sorted)       
         print(f"The versioned scripts were applied.")
 
     def apply_repeatable_scripts(self, scripts_dir, force_reapply = False):
@@ -685,9 +689,9 @@ class UpdateCommand (BaseCommand):
                 elif not self.check_if_repeatable_script_installed(sha256sum, target_version):
                     scripts_to_repeat.append(script_path)
         if len(scripts_to_repeat) == 0:
-            print(f"No any repeatable scripts found for (re)installation")       
+            print(f"No changed repeatable scripts found for (re)installation.")       
             return
-        print(f"{len(scripts_to_repeat)} scripts were found to repeat")
+        print(f"Found {len(scripts_to_repeat)} scripts to re-run")
         print(f"Apply repeatable scripts...")       
         with self.dbconn.cursor() as cur:
             for script_path in scripts_to_repeat:
@@ -696,7 +700,7 @@ class UpdateCommand (BaseCommand):
                     sha256sum = get_sha256sum_for_bytes(script_bytes)
                     script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                    print(f"Running script: '{relative_script_path}'...")
+                    print(f"Running script: [{relative_script_path}]...")
                     cur.execute("BEGIN")
                     if force_reapply:
                         formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_repeatable WHERE sha256sum = %s AND version_id = %s", 
@@ -913,7 +917,7 @@ class VerifyCommand (BaseCommand):
         try:
             latest_installed_version = self.get_latest_version_installed()
         except CommandError:
-            print(f"No any versions are installed in the database schema.")
+            print(f"No versions were installed in the database schema.")
 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
@@ -930,7 +934,7 @@ class VerifyCommand (BaseCommand):
                     if not target_script_path is None:
                         scripts_to_repeat_dict[sha256sum] = script_path
         if len(scripts_to_repeat) == 0:
-            print(f"No any new repeatable scripts were found for installation")
+            print(f"No changed repeatable scripts found for (re)installation.")
             return
         print(f"The repeatable scripts to (re)install: ")
         for item in scripts_to_repeat:
