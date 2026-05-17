@@ -50,6 +50,11 @@ VERSION_CLEANUP_FILE_NAME = "_cleanup.sql"
 
 SEARCH_PATH_FILE_NAME = "set_search_path.txt"
 
+BASELINE_FILES_DEPTH = 2
+VERSIONED_FILES_DEPTH = 2
+REPEATABLE_FILES_DEPTH = 1
+TESTS_FILES_DEPTH = 1
+
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
     def __init__(self, message):
@@ -208,17 +213,44 @@ class BaseCommand:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
         return tool_name
 
-    def walk_through_dir_sorted(self, dir, force_run_cleanup = False):
+    def resolve_relative_script_path(self, start_path, depth_within_base_dir, path_str):
+        if not path_str.startswith("@"):
+            raise CommandError(f"The relative environment path must start with @ symbol, but '{path_str}' was found")
+        start = path_str.find("@") + 1
+        end = path_str.find(os.path.sep, start)
+        if end == -1:
+            end = path_str.find("/", start)
+            if end == -1:
+                script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
+                raise CommandError(f"No path separator found after environment name in path '{path_str}' specified in file '{script_list_file_path}'.")
+        env_name = path_str[start:end]
+        script_sub_path = path_str[end + 1:]
+        absolute = start_path.absolute()
+        parts = absolute.parts
+        if len(parts) < depth_within_base_dir + 1:
+            raise CommandError(f"Relative depth '{depth_within_base_dir}' within the base dir '{absolute}' exceeds the limit.")
+        envs_root_path = pathlib.Path(parts[0])
+        for part in parts[1:-(depth_within_base_dir+1)]:
+            envs_root_path = envs_root_path.joinpath(part)
+        new_env_root_path = envs_root_path.joinpath(env_name)       
+        new_start_path = new_env_root_path
+        last_parts = parts[-depth_within_base_dir:]
+        for part in last_parts:
+            new_start_path = new_start_path.joinpath(part)
+        result = new_start_path.joinpath(script_sub_path)
+        return result
+
+    def walk_through_dir_sorted(self, base_dir, depth_within_base_dir, force_run_cleanup = False):
         exclusions = [
             VERSION_CLEANUP_FILE_NAME, 
             USE_TOOL_NAME_FILE_NAME, 
             TARGET_VERSION_FILE]
         exclusions_set = set(exclusions)
-        start_path = pathlib.Path(dir) 
+        start_path = pathlib.Path(base_dir) 
         if not start_path.exists():
-            raise CommandError(f"The folder '{dir}' does not exists")
+            raise CommandError(f"The folder '{base_dir}' does not exists")
         if not start_path.is_dir():
-            raise CommandError(f"The path '{dir}' is not a directory")        
+            raise CommandError(f"The path '{base_dir}' is not a directory")        
         script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
         sorted_files = []
         if script_list_file_path.exists():
@@ -232,7 +264,10 @@ class BaseCommand:
                     if trimmed_str.startswith("!"):
                         print(f"Skip: {trimmed_str}")
                         continue;
-                    script_path = start_path.joinpath(trimmed_str)
+                    if trimmed_str.startswith("@"):
+                        script_path = self.resolve_relative_script_path(base_dir, depth_within_base_dir, trimmed_str)
+                    else:
+                        script_path = start_path.joinpath(trimmed_str)
                     if not script_path.exists():
                         raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
                     if not script_path.is_file():
@@ -553,7 +588,7 @@ class UpdateCommand (BaseCommand):
         baseline_version = baseline_version_subdir.name
         print(f"The baseline version to install {baseline_version}.")       
         print(f"Apply baseline scripts...")
-        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir, force_run_cleanup = self.args.force_run_cleanup)
+        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
         
         external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
         if not external_tool_name is None:
@@ -579,7 +614,7 @@ class UpdateCommand (BaseCommand):
             raise CommandError(f"The version cleanup file '{VERSION_CLEANUP_FILE_NAME}' does not exists in folder {str(latest_version_dir)}")
         if not clean_version_file_path.is_file():
             raise CommandError(f"The version cleanup file '{VERSION_CLEANUP_FILE_NAME}' is not a file")
-        scripts_sorted = self.walk_through_dir_sorted(latest_version_dir)
+        scripts_sorted = self.walk_through_dir_sorted(latest_version_dir, VERSIONED_FILES_DEPTH)
         if len(scripts_sorted) == 0:
             filters_str = ",".join(self.file_glob_filters)
             raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
@@ -608,7 +643,7 @@ class UpdateCommand (BaseCommand):
         print(f"Apply versioned scripts...")
         for script_version_dir in newer_version_subdirs_sorted:        
             version_id = script_version_dir.name
-            scripts_sorted = self.walk_through_dir_sorted(script_version_dir, force_run_cleanup = self.args.force_run_cleanup)
+            scripts_sorted = self.walk_through_dir_sorted(script_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any '{filters_str}' scripts")
@@ -630,7 +665,7 @@ class UpdateCommand (BaseCommand):
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version {latest_installed_version}.")                  
         print(f"Target version matches the latest installed version '{target_version}'")
-        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir)
+        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir, REPEATABLE_FILES_DEPTH)
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
@@ -652,7 +687,7 @@ class UpdateCommand (BaseCommand):
                     script_bytes = f.read()
                     sha256sum = get_sha256sum_for_bytes(script_bytes)
                     script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
-                    relative_script_path = script_path.relative_to(scripts_dir)
+                    relative_script_path = script_path
                     print(f"Running script: '{script_path}'...")
                     cur.execute("BEGIN")
                     if force_reapply:
@@ -770,7 +805,7 @@ class VerifyCommand (BaseCommand):
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
 
-        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir)
+        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir, BASELINE_FILES_DEPTH)
         print(f"The baseline scripts to install: ")       
         for item in scripts_sorted:
             print(f"[{item}]")
@@ -830,7 +865,7 @@ class VerifyCommand (BaseCommand):
 
         print(f"The versioned scripts to install: ")    
         for script_version_dir in newer_version_subdirs_sorted:    
-            scripts_sorted = self.walk_through_dir_sorted(script_version_dir)
+            scripts_sorted = self.walk_through_dir_sorted(script_version_dir, VERSIONED_FILES_DEPTH)
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
@@ -874,7 +909,7 @@ class VerifyCommand (BaseCommand):
 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
-        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir)
+        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir, REPEATABLE_FILES_DEPTH)
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
         scripts_to_repeat_dict = {}
@@ -1132,7 +1167,7 @@ class RunTestsCommand (BaseCommand):
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
         print(f"Target version matches the latest installed version '{target_version}'")    
-        scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir)        
+        scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir, TESTS_FILES_DEPTH)        
         self.run_test_scripts_each_in_own_tran(scripts_sorted)
         if self.fail_count > 0:
             raise CommandError(f"Tests failed: {self.fail_count}, passed: {self.pass_count}.")
