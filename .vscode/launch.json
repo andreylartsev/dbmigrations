@@ -9,7 +9,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "update", "test1", "./dbmigrations/samples/envs/dev1/"
+                "update", "test1", "./dbmigrations/samples/envs/dev1/", "--force-run-cleanup"
             ],
         }
     ]

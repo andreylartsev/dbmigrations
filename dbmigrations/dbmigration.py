@@ -248,7 +248,10 @@ class BaseCommand:
         result = result.joinpath(script_sub_path)
         return result
 
-    def walk_through_dir_sorted(self, base_dir, depth_within_base_dir, force_run_cleanup = False):
+    def walk_through_dir_sorted(self, base_dir, depth_within_base_dir, force_run_cleanup = False, recursion_depth=0):
+        MAX_RECURSION_DEPTH = 25
+        if recursion_depth > MAX_RECURSION_DEPTH:
+            raise CommandError(f"The max recursion depth is achieved {recursion_depth} at '{base_dir}' by path cross referencing")
         start_path = pathlib.Path(base_dir) 
         if not start_path.exists():
             raise CommandError(f"The folder '{base_dir}' does not exists")
@@ -271,18 +274,22 @@ class BaseCommand:
                     else:
                         script_path = start_path.joinpath(trimmed_str)
                     script_name = script_path.name
-                    if force_run_cleanup:
-                        if len(sorted_files) == 0 and (not script_name == VERSION_CLEANUP_FILE_NAME):
-                            raise CommandError(f"The list of scripts '{script_list_file_path}' must start with '{VERSION_CLEANUP_FILE_NAME}', but '{script_name}' was given.")
+                    if script_name == '*':
+                        new_base_path = script_path.parent
+                        scripts_to_add = self.walk_through_dir_sorted(new_base_path, depth_within_base_dir, force_run_cleanup, recursion_depth + 1)
+                        sorted_files = [*sorted_files, *scripts_to_add]
                     else:
-                        if (script_name == VERSION_CLEANUP_FILE_NAME):
-                            continue
-                    if not script_path.exists():
-                        raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
-                    if not script_path.is_file():
-                        raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file")
-
-                    sorted_files.append(script_path)
+                        if force_run_cleanup:
+                            if len(sorted_files) == 0 and (not script_name == VERSION_CLEANUP_FILE_NAME):
+                                raise CommandError(f"The list of scripts '{script_list_file_path}' must start with '{VERSION_CLEANUP_FILE_NAME}', but '{script_name}' was given.")
+                        else:
+                            if (script_name == VERSION_CLEANUP_FILE_NAME):
+                                continue
+                        if not script_path.exists():
+                            raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
+                        if not script_path.is_file():
+                            raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file")
+                        sorted_files.append(script_path)
         else:
             all_files = []
             exclusions = [
