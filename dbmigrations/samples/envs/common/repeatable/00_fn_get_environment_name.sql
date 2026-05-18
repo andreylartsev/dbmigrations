@@ -4,6 +4,6 @@ LANGUAGE plpgsql
 IMMUTABLE
 AS $$
 BEGIN
-    RAISE EXCEPTION 'Environment name is undefined!'
+    RAISE EXCEPTION 'Environment name is undefined!';
 END;
 $$;

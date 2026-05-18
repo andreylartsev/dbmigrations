@@ -1,1 +1,2 @@
+@common/_cleanup.sql
 @common/dummy.sql

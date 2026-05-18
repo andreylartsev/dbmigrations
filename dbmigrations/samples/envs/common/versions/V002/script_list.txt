@@ -1,2 +1,2 @@
-!_cleanup.sql
+_cleanup.sql
 dummy.sql

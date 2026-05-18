@@ -249,11 +249,6 @@ class BaseCommand:
         return result
 
     def walk_through_dir_sorted(self, base_dir, depth_within_base_dir, force_run_cleanup = False):
-        exclusions = [
-            VERSION_CLEANUP_FILE_NAME, 
-            USE_TOOL_NAME_FILE_NAME, 
-            TARGET_VERSION_FILE]
-        exclusions_set = set(exclusions)
         start_path = pathlib.Path(base_dir) 
         if not start_path.exists():
             raise CommandError(f"The folder '{base_dir}' does not exists")
@@ -262,40 +257,52 @@ class BaseCommand:
         script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
         sorted_files = []
         if script_list_file_path.exists():
-            sorted_files = []
             with script_list_file_path.open("r") as script_list_file:
                 lines = script_list_file.readlines()
                 for line in lines:
                     trimmed_str = line.strip()
                     if len(trimmed_str) == 0 or trimmed_str.startswith("#"):
-                        continue;              
+                        continue              
                     if trimmed_str.startswith("!"):
                         print(f"Skip: {trimmed_str}")
-                        continue;
+                        continue
                     if trimmed_str.startswith("@"):
                         script_path = self.resolve_relative_script_path(base_dir, depth_within_base_dir, trimmed_str)
                     else:
                         script_path = start_path.joinpath(trimmed_str)
+                    script_name = script_path.name
+                    if force_run_cleanup:
+                        if len(sorted_files) == 0 and (not script_name == VERSION_CLEANUP_FILE_NAME):
+                            raise CommandError(f"The list of scripts '{script_list_file_path}' must start with '{VERSION_CLEANUP_FILE_NAME}', but '{script_name}' was given.")
+                    else:
+                        if (script_name == VERSION_CLEANUP_FILE_NAME):
+                            continue
                     if not script_path.exists():
                         raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
                     if not script_path.is_file():
-                        raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file") 
+                        raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file")
+
                     sorted_files.append(script_path)
         else:
             all_files = []
+            exclusions = [
+                USE_TOOL_NAME_FILE_NAME, 
+                TARGET_VERSION_FILE,
+                VERSION_CLEANUP_FILE_NAME]
+            exclusions_set = set(exclusions)
             for glob_filter in self.file_glob_filters:
                 all_items = start_path.rglob(glob_filter)
                 for item in all_items: 
                     if item.is_file() and not item.name in exclusions_set:
                         all_files.append(item)
             sorted_files = sorted(all_files)
-        if force_run_cleanup:
-            cleanup_file_path = start_path.joinpath(VERSION_CLEANUP_FILE_NAME)
-            if not cleanup_file_path.exists():
-                raise CommandError(f"The file '{cleanup_file_path}' does not exists")
-            if not cleanup_file_path.is_file():
-                raise CommandError(f"The path '{cleanup_file_path}' is not a file")
-            sorted_files.insert(0, cleanup_file_path)
+            if force_run_cleanup:
+                cleanup_file_path = start_path.joinpath(VERSION_CLEANUP_FILE_NAME)
+                if not cleanup_file_path.exists():
+                    raise CommandError(f"The file '{cleanup_file_path}' does not exists")
+                if not cleanup_file_path.is_file():
+                    raise CommandError(f"The path '{cleanup_file_path}' is not a file")
+                sorted_files.insert(0, cleanup_file_path)
         return sorted_files
 
     def format_sql(self, sql, **params):
