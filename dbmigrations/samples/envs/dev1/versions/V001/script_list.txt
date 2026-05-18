@@ -1,3 +1,1 @@
-@common/_cleanup.sql
-@common/00_create_t2.sql
-@common/01_insert_into_t2.sql
+@common/*
