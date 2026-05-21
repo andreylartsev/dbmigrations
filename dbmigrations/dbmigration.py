@@ -635,17 +635,11 @@ class UpdateCommand (BaseCommand):
         if len(version_subdirs) != 1:
             raise CommandError(f"There is no subdirectory with scripts that matched to the latest installed version '{latest_installed_version}'")
         latest_version_dir = version_subdirs[0]
-        clean_version_file_path = latest_version_dir.joinpath(VERSION_CLEANUP_FILE_NAME)
-        if not clean_version_file_path.exists():
-            raise CommandError(f"The version cleanup file '{VERSION_CLEANUP_FILE_NAME}' does not exists in folder {str(latest_version_dir)}")
-        if not clean_version_file_path.is_file():
-            raise CommandError(f"The version cleanup file '{VERSION_CLEANUP_FILE_NAME}' is not a file")
-        scripts_sorted = self.walk_through_dir_sorted(latest_version_dir, VERSIONED_FILES_DEPTH)
+        scripts_sorted = self.walk_through_dir_sorted(latest_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=True)
         if len(scripts_sorted) == 0:
             filters_str = ",".join(self.file_glob_filters)
             raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
-        cleanup_and_reapply_scripts = [clean_version_file_path, *scripts_sorted]
-        self.rerun_versioned_scripts(latest_installed_version, scripts_dir, cleanup_and_reapply_scripts)       
+        self.rerun_versioned_scripts(latest_installed_version, scripts_dir, scripts_sorted)       
 
 
     def apply_versioned_scripts(self, scripts_dir):
