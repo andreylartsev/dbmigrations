@@ -220,7 +220,7 @@ class BaseCommand:
             result = file.relative_to(dir)
         else:
             result = script_path
-        return result
+        return result.as_posix()
 
     def resolve_relative_script_path(self, start_path, depth_within_base_dir, path_str):
         if not path_str.startswith("@"):
