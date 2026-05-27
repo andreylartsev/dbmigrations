@@ -594,7 +594,8 @@ class UpdateCommand (BaseCommand):
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
-        self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="cleanup the latest version within database and reapply the included *.sql scripts")
+        self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="cleanup the latest version within database and reapply the included *.sql scripts.")
+        self.parser.add_argument("--force-reapply-all-repeatable",  action="store_true", default=False, help="reapply all repeatable scripts regardless of whether they have changed.")
         self.parser.add_argument("--force-run-cleanup",  action="store_true", default=False, help="run the cleanup script before applying scripts for each version.")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
 
@@ -736,7 +737,7 @@ class UpdateCommand (BaseCommand):
             self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
             self.apply_baseline_scripts(self.scripts_dir)
             self.apply_versioned_scripts(self.scripts_dir)
-            self.apply_repeatable_scripts(self.scripts_dir, force_reapply=False)
+            self.apply_repeatable_scripts(self.scripts_dir, force_reapply=self.args.force_reapply_all_repeatable)
             print(f"Updated.")
 
 class VerifyCommand (BaseCommand):
