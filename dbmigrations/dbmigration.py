@@ -542,7 +542,8 @@ class BaseCommand:
     def __init__(self, config, subparsers, command_name, command_help):
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
-        self.dbconn_settings, _, self.no_password = self.get_dbenv_config(config, self.default_dbenv)  
+        self.dbconn_settings, _, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
+        self.run_tests_by = None
         try:        
             self.options = config[OPTIONS_CONFIG_GROUP]
         except:
@@ -555,10 +556,10 @@ class BaseCommand:
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
         self.parser.add_argument("--dbenv", type=str, default=self.default_dbenv, help="db environment name within TOML config")
-        self.parser.add_argument("--host", type=str, default=self.dbconn_settings.get("host", DBCONN_DEFAULT_HOST), help="db server host name")
-        self.parser.add_argument("--port", type=int, default=self.dbconn_settings.get("port", DBCONN_DEFAULT_PORT), help="db server port")
-        self.parser.add_argument("--dbname", type=str, default=self.dbconn_settings.get("dbname", DBCONN_DEFAULT_DBNAME), help="database name")
-        self.parser.add_argument("--user", type=str, default=self.dbconn_settings.get("user", DBCONN_DEFAULT_USER), help="user name")
+        self.parser.add_argument("--host", type=str, default=None, help="db server host name")
+        self.parser.add_argument("--port", type=int, default=None, help="db server port")
+        self.parser.add_argument("--dbname", type=str, default=None, help="database name")
+        self.parser.add_argument("--user", type=str, default=None, help="user name")
         self.parser.add_argument("-n","--no-password",  action="store_true", default=self.no_password, help="dont ask user password")
         self.parser.set_defaults(call=self) 
     def __enter__(self):
@@ -570,6 +571,8 @@ class BaseCommand:
             self.dbconn_settings["port"]=self.args.port
         if not self.args.user is None:
             self.dbconn_settings["user"]=self.args.user
+        if not self.run_tests_by is None:
+            self.dbconn_settings["user"]=self.run_tests_by
         if not self.args.dbname is None:
             self.dbconn_settings["dbname"]=self.args.dbname
         if not self.args.no_password:
@@ -1256,9 +1259,7 @@ class RunTestsCommand (BaseCommand):
     
     def __enter__(self):
         if not self.args.dbenv is None:
-            self.dbconn_settings, self.run_tests_by, _ = self.get_dbenv_config(self.config, self.args.dbenv)  
-        if not self.run_tests_by is None:
-            self.dbconn_settings["user"] = self.run_tests_by  
+            _, self.run_tests_by, _ = self.get_dbenv_config(self.config, self.args.dbenv)  
         super().__enter__()
 
     def run_unit_test_scripts(self, scripts_dir):
