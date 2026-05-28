@@ -289,7 +289,7 @@ COMMIT
 
 1. Prefixed with __assure_that___ should just finish w/o errors;
 2. Prefixed with __is_true_that___ should return one record with one boolean value = "true"; 
-3. Prefixed with __detect_missing___ should empty result set;
+3. Prefixed with __detect_missing___ should return empty result set;
 
 There are number of samples within [samples](./dbmigrations/samples/) folder.
 
