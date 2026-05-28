@@ -87,7 +87,7 @@ The [samples folder](./dbmigrations/samples/) includes sample DML/DDL scripts re
 2. Now you are ready to initialize schema with version control tables:
   ```
   (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> $env:USER_PASSWORD=topsecret123
-  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py init test1
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py init test2
   Opened db connection
   Creating the version control tables...
   Created.
@@ -99,44 +99,42 @@ But the user's password must be passed via environment variable "USER_PASSWORD" 
 
 3. Now you can update target schema with DDL/DML scripts: 
   ```
-  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py update esbdb .\dbmigrations\samples\test1\
-  Opened db connection
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py update test2 .\dbmigrations\samples\test1\
+  Opened db connection by role 'postgres'
+  Using 'test2,public' as a session 'search_path'
+  Performing updates from scripts repository: 'dbmigrations\samples\test1'
   Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: dbmigrations\samples\test1
   Completed.
-  Performing updates from scripts repository: 'dbmigrations\samples\test1'
   The baseline version to install V000.
   Apply baseline scripts...
-  Running script: 'dbmigrations\samples\test1\baseline\V000\00_create_t1.sql'...
-  Begin transaction
-  Committed transaction
-  Running script: 'dbmigrations\samples\test1\baseline\V000\01_insert_into_t1.sql'...
-  Begin transaction
-  Committed transaction
-  Setting the baseline version 'V000'...
-  Committed transaction
+  Running script: [test1/baseline/V000/00_create_t1.sql]...
+  Committed.
+  Running script: [test1/baseline/V000/01_insert_into_t1.sql]...
+  Committed.
+  Setting the baseline version as 'V000'.
+  Committed.
   The baseline scripts were applied.
   The latest installed version is V000.
-  1 new versions were found for installation.
+  Found 2 new versions for installation.
   Apply versioned scripts...
-  Begin transaction
-  Running script: 'dbmigrations\samples\test1\versions\V001\00_create_t2.sql'...
-  Running script: 'dbmigrations\samples\test1\versions\V001\01_insert_into_t2.sql'...
-  Committed transaction
+  Apply version V001...
+  Running script: [test1/versions/V001/00_create_t2.sql]...
+  Running script: [test1/versions/V001/01_insert_into_t2.sql]...
+  Committed.
+  Apply version V002...
+  Running script: [test1/versions/V002/dummy.sql]...
+  Committed.
   The versioned scripts were applied.
   Check repeatable scripts...
-  Target version matches the latest installed version 'V001'
-  Checking script 'dbmigrations\samples\test1\repeatable\00_create_view_latest_t1.sql' checksum...
-  Script 'dbmigrations\samples\test1\repeatable\00_create_view_latest_t1.sql' with checksum '90de5d9254461944fab716771b3c6c29fc9b57c924e23dc1e67f2bcb31024a93' will be (re)installed
-  1 scripts were found to repeat
+  Target version matches the latest installed version 'V002'
+  Found 1 scripts to re-run
   Apply repeatable scripts...
-  Running script 'dbmigrations\samples\test1\repeatable\00_create_view_latest_t1.sql'...
-  Begin transaction
-  Committed transaction.
+  Running script: [test1/repeatable/00_create_view_latest_t1.sql]...
+  Committed.
   The repeatable scripts were applied.
   Updated.
-  Closed db connection
-  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations>
-  ```
+  Closed db connection.
+```
 The first argument is a command name __"update"__ and second argument is a schema name __"test1"__ and third parameter is path to scripts folder __".\dbmigrations\samples\test1\"__ 
 
 4. And now let's look at the results inside the database:
@@ -144,35 +142,27 @@ The first argument is a command name __"update"__ and second argument is a schem
 Try connect to database using __psql__ and execute following commands:
 
 ```
-  > SET search_path TO test, public;
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> psql -U postgres test1
+  test1=# SET search_path TO test2, public;
+  SET
+  test1=# SELECT * FROM dbmigration_versions;
+  version_id | is_baseline |          created_at          | created_by | created_from
+  ------------+-------------+------------------------------+------------+--------------
+  V000       | t           | 2026-05-28 13:04:18.86726+03 | postgres   | 127.0.0.1
+  V001       | f           | 2026-05-28 13:04:18.8769+03  | postgres   | 127.0.0.1
+  V002       | f           | 2026-05-28 13:04:18.88653+03 | postgres   | 127.0.0.1
+  (3 rows)
 
-  > SELECT * FROM dbmigration_versions;
-  version_id|is_baseline|created_at                   |created_by|created_from|
-  ----------+-----------+-----------------------------+----------+------------+
-  V000      |true       |2026-04-03 00:36:58.643 +0300|postgres  |172.17.0.1  |
-  V001      |false      |2026-04-03 00:36:58.651 +0300|postgres  |172.17.0.1  |
 
-  > SELECT * FROM dbmigration_repeatable;
+  test1=# SELECT * FROM dbmigration_repeatable;
+  version_id |                 relative_path                 |          created_at           |                            sha256sum                             | created_by | created_from
+  ------------+-----------------------------------------------+-------------------------------+------------------------------------------------------------------+------------+--------------
+  V002       | test1/repeatable/00_create_view_latest_t1.sql | 2026-05-28 13:04:18.909018+03 | 1c996d791f080a72a4985be6691ff61f52278d67fac7f7f29a061cf79bffbd83 | postgres   | 127.0.0.1
+  (1 row)
 
-  sha256sum                                                       |relative_path                          |created_at                   |created_by|created_from|
-  ----------------------------------------------------------------+---------------------------------------+-----------------------------+----------+------------+
-  90de5d9254461944fab716771b3c6c29fc9b57c924e23dc1e67f2bcb31024a93|repeatable\00_create_view_latest_t1.sql|2026-04-03 00:36:58.681 +0300|postgres  |172.17.0.1  |
 
-  > SELECT * FROM t1;
-
-  v1|
-  --+
-  1|
-  2|
-
-  > SELECT * FROM t2;
-
-  kk|created_at                   |
-  --+-----------------------------+
-  1 |2026-04-03 00:36:58.651 +0300|
-  2 |2026-04-03 00:36:58.651 +0300|
-
-  ```
+  test1=#
+```
 
 ## How can we make script for code review
 
@@ -180,22 +170,25 @@ In additional to __update__ the tool supports the command __verify__ that verifi
 The __verify__ command have the option __--build-update-script__ that instructs the tool to build update script for code review.
 
 ```
-(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ python3 ./dbmigrations/dbmigration.py verify esbdb ./dbmigrations/samples/test1 --build-update-script esbdb.sql
-Opened db connection
-Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: dbmigrations/samples/test1
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py verify test2 .\dbmigrations\samples\test1\ --build-update-script xx.sql
+Opened db connection by role 'postgres'
+Using 'test1,test2,test3,public' as a session 'search_path'
+Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: dbmigrations\samples\test1
 Completed.
-The baseline scripts to install: 
-[dbmigrations/samples/test1/baseline/V000/00_create_t1.sql]
-[dbmigrations/samples/test1/baseline/V000/01_insert_into_t1.sql]
-The versioned scripts to install: 
-[dbmigrations/samples/test1/versions/V001/00_create_t2.sql]
-[dbmigrations/samples/test1/versions/V001/01_insert_into_t2.sql]
-No any versions are installed in the database schema.
-The target version for repeatable scripts is V001.
-The repeatable scripts to (re)install: 
-[dbmigrations/samples/test1/repeatable/00_create_view_latest_t1.sql]
-The update script is written to 'esbdb.sql'.
-Closed db connection
+Using 'test2,public' as a session 'search_path'
+The baseline scripts to install:
+[dbmigrations\samples\test1\baseline\V000\00_create_t1.sql]
+[dbmigrations\samples\test1\baseline\V000\01_insert_into_t1.sql]
+The versioned scripts to install:
+[dbmigrations\samples\test1\versions\V001\00_create_t2.sql]
+[dbmigrations\samples\test1\versions\V001\01_insert_into_t2.sql]
+[dbmigrations\samples\test1\versions\V002\dummy.sql]
+No versions were installed in the database schema.
+The target version for repeatable scripts is V002.
+The repeatable scripts to (re)install:
+[dbmigrations\samples\test1\repeatable\00_create_view_latest_t1.sql]
+The update script is written to 'xx.sql'.
+Closed db connection.
 ```
 
 The resulting script includes all necessary updates to db, transaction control statements to make it safe and inserts into version control tables. 
@@ -203,53 +196,66 @@ The resulting script includes all necessary updates to db, transaction control s
 It looks like this: 
 
 ```
-(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ cat esbdb.sql 
-SET search_path TO esbdb, public;
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> cat .\xx.sql
+SELECT pg_catalog.set_config('search_path', 'test1,test2,test3,public', false);
 -- Baseline scripts for version 'V000'
--- dbmigrations/samples/test1/baseline/V000/00_create_t1.sql
+-- E'dbmigrations\\samples\\test1\\baseline\\V000\\00_create_t1.sql'
 BEGIN;
 create table t1 (
     v1 serial not null primary key
 );
 
 COMMIT;
--- dbmigrations/samples/test1/baseline/V000/01_insert_into_t1.sql
+-- E'dbmigrations\\samples\\test1\\baseline\\V000\\01_insert_into_t1.sql'
 BEGIN;
 insert into t1 values (1);
 insert into t1 values (2);
 COMMIT;
 BEGIN;
-INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('V000', TRUE);
+INSERT INTO "test2".dbmigration_versions (version_id, is_baseline) VALUES ('V000', TRUE);
 COMMIT;
 -- Versioned scripts for version 'V001'
 BEGIN;
--- dbmigrations/samples/test1/versions/V001/00_create_t2.sql
+-- E'dbmigrations\\samples\\test1\\versions\\V001\\00_create_t2.sql'
 create table t2 (
     kk varchar(36) not null primary key,
     created_at timestamp with time zone not null default current_timestamp
 );
 
--- dbmigrations/samples/test1/versions/V001/01_insert_into_t2.sql
+-- E'dbmigrations\\samples\\test1\\versions\\V001\\01_insert_into_t2.sql'
 insert into t2 values ('1');
 insert into t2 values ('2');
-INSERT INTO dbmigration_versions (version_id, is_baseline) VALUES ('V001', FALSE);
+INSERT INTO "test2".dbmigration_versions (version_id, is_baseline) VALUES ('V001', FALSE);
 COMMIT;
--- Repeatable scripts for version 'V001'
--- dbmigrations/samples/test1/repeatable/00_create_view_latest_t1.sql
+-- Versioned scripts for version 'V002'
+BEGIN;
+-- E'dbmigrations\\samples\\test1\\versions\\V002\\dummy.sql'
+DO $$
+BEGIN
+    NULL;
+END
+$$;
+INSERT INTO "test2".dbmigration_versions (version_id, is_baseline) VALUES ('V002', FALSE);
+COMMIT;
+-- Repeatable scripts for version 'V002'
+--'test1/repeatable/00_create_view_latest_t1.sql'
 BEGIN;
 drop view if exists latest_t1;
 
-create view latest_t1 as 
+create view latest_t1 as
     select max(v1) as v1 from t1;
 
-INSERT INTO dbmigration_repeatable (sha256sum, relative_path) VALUES ('90de5d9254461944fab716771b3c6c29fc9b57c924e23dc1e67f2bcb31024a93', 'dbmigrations/samples/test1/repeatable/00_create_view_latest_t1.sql');
+
+
+INSERT INTO "test2".dbmigration_repeatable (sha256sum, version_id, relative_path) VALUES ('1c996d791f080a72a4985be6691ff61f52278d67fac7f7f29a061cf79bffbd83', 'V002', 'test1/repeatable/00_create_view_latest_t1.sql');
 COMMIT;
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations>
 ```
 
 And of course after code review you can apply it to db using plain __psql__ tool:
 
 ```
-(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ psql postgres < esbdb.sql 
+(.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ psql -U postgres test1 -f xx.sql 
 SET
 BEGIN
 CREATE TABLE
@@ -281,39 +287,47 @@ COMMIT
 ### __Init__ subcommand help:
 
 ```
-.(venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py init --help
-usage: dbmigration.py init [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] schema_name
+  test1=# \q
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py init -h
+  usage: dbmigration.py init [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] [--force-init] schema_name
 
-positional arguments:
-  schema_name        the name of target database schema
+  positional arguments:
+    schema_name        the name of target database schema
 
-options:
-  -h, --help         show this help message and exit
-  --host HOST        db server host name
-  --port PORT        db server port
-  --dbname DBNAME    database name
-  --user USER        user name
-  -n, --no-password  don't ask user password
+  options:
+    -h, --help         show this help message and exit
+    --host HOST        db server host name
+    --port PORT        db server port
+    --dbname DBNAME    database name
+    --user USER        user name
+    -n, --no-password  dont ask user password
+    --force-init       Force create version control tables even on non empty schema
 ```
 
 ### __Update__ subcommand help:
 
 ```
-.(venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py update --help
-usage: dbmigration.py update [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n]
-                             schema_name scripts_path
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py update -h
+  usage: dbmigration.py update [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] [--force-reapply-latest-version]
+                              [--force-reapply-all-repeatable] [--force-run-cleanup]
+                              schema_name scripts_path
 
-positional arguments:
-  schema_name        the name of target database schema
-  scripts_path       source scripts repository path
+  positional arguments:
+    schema_name           the name of target database schema
+    scripts_path          source scripts repository path
 
-options:
-  -h, --help         show this help message and exit
-  --host HOST        db server host name
-  --port PORT        db server port
-  --dbname DBNAME    database name
-  --user USER        user name
-  -n, --no-password  don't ask user password
+  options:
+    -h, --help            show this help message and exit
+    --host HOST           db server host name
+    --port PORT           db server port
+    --dbname DBNAME       database name
+    --user USER           user name
+    -n, --no-password     dont ask user password
+    --force-reapply-latest-version
+                          cleanup the latest version within database and reapply the included *.sql scripts.
+    --force-reapply-all-repeatable
+                          reapply all repeatable scripts regardless of whether they have changed.
+    --force-run-cleanup   run the cleanup script before applying scripts for each version.
 ```
 ### __Verify__ subcommand help:
 

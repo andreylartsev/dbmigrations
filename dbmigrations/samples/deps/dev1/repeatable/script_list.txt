@@ -1,0 +1,3 @@
+@common/*
+./fn_get_environment_name.sql
+./global_params.sql

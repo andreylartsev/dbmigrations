@@ -1,0 +1,2 @@
+./global_params.sql
+./fn_get_environment_name.sql
