@@ -292,6 +292,7 @@ The test scripts should be located within the "tests" subfolder of the script re
 1. Prefixed with __assure_that___ should just finish w/o errors;
 2. Prefixed with __is_true_that___ should return one record with one boolean value = "true"; 
 3. Prefixed with __detect_missing___ should return empty result set;
+4. The script named __"_setup.sql"__ is a special script type that is needed for preparation test data.
 
 There are number of samples within [samples](./dbmigrations/samples/) folder.
 
