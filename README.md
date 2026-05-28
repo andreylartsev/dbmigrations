@@ -336,53 +336,54 @@ Command error: Tests failed: 2, passed: 8.
 ### __Init__ subcommand help:
 
 ```
-  test1=# \q
-  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py init -h
-  usage: dbmigration.py init [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] [--force-init] schema_name
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py init --help
+usage: dbmigration.py init [-h] [--dbenv DBENV] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] [--force-init] schema_name
 
-  positional arguments:
-    schema_name        the name of target database schema
+positional arguments:
+  schema_name        the name of target database schema
 
-  options:
-    -h, --help         show this help message and exit
-    --host HOST        db server host name
-    --port PORT        db server port
-    --dbname DBNAME    database name
-    --user USER        user name
-    -n, --no-password  dont ask user password
-    --force-init       Force create version control tables even on non empty schema
+options:
+  -h, --help         show this help message and exit
+  --dbenv DBENV      db environment name within TOML config
+  --host HOST        db server host name
+  --port PORT        db server port
+  --dbname DBNAME    database name
+  --user USER        user name
+  -n, --no-password  dont ask user password
+  --force-init       Force create version control tables even on non empty schema
 ```
 
 ### __Update__ subcommand help:
 
 ```
-  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py update -h
-  usage: dbmigration.py update [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] [--force-reapply-latest-version]
-                              [--force-reapply-all-repeatable] [--force-run-cleanup]
-                              schema_name scripts_path
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py update --help
+usage: dbmigration.py update [-h] [--dbenv DBENV] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] [--force-reapply-latest-version]
+                             [--force-reapply-all-repeatable] [--force-run-cleanup]
+                             schema_name scripts_path
 
-  positional arguments:
-    schema_name           the name of target database schema
-    scripts_path          source scripts repository path
+positional arguments:
+  schema_name           the name of target database schema
+  scripts_path          source scripts repository path
 
-  options:
-    -h, --help            show this help message and exit
-    --host HOST           db server host name
-    --port PORT           db server port
-    --dbname DBNAME       database name
-    --user USER           user name
-    -n, --no-password     dont ask user password
-    --force-reapply-latest-version
-                          cleanup the latest version within database and reapply the included *.sql scripts.
-    --force-reapply-all-repeatable
-                          reapply all repeatable scripts regardless of whether they have changed.
-    --force-run-cleanup   run the cleanup script before applying scripts for each version.
+options:
+  -h, --help            show this help message and exit
+  --dbenv DBENV         db environment name within TOML config
+  --host HOST           db server host name
+  --port PORT           db server port
+  --dbname DBNAME       database name
+  --user USER           user name
+  -n, --no-password     dont ask user password
+  --force-reapply-latest-version
+                        clean up the latest version within the database and reapply the included *.sql scripts.
+  --force-reapply-all-repeatable
+                        reapply all repeatable scripts, regardless of changes.
+  --force-run-cleanup   run the cleanup script before executing version-specific scripts.
 ```
 ### __Verify__ subcommand help:
 
 ```
-(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py verify --help
-usage: dbmigration.py verify [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n]
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py verify --help
+usage: dbmigration.py verify [-h] [--dbenv DBENV] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n]
                              [--build-update-script BUILD_UPDATE_SCRIPT]
                              schema_name scripts_path
 
@@ -392,11 +393,12 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
+  --dbenv DBENV         db environment name within TOML config
   --host HOST           db server host name
   --port PORT           db server port
   --dbname DBNAME       database name
   --user USER           user name
-  -n, --no-password     don't ask user password
+  -n, --no-password     dont ask user password
   --build-update-script BUILD_UPDATE_SCRIPT
                         the update script path if you want one as an additional result of the verify command
 ```
@@ -405,7 +407,7 @@ options:
 
 ```
 (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py run-tests --help
-usage: dbmigration.py run-tests [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] schema_name scripts_path
+usage: dbmigration.py run-tests [-h] [--dbenv DBENV] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] schema_name scripts_path
 
 positional arguments:
   schema_name        the name of target database schema
@@ -413,6 +415,7 @@ positional arguments:
 
 options:
   -h, --help         show this help message and exit
+  --dbenv DBENV      db environment name within TOML config
   --host HOST        db server host name
   --port PORT        db server port
   --dbname DBNAME    database name
