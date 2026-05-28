@@ -674,9 +674,9 @@ class UpdateCommand (BaseCommand):
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
-        self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="cleanup the latest version within database and reapply the included *.sql scripts.")
-        self.parser.add_argument("--force-reapply-all-repeatable",  action="store_true", default=False, help="reapply all repeatable scripts regardless of whether they have changed.")
-        self.parser.add_argument("--force-run-cleanup",  action="store_true", default=False, help="run the cleanup script before applying scripts for each version.")
+        self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="clean up the latest version within the database and reapply the included *.sql scripts.")
+        self.parser.add_argument("--force-reapply-all-repeatable",  action="store_true", default=False, help="reapply all repeatable scripts, regardless of changes.")
+        self.parser.add_argument("--force-run-cleanup",  action="store_true", default=False, help="run the cleanup script before executing version-specific scripts.")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
 
 
