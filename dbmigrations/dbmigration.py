@@ -153,7 +153,7 @@ class BaseCommand:
 
     def check_if_repeatable_table_have_pk_v3(self):
         sql = """
-            SELECT EXISTS (
+            SELECT NOT EXISTS (
                 SELECT 1 
                 FROM information_schema.table_constraints
                 WHERE table_schema = %s
