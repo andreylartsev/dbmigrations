@@ -4,17 +4,22 @@
 # - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 #
 [dbconnection]
-#host = "10.70.41.240"
-#port = 5433
-#dbname = "test1"
+
+## test1
+
+host = "10.70.41.240"
+port = 5433
+dbname = "test1"
 #dbname = "ish_import_zapk_smft_02"
 #dbname = "ish_import_zapk_smft"
-#user = "dbinstall"
-host = "localhost"
-port = 5432
-dbname = "test1"
-user = "postgres"
-connect_timeout = 10
+user = "dbinstall"
+
+## windows local postgres
+#host = "localhost"
+#port = 5432
+#dbname = "test1"
+#user = "postgres"
+#connect_timeout = 10
 # sslmode = "prefer"
 
 [dbenv.local_windows]
@@ -53,7 +58,7 @@ default_dbenv = "test1"
 #no_password = true # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
 #no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
 #run_tests_by = "postgres"  
-#run_tests_by = "dbinstall"  
+run_tests_by = "dbinstall"  
 #run_tests_by = "zapkesb"  
 file_glob_filters = ["*.sql", "*.dump"]
 file_read_encoding = "utf-8"
