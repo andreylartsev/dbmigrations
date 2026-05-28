@@ -16,11 +16,14 @@ import psycopg;
 import subprocess;
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
-DBCONN_CONFIG_GROUP = 'dbconnection'
 OPTIONS_CONFIG_GROUP = "options"
+
+DBENVS_CONFIG_GROUP = "dbenvs"
+DEFAULT_DBENV_CONFIG_ATTRIBUTE = "default_dbenv"
 
 RUN_TESTS_BY_ATTRIBUTE = "run_tests_by"
 DBCONN_CONFIG_USER_ATTRIBUTE = "user"
+NO_PASSWORD_ATTRIBUTE = "no_password"
 
 OPTIONS_DEFAULT_FILE_GLOB_FILTERS = ["*.sql", "*.dump"]
 OPTIONS_DEFAULT_FILE_READ_ENCODING = "utf-8"
@@ -76,6 +79,7 @@ def read_as_trimmed_string(file_path):
 def log_server_notices(diag):
     print(f"Server notice: {diag.severity} - {diag.message_primary}")
 
+
 class ExternalTool:
     def make_variables_dict_from_config_and_script_path(self, script_path):
         result = {}
@@ -97,13 +101,11 @@ class ExternalTool:
                 result.append(arg)
         return result
 
-    def __init__(self, tool_name, schema_name, toml_config):
+    def __init__(self, tool_name, schema_name, dbconn_config, toml_config):
         self.tool_name = tool_name
         self.schema_name = schema_name
-        if not DBCONN_CONFIG_GROUP in toml_config:
-            raise CommandError(f"There is no configuration group '{DBCONN_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
-        self.dbconn_config = toml_config[DBCONN_CONFIG_GROUP]
-        
+        self.dbconn_config = dbconn_config
+
         if not TOOLS_CONFIG_GROUP in toml_config:
             raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
         tools_config = toml_config[TOOLS_CONFIG_GROUP]
@@ -150,6 +152,23 @@ class ExternalTool:
             raise CommandError(f"The tool '{self.tool_name}' returned unsuccessful result code {result_code}!")
 
 class BaseCommand:
+
+    def get_default_dbenv(self, toml_config):
+        if not DEFAULT_DBENV_CONFIG_ATTRIBUTE in toml_config:
+            raise CommandError(f"There is no '{DEFAULT_DBENV_CONFIG_ATTRIBUTE}' within the configuration file '{TOML_CONFIG_FILE}'.")
+        default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
+        return default_dbenv
+
+    def get_dbenv_config(self, toml_config, dbenv_param):
+        if not DBENVS_CONFIG_GROUP in toml_config:
+            raise CommandError(f"There is no configuration group'{DBENVS_CONFIG_GROUP}' within the configuration file '{TOML_CONFIG_FILE}'.")
+        dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
+        if not dbenv_param in dbenvs_config:
+            raise CommandError(f"There is no configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' within the configuration file '{TOML_CONFIG_FILE}'.")
+        config = dbenvs_config[dbenv_param]
+        run_tests_by = config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
+        no_password = config.pop(NO_PASSWORD_ATTRIBUTE, False)
+        return config, run_tests_by, no_password
 
     def check_if_repeatable_table_have_pk_v3(self):
         sql = """
@@ -521,11 +540,9 @@ class BaseCommand:
             raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
 
     def __init__(self, config, subparsers, command_name, command_help):
-        self.config = config        
-        try:        
-            self.dbconn_settings = config[DBCONN_CONFIG_GROUP]
-        except:
-            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration group '{DBCONN_CONFIG_GROUP}'")
+        self.config = config
+        self.default_dbenv = self.get_default_dbenv(config)
+        self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)  
         try:        
             self.options = config[OPTIONS_CONFIG_GROUP]
         except:
@@ -537,13 +554,16 @@ class BaseCommand:
         
         self.parser = subparsers.add_parser(command_name, help=command_help)
         self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
+        self.parser.add_argument("--dbenv", type=str, default=self.default_dbenv, help="db environment name within TOML config")
         self.parser.add_argument("--host", type=str, default=self.dbconn_settings.get("host", DBCONN_DEFAULT_HOST), help="db server host name")
         self.parser.add_argument("--port", type=int, default=self.dbconn_settings.get("port", DBCONN_DEFAULT_PORT), help="db server port")
         self.parser.add_argument("--dbname", type=str, default=self.dbconn_settings.get("dbname", DBCONN_DEFAULT_DBNAME), help="database name")
         self.parser.add_argument("--user", type=str, default=self.dbconn_settings.get("user", DBCONN_DEFAULT_USER), help="user name")
-        self.parser.add_argument("-n","--no-password",  action="store_true", default=self.options.get("no_password", False), help="dont ask user password")
+        self.parser.add_argument("-n","--no-password",  action="store_true", default=self.no_password, help="dont ask user password")
         self.parser.set_defaults(call=self) 
     def __enter__(self):
+        if not self.args.dbenv is None:
+            self.dbconn_settings, _, _ = self.get_dbenv_config(self.config, self.args.dbenv)  
         if not self.args.host is None:
             self.dbconn_settings["host"]=self.args.host
         if not self.args.port is None:
@@ -679,7 +699,7 @@ class UpdateCommand (BaseCommand):
         
         external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
         if not external_tool_name is None:
-            tool = ExternalTool(external_tool_name, self.args.schema_name, self.config)
+            tool = ExternalTool(external_tool_name, self.args.schema_name, self.dbconn_settings, self.config)
             self.run_baseline_scripts_with_external_tool(baseline_version, scripts_dir, scripts_sorted, tool)
         else:
             self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_dir, scripts_sorted)
@@ -1230,15 +1250,7 @@ class RunTestsCommand (BaseCommand):
 
             cur.execute("ROLLBACK") # rollback global tran for tests
 
-    def __init__(self, config, subparsers):
-
-        if OPTIONS_CONFIG_GROUP in config:
-            options = config[OPTIONS_CONFIG_GROUP]
-            if RUN_TESTS_BY_ATTRIBUTE in options:
-                run_tests_by = options[RUN_TESTS_BY_ATTRIBUTE]
-                if DBCONN_CONFIG_GROUP in config:
-                    if DBCONN_CONFIG_USER_ATTRIBUTE in config[DBCONN_CONFIG_GROUP]:
-                        config[DBCONN_CONFIG_GROUP][DBCONN_CONFIG_USER_ATTRIBUTE] = run_tests_by          
+    def __init__(self, config, subparsers):       
         super().__init__(config, subparsers, "run-tests", RunTestsCommand.__doc__)
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
 

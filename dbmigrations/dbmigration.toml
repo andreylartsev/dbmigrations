@@ -3,26 +3,9 @@
 # - https://www.psycopg.org/psycopg3/docs/api/connections.html
 # - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 #
-[dbconnection]
+default_dbenv = "local_windows_test_2"
 
-## test1
-
-host = "10.70.41.240"
-port = 5433
-dbname = "test1"
-#dbname = "ish_import_zapk_smft_02"
-#dbname = "ish_import_zapk_smft"
-user = "dbinstall"
-
-## windows local postgres
-#host = "localhost"
-#port = 5432
-#dbname = "test1"
-#user = "postgres"
-#connect_timeout = 10
-# sslmode = "prefer"
-
-[dbenv.local_windows]
+[dbenvs.local_windows]
 host = "localhost"
 port = 5432
 dbname = "test1"
@@ -30,8 +13,20 @@ user = "postgres"
 run_tests_by = "postgres"  
 connect_timeout = 10
 no_password = false
+# sslmode = "prefer"
 
-[dbenv.local_macbook]
+[dbenvs.local_windows_test_2]
+host = "localhost"
+port = 5432
+dbname = "test2"
+user = "postgres"
+run_tests_by = "postgres"  
+connect_timeout = 10
+no_password = false
+# sslmode = "prefer"
+
+
+[dbenvs.local_macbook]
 host = "localhost"
 port = 5432
 dbname = "esbdb7"
@@ -40,36 +35,27 @@ run_tests_by = "postgres"
 connect_timeout = 10
 no_password = false
 
-[dbenv.test1]
+[dbenvs.test1]
 host = "10.70.41.240"
 port = 5433
 dbname = "test1"
 user = "dbinstall"
-run_tests_by = "zapkesb"  
+#run_tests_by = "zapkesb"  
 no_password = false 
 # sslmode = "prefer"
 
 # command options
 [options]
-#default_dbenv = "test1"
-default_dbenv = "test1"
-#default_dbenv = "test1"
-
-#no_password = true # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
-#no_password = false # The 'true' value means that it won't use password for connecting database. Otherwise the password must be provided by environment variable USER_PASSWORD
-#run_tests_by = "postgres"  
-run_tests_by = "dbinstall"  
-#run_tests_by = "zapkesb"  
 file_glob_filters = ["*.sql", "*.dump"]
 file_read_encoding = "utf-8"
 file_read_encoding_errors = "ignore"
 
-
 # external tools to apply baseline
 [tools.psql]
-executable = "/opt/homebrew/bin/psql"
-# args = ["-h", "${host}", "-p", "${port}", "-U", "${user}, "-d", "${dbname}", "-f", "${file}"]
-args = ["-f", "${file}", "${dbname}"]
+#executable = "/opt/homebrew/bin/psql"
+# args = ["-f", "${file}", "${dbname}"]
+executable = "C:/Users/andrey.larcev/NoInstaller/postgresql-18.3-2-windows-x64-binaries/pgsql/bin/psql.exe"
+args = ["-h", "${host}", "-p", "${port}", "-U", "${user}", "-d", "${dbname}", "-f", "${file}"]
 success_result_code = 0
 
 [tools.pg_restore] 
