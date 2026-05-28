@@ -285,6 +285,8 @@ COMMIT
 
 ## Let's assume that you are reach enough to be ready to write & use unit tests on the database level 
 
+The test scripts should be located within the "tests" subfolder of the script repository root.
+
 ### There are three types of test scripts:
 
 1. Prefixed with __assure_that___ should just finish w/o errors;
