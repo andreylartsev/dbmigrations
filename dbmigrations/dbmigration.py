@@ -542,7 +542,7 @@ class BaseCommand:
     def __init__(self, config, subparsers, command_name, command_help):
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
-        self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)  
+        self.dbconn_settings, _, self.no_password = self.get_dbenv_config(config, self.default_dbenv)  
         try:        
             self.options = config[OPTIONS_CONFIG_GROUP]
         except:
@@ -1253,6 +1253,13 @@ class RunTestsCommand (BaseCommand):
     def __init__(self, config, subparsers):       
         super().__init__(config, subparsers, "run-tests", RunTestsCommand.__doc__)
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
+    
+    def __enter__(self):
+        if not self.args.dbenv is None:
+            self.dbconn_settings, self.run_tests_by, _ = self.get_dbenv_config(self.config, self.args.dbenv)  
+        if not self.run_tests_by is None:
+            self.dbconn_settings["user"] = self.run_tests_by  
+        super().__enter__()
 
     def run_unit_test_scripts(self, scripts_dir):
         unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
