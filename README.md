@@ -31,20 +31,21 @@ More you can find in the [docs folder](./doc)
 
 ## The best way to learn about the functionality of a tool is to call the embedded "help" subcommand:
 ```
-(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3 .\dbmigrations\dbmigration.py --help
-usage: dbmigration.py [-h] {update,verify,init} ...
+  (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py -h
+  usage: dbmigration.py [-h] {update,verify,init,run-tests} ...
 
-Simple database migrations tool
+  Simple database migrations tool
 
-positional arguments:
-  {update,verify,init}  Available subcommands
-    update              Applies base, versioned, and repeatable scripts to the target database schema.
-    verify              Validates the target schema and lists versioned and reproducible scripts to apply if the
-                        'update' command is executed.
-    init                Creates version control tables in an empty database schema.
+  positional arguments:
+    {update,verify,init,run-tests}
+                          Available subcommands
+      update              Applies base, versioned, and repeatable scripts to the target database schema.
+      verify              Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed.
+      init                Creates version control tables in an empty database schema.
+      run-tests           Runs db unit test scripts to the target database schema.
 
-options:
-  -h, --help            show this help message and exit
+  options:
+    -h, --help            show this help message and exit
 ```
 
 To try use it you'll need install __python 3.11+__ (mostly because of __tomllib__ package using for parsing configuration) + __psycopg__ package with its dependencies.  
@@ -282,6 +283,49 @@ COMMIT
 (.venv) andreylartsev@MacBook-Pro-Andrey Projects/dbmigrations$ 
 ```
 
+## Let's assume that you are reach enough to be ready to write & use unit tests on the database level 
+
+### There are three types of test scripts:
+
+1. Prefixed with __assure_that___ should just finish w/o errors;
+2. Prefixed with __is_true_that___ should return one record with one boolean value = "true"; 
+3. Prefixed with __detect_missing___ should empty result set;
+
+There are number of samples within [samples](./dbmigrations/samples/) folder.
+
+```
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py run-tests test2 .\dbmigrations\samples\test1\
+Opened db connection by role 'postgres'
+Using 'test2,public' as a session 'search_path'
+Running unit tests for scripts repository: 'dbmigrations\samples\test1'
+Target version matches the latest installed version 'V002'
+Make savepoint...
+Running setup: 'dbmigrations\samples\test1\tests\_setup.sql'...DONE
+Make savepoint...
+Running setup: 'dbmigrations\samples\test1\tests\00\_setup.sql'...DONE
+Running test: 'dbmigrations\samples\test1\tests\00\is_true_that_setup_data_is_populated.sql'...PASS
+Rolled back to savepoint.
+Make savepoint...
+Running setup: 'dbmigrations\samples\test1\tests\t1\_setup.sql'...DONE
+Running test: 'dbmigrations\samples\test1\tests\t1\is_true_that_setup_data_is_populated.sql'...PASS
+Running test: 'dbmigrations\samples\test1\tests\t1\assure_that_t1_exists.sql'...PASS
+Running test: 'dbmigrations\samples\test1\tests\t1\assure_that_t1_fields_are_present.sql'...PASS
+Running test: 'dbmigrations\samples\test1\tests\t1\detect_missing_t1_records.sql'...FAIL. (2) Missing records:
+=================================
+id: 3
+FAIL. Expected no results!
+Rolled back to savepoint.
+Running test: 'dbmigrations\samples\test1\tests\t2\assure_that_t2_is_ok.sql'...PASS
+Running test: 'dbmigrations\samples\test1\tests\t2\detect_missing_t2_records.sql'...PASS
+Running test: 'dbmigrations\samples\test1\tests\latest_t1\assure_that_latest_t1_exists.sql'...PASS
+Running test: 'dbmigrations\samples\test1\tests\latest_t1\is_true_that_latest_t1_returns_max_value.sql'...FAIL. (2) Expected true, got False!
+Running test: 'dbmigrations\samples\test1\tests\is_true_that_setup_data_is_populated.sql'...PASS
+Rolled back transaction.
+Closed db connection.
+Command error: Tests failed: 2, passed: 8.
+```
+
+
 ## Now let's take a quick look at the utility's built-in subcommand help:
 
 ### __Init__ subcommand help:
@@ -350,6 +394,25 @@ options:
   -n, --no-password     don't ask user password
   --build-update-script BUILD_UPDATE_SCRIPT
                         the update script path if you want one as an additional result of the verify command
+```
+
+### __Run Tests__ subcommand help:
+
+```
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py run-tests --help
+usage: dbmigration.py run-tests [-h] [--host HOST] [--port PORT] [--dbname DBNAME] [--user USER] [-n] schema_name scripts_path
+
+positional arguments:
+  schema_name        the name of target database schema
+  scripts_path       source scripts repository path
+
+options:
+  -h, --help         show this help message and exit
+  --host HOST        db server host name
+  --port PORT        db server port
+  --dbname DBNAME    database name
+  --user USER        user name
+  -n, --no-password  dont ask user password
 ```
 
 For now it is all and good luck dude in your fight. 
