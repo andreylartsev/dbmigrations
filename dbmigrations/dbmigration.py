@@ -170,7 +170,7 @@ class BaseCommand:
             DECLARE 
                 pk_name VARCHAR(128);
             BEGIN
-                RAISE NOTICE 'Start migration of table dbmigration_repeatable to add modify pk to version 3.';
+                RAISE NOTICE 'Start migration of table dbmigration_repeatable to modify pk to version 3.';
 
                 SELECT constraint_name INTO pk_name
                 FROM information_schema.table_constraints
