@@ -286,16 +286,18 @@ COMMIT
 ## Let's assume that you are reach enough to be ready to write & use unit tests on the database level 
 
 The test scripts should be located within the "tests" subfolder of the script repository root.
+Each of test script running within own transaction and that is rolls back thereafter.
 
 ### There are three types of test scripts:
 
 1. Prefixed with __assure_that___ should just finish w/o errors;
 2. Prefixed with __is_true_that___ should return one record with one boolean value = "true"; 
 3. Prefixed with __detect_missing___ should return empty result set;
-4. The script named __"_setup.sql"__ is a special script type that is needed for preparation test data.
+4. The script named ___setup.sql__ is a special script type that is needed for preparation test data. The tool placing savepoint before calling each setup script and rolls back to this savepoint thereafter
 
 There are number of samples within [samples](./dbmigrations/samples/) folder.
 
+Here is how result of running tests looks like:
 ```
 (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.exe .\dbmigrations\dbmigration.py run-tests test2 .\dbmigrations\samples\test1\
 Opened db connection by role 'postgres'
