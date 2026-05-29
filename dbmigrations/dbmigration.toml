@@ -3,7 +3,7 @@
 # - https://www.psycopg.org/psycopg3/docs/api/connections.html
 # - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 #
-default_dbenv = "local_windows_test_2"
+default_dbenv = "local_windows"
 
 [dbenvs.local_windows]
 host = "localhost"
@@ -39,6 +39,33 @@ no_password = false
 host = "10.70.41.240"
 port = 5433
 dbname = "test1"
+user = "dbinstall"
+run_tests_by = "zapkesb"
+no_password = false 
+# sslmode = "prefer"
+
+[dbenvs.dev_korotin]
+host = "10.70.41.240"
+port = 5433
+dbname = "dev_korotin"
+user = "dbinstall"
+#run_tests_by = "zapkesb"  
+no_password = false 
+# sslmode = "prefer"
+
+[dbenvs.ish_import_zapk_smft_01]
+host = "10.70.41.240"
+port = 5433
+dbname = "ish_import_zapk_smft_01"
+user = "dbinstall"
+#run_tests_by = "zapkesb"  
+no_password = false 
+# sslmode = "prefer"
+
+[dbenvs.ish_import_zapk_smft_02]
+host = "10.70.41.240"
+port = 5433
+dbname = "ish_import_zapk_smft_02"
 user = "dbinstall"
 #run_tests_by = "zapkesb"  
 no_password = false 
