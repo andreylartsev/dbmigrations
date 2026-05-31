@@ -30,12 +30,8 @@ OPTIONS_DEFAULT_FILE_GLOB_FILTERS = ["*.sql", "*.dump"]
 OPTIONS_DEFAULT_FILE_READ_ENCODING = "utf-8"
 OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS = "ignore"
 
-DBCONN_DEFAULT_HOST = 'localhost'
-DBCONN_DEFAULT_PORT = 5432
-DBCONN_DEFAULT_USER = None
-DBCONN_DEFAULT_DBNAME = 'postgres'
 DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
-
+DBCONN_TESTER_PASSWORD_ENVVAR_NAME = "TESTER_PASSWORD"
 
 BASELINE_DIR_NAME = "baseline"
 VERSIONED_DIR_NAME = "versions"
@@ -618,9 +614,13 @@ class BaseCommand:
         if not self.args.dbname is None:
             self.dbconn_settings["dbname"]=self.args.dbname
         if not self.args.no_password and not self.no_password:
-            password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
-            if password is None:
-                raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
+            password = None
+            if self.use_run_tests_by_user:
+                password = os.getenv(DBCONN_TESTER_PASSWORD_ENVVAR_NAME)
+                if password is None:
+                    password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
+                    if password is None:
+                        raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
             self.dbconn_settings["password"]=password
         else:
             self.dbconn_settings.pop("password", None)
