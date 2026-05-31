@@ -171,7 +171,36 @@ class BaseCommand:
         no_password = config.pop(NO_PASSWORD_ATTRIBUTE, False)
         return config, run_tests_by, no_password
 
-    def check_if_repeatable_table_have_pk_v3(self):
+    def check_if_version_control_tables_is_not_granted_to_public_for_select(self):
+        sql = """
+            SELECT COUNT(DISTINCT table_name) <> 2 
+            FROM information_schema.table_privileges 
+            WHERE grantee = 'PUBLIC' 
+            AND table_schema = %s 
+            AND table_name IN ('dbmigration_repeatable', 'dbmigration_versions' )
+            AND privilege_type = 'SELECT'
+        """
+        result = self.dbconn_get_single_value(sql, (self.args.schema_name,))
+        return result
+
+    def migration_to_grant_select_to_version_control_tables_to_public(self):
+        sql = """
+            DO $$
+            BEGIN
+                RAISE NOTICE 'Start migration to grant SELECT privilege to version control tables to the PUBLIC role.';
+
+                GRANT SELECT ON TABLE {schema_name_identity}.dbmigration_versions TO PUBLIC;
+                GRANT SELECT ON TABLE {schema_name_identity}.dbmigration_repeatable TO PUBLIC;
+
+                RAISE NOTICE 'The SELECT privilege has been granted.';
+            END
+            $$;
+        """
+        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name())
+        self.dbconn_exec_with_no_result(formatted_sql, [])
+
+
+    def check_if_repeatable_table_dont_have_pk_v3(self):
         sql = """
             SELECT NOT EXISTS (
                 SELECT 1 
@@ -554,8 +583,8 @@ class BaseCommand:
     def __init__(self, config, subparsers, command_name, command_help):
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
-        self.dbconn_settings, _, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
-        self.run_tests_by = None
+        self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
+        self.use_run_tests_by_user = False
         try:        
             self.options = config[OPTIONS_CONFIG_GROUP]
         except:
@@ -576,18 +605,20 @@ class BaseCommand:
         self.parser.set_defaults(call=self) 
     def __enter__(self):
         if not self.args.dbenv is None:
-            self.dbconn_settings, _, _ = self.get_dbenv_config(self.config, self.args.dbenv)  
+            self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(self.config, self.args.dbenv)  
         if not self.args.host is None:
             self.dbconn_settings["host"]=self.args.host
         if not self.args.port is None:
             self.dbconn_settings["port"]=self.args.port
+        
         if not self.args.user is None:
             self.dbconn_settings["user"]=self.args.user
-        if not self.run_tests_by is None:
+        elif not self.run_tests_by is None and self.use_run_tests_by_user:
             self.dbconn_settings["user"]=self.run_tests_by
+        
         if not self.args.dbname is None:
             self.dbconn_settings["dbname"]=self.args.dbname
-        if not self.args.no_password:
+        if not self.args.no_password and not self.no_password:
             password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
             if password is None:
                 raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
@@ -818,8 +849,10 @@ class UpdateCommand (BaseCommand):
         self.do_initial_cross_checks()
         if self.check_if_version_id_column_is_missing_in_repeatable_table():
             self.migration_to_add_version_id_to_repeatable_table()
-        if self.check_if_repeatable_table_have_pk_v3():
+        if self.check_if_repeatable_table_dont_have_pk_v3():
             self.migration_to_add_pk_v3_to_repeatable_table()
+        if self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+            self.migration_to_grant_select_to_version_control_tables_to_public()
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
             self.reapply_the_latest_version(self.scripts_dir)
@@ -1051,8 +1084,10 @@ class VerifyCommand (BaseCommand):
         self.do_initial_cross_checks()
         if self.check_if_version_id_column_is_missing_in_repeatable_table():
             raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
-        if self.check_if_repeatable_table_have_pk_v3():
+        if self.check_if_repeatable_table_dont_have_pk_v3():
             raise CommandError(f"It is required to update dbmigration_repeatable table to modify pk. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
+        if self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
         script_path = None
@@ -1125,7 +1160,12 @@ class InitCommand (BaseCommand):
                 CONSTRAINT dbmigration_repeatable_primary_key_3 PRIMARY KEY(version_id, relative_path, created_at)
             );
             INSERT INTO {schema_name}.dbmigration_repeatable (version_id, relative_path, sha256sum) VALUES ('000', 'test.sql', '0');
-            DELETE FROM {schema_name}.dbmigration_repeatable WHERE version_id = '000';                        
+            DELETE FROM {schema_name}.dbmigration_repeatable WHERE version_id = '000';  
+
+
+            GRANT SELECT ON TABLE {schema_name}.dbmigration_versions TO PUBLIC;
+            GRANT SELECT ON TABLE {schema_name}.dbmigration_repeatable TO PUBLIC;
+
             COMMIT;
         """        
         with self.dbconn.cursor() as cur:
@@ -1144,8 +1184,10 @@ class InitCommand (BaseCommand):
         if not self.check_if_schema_is_empty():
             if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_version_id_column_is_missing_in_repeatable_table():
                 self.migration_to_add_version_id_to_repeatable_table()
-            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_repeatable_table_have_pk_v3():
+            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_repeatable_table_dont_have_pk_v3():
                 self.migration_to_add_pk_v3_to_repeatable_table()
+            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+                self.migration_to_grant_select_to_version_control_tables_to_public()
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
             if self.check_if_version_table_exists("dbmigration_versions"):
@@ -1269,8 +1311,7 @@ class RunTestsCommand (BaseCommand):
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
     
     def __enter__(self):
-        if not self.args.dbenv is None:
-            _, self.run_tests_by, _ = self.get_dbenv_config(self.config, self.args.dbenv)  
+        self.use_run_tests_by_user = True
         super().__enter__()
 
     def run_unit_test_scripts(self, scripts_dir):
@@ -1297,8 +1338,10 @@ class RunTestsCommand (BaseCommand):
         self.do_initial_cross_checks()
         if self.check_if_version_id_column_is_missing_in_repeatable_table():
             self.migration_to_add_version_id_to_repeatable_table()
-        if self.check_if_repeatable_table_have_pk_v3():
+        if self.check_if_repeatable_table_dont_have_pk_v3():
             self.migration_to_add_pk_v3_to_repeatable_table()
+        if self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+            self.migration_to_grant_select_to_version_control_tables_to_public();
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
 
