@@ -23,6 +23,7 @@
         "psycopg",
         "regclass",
         "sslmode",
+        "timestamptz",
         "tomllib",
         "topsecret",
         "varchar",
