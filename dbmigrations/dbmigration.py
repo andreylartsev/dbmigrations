@@ -14,6 +14,7 @@ import pathlib
 import hashlib
 import psycopg;
 import subprocess;
+import copy;
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
@@ -165,7 +166,7 @@ class BaseCommand:
         dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
         if not dbenv_param in dbenvs_config:
             raise CommandError(f"There is no configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' within the configuration file '{TOML_CONFIG_FILE}'.")
-        config = dbenvs_config[dbenv_param]
+        config = copy.deepcopy(dbenvs_config[dbenv_param])
         run_tests_by = config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
         no_password = config.pop(NO_PASSWORD_ATTRIBUTE, False)
         return config, run_tests_by, no_password
@@ -392,6 +393,17 @@ class BaseCommand:
         with self.dbconn.cursor() as cur:
             cur.execute(sql, params)
 
+    def dbconn_attr_as_utf_8(self, attr):
+        if attr is None:
+            return "None"
+        else:
+            return attr.decode('utf-8')
+
+    def dbconn_get_connection_str(self, dbconn):
+        info = dbconn.pgconn
+        result = f"{self.dbconn_attr_as_utf_8(info.user)}@{self.dbconn_attr_as_utf_8(info.host)}:{self.dbconn_attr_as_utf_8(info.port)}/{self.dbconn_attr_as_utf_8(info.db)}"
+        return result
+
     def get_schema_name(self):
          if self.args is None:
              raise CommandError(f"The attribute self.args must not be None")
@@ -583,8 +595,7 @@ class BaseCommand:
         else:
             self.dbconn_settings.pop("password", None)
         self.dbconn = psycopg.connect(**self.dbconn_settings)
-        connected_by = self.dbconn_settings.get("user", "No user")
-        print(f"Opened db connection by role '{connected_by}'")
+        print(f"Opened db connection: '{self.dbconn_get_connection_str(self.dbconn)}'")
         self.dbconn.add_notice_handler(log_server_notices)
         self.dbconn.autocommit = True 
 
