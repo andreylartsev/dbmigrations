@@ -171,7 +171,7 @@ class BaseCommand:
         no_password = config.pop(NO_PASSWORD_ATTRIBUTE, False)
         return config, run_tests_by, no_password
 
-    def check_if_version_control_tables_is_not_granted_to_public_for_select(self):
+    def check_if_version_control_tables_are_not_granted_to_public_for_select(self):
         sql = """
             SELECT has_table_privilege(0, '{schema_name_identity}.dbmigration_versions', 'SELECT') 
                 AND has_table_privilege(0, '{schema_name_identity}.dbmigration_repeatable', 'SELECT');
@@ -850,7 +850,7 @@ class UpdateCommand (BaseCommand):
             self.migration_to_add_version_id_to_repeatable_table()
         if self.check_if_repeatable_table_dont_have_pk_v3():
             self.migration_to_add_pk_v3_to_repeatable_table()
-        if self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+        if self.check_if_version_control_tables_are_not_granted_to_public_for_select():
             self.migration_to_grant_select_to_version_control_tables_to_public()
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
@@ -1085,7 +1085,7 @@ class VerifyCommand (BaseCommand):
             raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         if self.check_if_repeatable_table_dont_have_pk_v3():
             raise CommandError(f"It is required to update dbmigration_repeatable table to modify pk. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
-        if self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+        if self.check_if_version_control_tables_are_not_granted_to_public_for_select():
             raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
@@ -1184,7 +1184,7 @@ class InitCommand (BaseCommand):
                 self.migration_to_add_version_id_to_repeatable_table()
             if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_repeatable_table_dont_have_pk_v3():
                 self.migration_to_add_pk_v3_to_repeatable_table()
-            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_version_control_tables_are_not_granted_to_public_for_select():
                 self.migration_to_grant_select_to_version_control_tables_to_public()
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
@@ -1338,7 +1338,7 @@ class RunTestsCommand (BaseCommand):
             raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         if self.check_if_repeatable_table_dont_have_pk_v3():
             raise CommandError(f"It is required to update dbmigration_repeatable table to modify pk. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
-        if self.check_if_version_control_tables_is_not_granted_to_public_for_select():
+        if self.check_if_version_control_tables_are_not_granted_to_public_for_select():
             raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
