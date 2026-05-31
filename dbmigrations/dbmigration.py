@@ -173,15 +173,12 @@ class BaseCommand:
 
     def check_if_version_control_tables_is_not_granted_to_public_for_select(self):
         sql = """
-            SELECT COUNT(DISTINCT table_name) <> 2 
-            FROM information_schema.table_privileges 
-            WHERE grantee = 'PUBLIC' 
-            AND table_schema = %s 
-            AND table_name IN ('dbmigration_repeatable', 'dbmigration_versions' )
-            AND privilege_type = 'SELECT'
+            SELECT has_table_privilege(0, '{schema_name_identity}.dbmigration_versions', 'SELECT') 
+                AND has_table_privilege(0, '{schema_name_identity}.dbmigration_repeatable', 'SELECT');
         """
-        result = self.dbconn_get_single_value(sql, (self.args.schema_name,))
-        return result
+        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name())
+        result = self.dbconn_get_single_value(formatted_sql, [])
+        return not result
 
     def migration_to_grant_select_to_version_control_tables_to_public(self):
         sql = """
@@ -204,10 +201,12 @@ class BaseCommand:
         sql = """
             SELECT NOT EXISTS (
                 SELECT 1 
-                FROM information_schema.table_constraints
-                WHERE table_schema = %s
-                AND table_name = 'dbmigration_repeatable'
-                AND constraint_name = 'dbmigration_repeatable_primary_key_3'
+                FROM pg_catalog.pg_constraint con
+                JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+                JOIN pg_catalog.pg_namespace nsp ON nsp.oid = rel.relnamespace
+                WHERE nsp.nspname = %s
+                AND rel.relname = 'dbmigration_repeatable'
+                AND con.conname = 'dbmigration_repeatable_primary_key_3'
             );
         """
         result = self.dbconn_get_single_value(sql, (self.args.schema_name,))
@@ -1162,7 +1161,6 @@ class InitCommand (BaseCommand):
             INSERT INTO {schema_name}.dbmigration_repeatable (version_id, relative_path, sha256sum) VALUES ('000', 'test.sql', '0');
             DELETE FROM {schema_name}.dbmigration_repeatable WHERE version_id = '000';  
 
-
             GRANT SELECT ON TABLE {schema_name}.dbmigration_versions TO PUBLIC;
             GRANT SELECT ON TABLE {schema_name}.dbmigration_repeatable TO PUBLIC;
 
@@ -1337,11 +1335,11 @@ class RunTestsCommand (BaseCommand):
     def run(self):
         self.do_initial_cross_checks()
         if self.check_if_version_id_column_is_missing_in_repeatable_table():
-            self.migration_to_add_version_id_to_repeatable_table()
+            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         if self.check_if_repeatable_table_dont_have_pk_v3():
-            self.migration_to_add_pk_v3_to_repeatable_table()
+            raise CommandError(f"It is required to update dbmigration_repeatable table to modify pk. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         if self.check_if_version_control_tables_is_not_granted_to_public_for_select():
-            self.migration_to_grant_select_to_version_control_tables_to_public();
+            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
 
