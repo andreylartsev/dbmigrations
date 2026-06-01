@@ -74,7 +74,7 @@ def read_as_trimmed_string(file_path):
         return trimmed_str
 
 def log_server_notices(diag):
-    print(f"Server notice: {diag.severity} - {diag.message_primary}")
+    print(f"Server: {diag.severity} - {diag.message_primary}")
 
 import sys
 
