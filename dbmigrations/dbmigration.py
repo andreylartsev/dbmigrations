@@ -323,8 +323,8 @@ class BaseCommand:
         return tool_name
     
     def script_path_for_log(self, scripts_dir, script_path):
-        dir = pathlib.Path(scripts_dir).parent
-        file = pathlib.Path(script_path)
+        dir = pathlib.Path(scripts_dir).parent.resolve()
+        file = pathlib.Path(script_path).resolve()
         if file.is_relative_to(dir):
             result = file.relative_to(dir)
         else:
@@ -867,7 +867,7 @@ class UpdateCommand (BaseCommand):
 
     def run(self):
         if not self.args.skip_confirmation:
-            print("You are going run updates! Would you like to continue [y/n]: ", end="", flush=True)
+            print("You are going to run updates! Would you like to continue [y/n]: ", end="", flush=True)
             answer = get_char().lower()
             if answer != 'y':
                 raise CommandError("Cancelled by user");
@@ -1102,7 +1102,8 @@ class VerifyCommand (BaseCommand):
             return
         print(f"The repeatable scripts to (re)install: ")
         for item in scripts_to_repeat:
-            print(f"[{item}]")
+            relative_script_path = self.script_path_for_log(scripts_dir, item)
+            print(f"[{relative_script_path}]")
         if not target_script_path is None:
             self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, scripts_dir, target_script_path)
 
