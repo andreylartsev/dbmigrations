@@ -76,6 +76,26 @@ def read_as_trimmed_string(file_path):
 def log_server_notices(diag):
     print(f"Server notice: {diag.severity} - {diag.message_primary}")
 
+import sys
+
+def get_char():
+    if sys.platform == "win32":
+        import msvcrt
+        char = msvcrt.getche().decode("utf-8", errors="ignore")
+        print()
+        return char
+    else:
+        import termios
+        import tty
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)
+            char = sys.stdin.read(1)
+            print(char) 
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return char
 
 class ExternalTool:
     def make_variables_dict_from_config_and_script_path(self, script_path):
@@ -721,6 +741,7 @@ class UpdateCommand (BaseCommand):
         self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="clean up the latest version within the database and reapply the included *.sql scripts.")
         self.parser.add_argument("--force-reapply-all-repeatable",  action="store_true", default=False, help="reapply all repeatable scripts, regardless of changes.")
         self.parser.add_argument("--force-run-cleanup",  action="store_true", default=False, help="run the cleanup script before executing version-specific scripts.")
+        self.parser.add_argument("--skip-confirmation",  action="store_true", default=False, help="skip confirmation before executing updates.")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
 
 
@@ -845,6 +866,11 @@ class UpdateCommand (BaseCommand):
         print(f"The repeatable scripts were applied.")       
 
     def run(self):
+        if not self.args.skip_confirmation:
+            print("You are going run updates! Would you like to continue [y/n]: ", end="", flush=True)
+            answer = get_char().lower()
+            if answer != 'y':
+                raise CommandError("Cancelled by user");
         self.do_initial_cross_checks()
         if self.check_if_version_id_column_is_missing_in_repeatable_table():
             self.migration_to_add_version_id_to_repeatable_table()
@@ -864,6 +890,8 @@ class UpdateCommand (BaseCommand):
             self.apply_versioned_scripts(self.scripts_dir)
             self.apply_repeatable_scripts(self.scripts_dir, force_reapply=self.args.force_reapply_all_repeatable)
             print(f"Updated.")
+
+
 
 class VerifyCommand (BaseCommand):
     """Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."""
