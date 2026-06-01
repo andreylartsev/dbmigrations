@@ -468,12 +468,12 @@ class BaseCommand:
         scripts_dir = pathlib.Path(self.args.scripts_path)
         set_search_path_file = scripts_dir.joinpath(SEARCH_PATH_FILE_NAME)
         if not set_search_path_file.exists():
-            print(f"No file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{self.args.scripts_path}', using current schema name '{self.args.schema_name}'")
+            print(f"Using target schema name '{self.args.schema_name}' as a session search path.")
             return self.args.schema_name
         if not set_search_path_file.is_file():
             raise CommandError(f"The search path file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{self.args.scripts_path}' is not a file")
         trimmed_str = read_as_trimmed_string(set_search_path_file)
-        print(f"Using '{trimmed_str}' as a session 'search_path'")
+        print(f"Using '{trimmed_str}' from '{set_search_path_file}' as the session search path.")
         return trimmed_str
     
     def set_session_search_path(self, search_path):
