@@ -748,10 +748,10 @@ class UpdateCommand (BaseCommand):
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. Skip running the baseline scripts.")
+            print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory.")
             return
         if self.check_if_version_table_include_baseline_version():
-            print(f"The target schema already has the baseline version installed. Skip running the baseline scripts.")
+            print(f"The target schema already has the baseline version installed. Baseline scripts will be skipped.")
             return
         baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
         if len(baseline_subdirs) != 1:
@@ -791,7 +791,7 @@ class UpdateCommand (BaseCommand):
     def apply_versioned_scripts(self, scripts_dir):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory. Skip running the versioned scrips")
+            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
             return
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if len(versioned_subdirs) == 0:
@@ -820,7 +820,7 @@ class UpdateCommand (BaseCommand):
         
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory. Skip running the repeatable updates")
+            print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
         print(f"Check repeatable scripts...")       
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
@@ -945,14 +945,15 @@ class VerifyCommand (BaseCommand):
             formatted_sql_text = self.format_sql("SELECT pg_catalog.set_config('search_path', {search_path}, false);\n", search_path=search_path)
             target_file.write(formatted_sql_text)
 
-    def write_baseline_scripts(self, version, scripts, target_script_path):
+    def write_baseline_scripts(self, version, scripts_dir, scripts, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
             formatted_sql_text = self.format_sql("-- Baseline scripts for version {version_id}\n", version_id=version)
             target_file.write(formatted_sql_text)
             for script_path in scripts:
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
-                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(script_path))
+                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))                    
                     target_file.write(formatted_sql_text)
                     target_file.write(f"BEGIN;\n")
                     target_file.writelines(lines)
@@ -982,14 +983,15 @@ class VerifyCommand (BaseCommand):
         scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir, BASELINE_FILES_DEPTH)
         print(f"The baseline scripts to install: ")       
         for item in scripts_sorted:
-            print(f"[{item}]")
+            relative_script_path = self.script_path_for_log(scripts_dir, item)
+            print(f"[{relative_script_path}]")
         if not target_script_path is None:
-            self.write_baseline_scripts(baseline_version, scripts_sorted, target_script_path)
+            self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, target_script_path)
         
         # remember latest version in scripts for the further use in verify_repeatable()
         self.latest_version_in_scripts = baseline_version
 
-    def write_versioned_scripts(self, version, scripts, target_script_path):
+    def write_versioned_scripts(self, version, scripts_dir, scripts, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
             formatted_sql_text = self.format_sql("-- Versioned scripts for version {version_id}\n", version_id=version)
             target_file.write(formatted_sql_text)
@@ -997,7 +999,8 @@ class VerifyCommand (BaseCommand):
             for script_path in scripts:
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
-                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(script_path))
+                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
                     target_file.write(formatted_sql_text)
                     target_file.writelines(lines)
                     target_file.write(f"\n")
@@ -1044,10 +1047,11 @@ class VerifyCommand (BaseCommand):
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
             for item in scripts_sorted:
-                print(f"[{item}]")
+                relative_script_path = self.script_path_for_log(scripts_dir, item)
+                print(f"[{relative_script_path}]")
             if not target_script_path is None:
                 version_id = script_version_dir.name
-                self.write_versioned_scripts(version_id, scripts_sorted, target_script_path)   
+                self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, target_script_path)   
 
     def write_repeatable_scripts(self, target_version, scripts_dict, scripts_dir, target_script_path):
         with pathlib.Path(target_script_path).open("a") as target_file:
