@@ -1245,10 +1245,11 @@ class RunTestsCommand (BaseCommand):
 
     SETUP_TESTS_FILE_NAME = "_setup.sql"
 
-    def run_conditional(self, cursor, script_path, script_text):
+    def run_conditional(self, cursor, scripts_dir, script_path, script_text):
         path = pathlib.Path(script_path)
         file_name = path.name
-        print(f"Running test: '{script_path}'...", end="", flush=True)
+        relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+        print(f"Running test: '{relative_script_path}'...", end="", flush=True)
         if file_name.startswith(self.IS_TRUE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
             result_number = 0
@@ -1289,7 +1290,7 @@ class RunTestsCommand (BaseCommand):
         hash_str = str(hash(folder))
         return psycopg.sql.Identifier("savepoint_" + hash_str)
 
-    def run_test_scripts_each_in_own_tran(self, scripts):
+    def run_test_scripts_each_in_own_tran(self, scripts_dir, scripts):
         self.fail_count = 0
         self.pass_count = 0
         with self.dbconn.cursor() as cur:
@@ -1317,14 +1318,15 @@ class RunTestsCommand (BaseCommand):
                         formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
                         print(f"Make savepoint...")
                         cur.execute(formatted_sql)
-                        print(f"Running setup: '{script_path}'...", end="", flush=True)
+                        relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+                        print(f"Running setup: '{relative_script_path}'...", end="", flush=True)
                         cur.execute(script_text)
                         print(f"DONE")
                         continue
                     else:
                         cur.execute("SAVEPOINT savepoint_test_boundary")
                         try:
-                            self.run_conditional(cur, script_path, script_text)
+                            self.run_conditional(cur, scripts_dir, script_path, script_text)
                             self.pass_count += 1
                         except TestFailed as e:
                             self.fail_count += 1
@@ -1358,7 +1360,7 @@ class RunTestsCommand (BaseCommand):
             raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
         print(f"Target version matches the latest installed version '{target_version}'")    
         scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir, TESTS_FILES_DEPTH)        
-        self.run_test_scripts_each_in_own_tran(scripts_sorted)
+        self.run_test_scripts_each_in_own_tran(scripts_dir, scripts_sorted)
         if self.fail_count > 0:
             raise CommandError(f"Tests failed: {self.fail_count}, passed: {self.pass_count}.")
         else:
