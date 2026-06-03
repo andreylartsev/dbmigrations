@@ -30,10 +30,8 @@ no_password = false
 host = "localhost"
 port = 5432
 dbname = "esbdb7"
-user = "postgres"
-run_tests_by = "postgres"  
 connect_timeout = 10
-no_password = false
+no_password = true
 
 [dbenvs.test1]
 host = "10.70.41.240"

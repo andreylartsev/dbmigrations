@@ -49,6 +49,7 @@ USE_TOOL_NAME_FILE_NAME = "use_tool.txt"
 VERSION_CLEANUP_FILE_NAME = "_cleanup.sql"
 
 SEARCH_PATH_FILE_NAME = "set_search_path.txt"
+DEFAULT_SEARCH_PATH = ":default"
 
 BASELINE_FILES_DEPTH = 2
 VERSIONED_FILES_DEPTH = 2
@@ -468,15 +469,14 @@ class BaseCommand:
         scripts_dir = pathlib.Path(self.args.scripts_path)
         set_search_path_file = scripts_dir.joinpath(SEARCH_PATH_FILE_NAME)
         if not set_search_path_file.exists():
-            print(f"Using target schema name '{self.args.schema_name}' as a session search path.")
             return self.args.schema_name
         if not set_search_path_file.is_file():
             raise CommandError(f"The search path file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{self.args.scripts_path}' is not a file")
         trimmed_str = read_as_trimmed_string(set_search_path_file)
-        print(f"Using '{trimmed_str}' from '{set_search_path_file}' as the session search path.")
         return trimmed_str
     
     def set_session_search_path(self, search_path):
+        print(f"Change the session search path to '{search_path}'.")
         sql = f"""
             SELECT pg_catalog.set_config('search_path', %s, false)"""
         result = self.dbconn_get_single_value(sql, (search_path,))
@@ -522,7 +522,7 @@ class BaseCommand:
                 AND newer.sha256sum = {sha256sum}
                 AND newer.created_at = (
                     SELECT current_rec.created_at 
-                    FROM dbmigration_repeatable current_rec
+                    FROM {schema_name}.dbmigration_repeatable current_rec
                     WHERE current_rec.relative_path = {relative_path}
                         AND current_rec.version_id = {version_id}
                     ORDER BY current_rec.created_at DESC
@@ -589,7 +589,10 @@ class BaseCommand:
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
         search_path = self.get_search_path_for_scripts()
-        self.set_session_search_path(search_path)     
+        if search_path != DEFAULT_SEARCH_PATH:
+            self.set_session_search_path(search_path)
+        else:
+            print(f"Use the default users search path")     
         if not self.check_if_version_table_exists("dbmigration_versions"):
             raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
         if not self.check_if_version_table_exists("dbmigration_repeatable"):
