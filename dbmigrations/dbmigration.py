@@ -476,7 +476,7 @@ class BaseCommand:
         return trimmed_str
     
     def set_session_search_path(self, search_path):
-        print(f"Change the session search path to '{search_path}'.")
+        print(f"Set session search path to '{search_path}'.")
         sql = f"""
             SELECT pg_catalog.set_config('search_path', %s, false)"""
         result = self.dbconn_get_single_value(sql, (search_path,))
