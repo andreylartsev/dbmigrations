@@ -358,7 +358,7 @@ class BaseCommand:
         result = result.joinpath(script_sub_path)
         return result
 
-    def walk_through_dir_sorted(self, base_dir, depth_within_base_dir, force_run_cleanup = False, recursion_depth=0):
+    def get_sorted_scripts_from_dir(self, base_dir, depth_within_base_dir, force_run_cleanup = False, recursion_depth=0):
         MAX_RECURSION_DEPTH = 25
         if recursion_depth > MAX_RECURSION_DEPTH:
             raise CommandError(f"Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' due to circular path references.")
@@ -386,7 +386,7 @@ class BaseCommand:
                     script_name = script_path.name
                     if script_name == '*':
                         new_base_path = script_path.parent
-                        scripts_to_add = self.walk_through_dir_sorted(new_base_path, depth_within_base_dir, force_run_cleanup, recursion_depth + 1)
+                        scripts_to_add = self.get_sorted_scripts_from_dir(new_base_path, depth_within_base_dir, force_run_cleanup, recursion_depth + 1)
                         sorted_files = [*sorted_files, *scripts_to_add]
                     else:
                         if force_run_cleanup:
@@ -763,7 +763,7 @@ class UpdateCommand (BaseCommand):
         baseline_version = baseline_version_subdir.name
         print(f"The baseline version to install {baseline_version}.")       
         print(f"Apply baseline scripts...")
-        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
+        scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
         
         external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
         if not external_tool_name is None:
@@ -784,7 +784,7 @@ class UpdateCommand (BaseCommand):
         if len(version_subdirs) != 1:
             raise CommandError(f"There is no subdirectory with scripts that matched to the latest installed version '{latest_installed_version}'")
         latest_version_dir = version_subdirs[0]
-        scripts_sorted = self.walk_through_dir_sorted(latest_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=True)
+        scripts_sorted = self.get_sorted_scripts_from_dir(latest_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=True)
         if len(scripts_sorted) == 0:
             filters_str = ",".join(self.file_glob_filters)
             raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
@@ -812,7 +812,7 @@ class UpdateCommand (BaseCommand):
         print(f"Apply versioned scripts...")
         for script_version_dir in newer_version_subdirs_sorted:        
             version_id = script_version_dir.name
-            scripts_sorted = self.walk_through_dir_sorted(script_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
+            scripts_sorted = self.get_sorted_scripts_from_dir(script_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any '{filters_str}' scripts")
@@ -834,7 +834,7 @@ class UpdateCommand (BaseCommand):
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version {latest_installed_version}.")                  
         print(f"Target version matches the latest installed version '{target_version}'")
-        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir, REPEATABLE_FILES_DEPTH)
+        repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
         scripts_to_repeat = [] 
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
@@ -983,7 +983,7 @@ class VerifyCommand (BaseCommand):
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
 
-        scripts_sorted = self.walk_through_dir_sorted(baseline_version_subdir, BASELINE_FILES_DEPTH)
+        scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH)
         print(f"The baseline scripts to install: ")       
         for item in scripts_sorted:
             relative_script_path = self.script_path_for_log(scripts_dir, item)
@@ -1045,7 +1045,7 @@ class VerifyCommand (BaseCommand):
 
         print(f"The versioned scripts to install: ")    
         for script_version_dir in newer_version_subdirs_sorted:    
-            scripts_sorted = self.walk_through_dir_sorted(script_version_dir, VERSIONED_FILES_DEPTH)
+            scripts_sorted = self.get_sorted_scripts_from_dir(script_version_dir, VERSIONED_FILES_DEPTH)
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
@@ -1091,7 +1091,7 @@ class VerifyCommand (BaseCommand):
 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
-        repeatable_scripts_sorted = self.walk_through_dir_sorted(repeatable_dir, REPEATABLE_FILES_DEPTH)
+        repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
         scripts_to_repeat_dict = {}
@@ -1362,7 +1362,7 @@ class RunTestsCommand (BaseCommand):
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
         print(f"Target version matches the latest installed version '{target_version}'")    
-        scripts_sorted = self.walk_through_dir_sorted(unit_tests_dir, TESTS_FILES_DEPTH)        
+        scripts_sorted = self.get_sorted_scripts_from_dir(unit_tests_dir, TESTS_FILES_DEPTH)        
         self.run_test_scripts_each_in_own_tran(scripts_dir, scripts_sorted)
         if self.fail_count > 0:
             raise CommandError(f"Tests failed: {self.fail_count}, passed: {self.pass_count}.")
