@@ -361,7 +361,7 @@ class BaseCommand:
     def walk_through_dir_sorted(self, base_dir, depth_within_base_dir, force_run_cleanup = False, recursion_depth=0):
         MAX_RECURSION_DEPTH = 25
         if recursion_depth > MAX_RECURSION_DEPTH:
-            raise CommandError(f"The max recursion depth is achieved {recursion_depth} at '{base_dir}' by path cross referencing")
+            raise CommandError(f"Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' due to circular path references.")
         start_path = pathlib.Path(base_dir) 
         if not start_path.exists():
             raise CommandError(f"The folder '{base_dir}' does not exists")
