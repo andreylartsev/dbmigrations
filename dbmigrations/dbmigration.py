@@ -870,7 +870,7 @@ class UpdateCommand (BaseCommand):
 
     def run(self):
         if not self.args.skip_confirmation:
-            print("You are going to run updates! Would you like to continue [y/n]: ", end="", flush=True)
+            print("You are going to run updates. Would you like to continue? [y/N]: ", end="", flush=True)
             answer = get_char().lower()
             if answer != 'y':
                 raise CommandError("Cancelled by user");
