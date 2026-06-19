@@ -1,1 +1,0 @@
-SELECT fn_get_environment_name();

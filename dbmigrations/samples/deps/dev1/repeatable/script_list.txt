@@ -1,3 +1,9 @@
 @common/*
 ./fn_get_environment_name.sql
-./global_params.sql
+./use_get_environment_name.sql
+./insert_into_t1_01.sql
+./insert_into_t1_02.sql
+./insert_into_t1_03.sql
+./insert_into_t1_04.sql
+./insert_into_t1_05.sql
+

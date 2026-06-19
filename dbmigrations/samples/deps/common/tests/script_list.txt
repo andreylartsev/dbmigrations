@@ -1,3 +1,0 @@
-./detect_missing_global_params.sql
-./assure_that_fn_get_environment_name_exists.sql
-

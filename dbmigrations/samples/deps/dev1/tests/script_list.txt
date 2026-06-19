@@ -1,1 +1,2 @@
 @common/*
+./detect_missing_t1_records.sql
