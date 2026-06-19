@@ -12,9 +12,11 @@ import tomllib
 import os
 import pathlib 
 import hashlib
-import psycopg;
-import subprocess;
-import copy;
+import psycopg
+import subprocess
+import copy
+import re
+import collections
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
@@ -357,6 +359,54 @@ class BaseCommand:
         # add extra path specified after env name
         result = result.joinpath(script_sub_path)
         return result
+
+    def get_script_dependencies(self, base_dir, depth_within_base_dir, script_path):
+        DEPENDS_ON_PATTERN = r'(?<=@depends_on)\s*(\S+)'
+        if not script_path.exists():
+            raise CommandError(f"The path {script_path} does not exists.")
+        if not script_path.is_file():
+            raise CommandError(f"The path {script_path} is not a file.")
+        start_path = pathlib.Path(base_dir)
+        result_list = []
+        with script_path.open("r") as script_file:
+            lines = script_file.readlines()
+            for line in lines:
+                match = re.search(DEPENDS_ON_PATTERN, line)
+                if match: 
+                    dependency_path = match.group(1)
+                    if dependency_path.startswith("@"):
+                        script_path = self.resolve_relative_script_path(base_dir, depth_within_base_dir, dependency_path)
+                        result_list.append(script_path)
+                    else:
+                        script_path = start_path.joinpath(dependency_path)
+                        result_list.append(script_path)                    
+        return result_list
+
+    def resolve_scripts_dependencies_inner_loop(self, reversed_deps, script_to_add, recursion_depth=0):
+        MAX_RECURSION_DEPTH = 25
+        if recursion_depth > MAX_RECURSION_DEPTH:
+            raise CommandError(f"Maximum recursion depth ({recursion_depth}) exceeded at '{script_to_add}' due to circular path references.")
+        result_list = [script_to_add]
+        if script_to_add in reversed_deps:
+            deps = reversed_deps[script_to_add]
+            for dependency in deps:
+                l = self.resolve_scripts_dependencies_inner_loop(reversed_deps, dependency, recursion_depth + 1)
+                result_list = [*result_list, *l] 
+        return result_list
+
+    def resolve_scripts_dependencies(self, base_dir, depth_within_base_dir, orig_script_list, changed_scripts):
+        reversed_deps = collections.defaultdict(list)
+        for script_path in orig_script_list:
+            script_deps = self.get_script_dependencies(base_dir, depth_within_base_dir, script_path)
+            for dependency in script_deps:
+                reversed_deps[dependency].append(script_path)
+        # print(reversed_deps)     
+        result_list = []
+        for changed in changed_scripts:
+            l = self.resolve_scripts_dependencies_inner_loop(reversed_deps, changed)
+            result_list = [*result_list, *l]
+        # print(result_list)     
+        return result_list
 
     def get_sorted_scripts_from_dir(self, base_dir, depth_within_base_dir, force_run_cleanup = False, recursion_depth=0):
         MAX_RECURSION_DEPTH = 25
@@ -849,6 +899,7 @@ class UpdateCommand (BaseCommand):
         if len(scripts_to_repeat) == 0:
             print(f"No changed repeatable scripts found for (re)installation.")       
             return
+        scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         print(f"Found {len(scripts_to_repeat)} scripts to re-run")
         print(f"Apply repeatable scripts...")       
         with self.dbconn.cursor() as cur:
