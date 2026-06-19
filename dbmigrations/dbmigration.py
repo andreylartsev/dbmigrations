@@ -405,7 +405,9 @@ class BaseCommand:
         for changed in changed_scripts:
             l = self.resolve_scripts_dependencies_inner_loop(reversed_deps, changed)
             result_list = [*result_list, *l]
-        # print(result_list)     
+        # print(result_list)
+        # make the list unique
+        result_list = list(dict.fromkeys(result_list)) 
         return result_list
 
     def get_sorted_scripts_from_dir(self, base_dir, depth_within_base_dir, force_run_cleanup = False, recursion_depth=0):
@@ -1145,7 +1147,6 @@ class VerifyCommand (BaseCommand):
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
-        scripts_to_repeat_dict = {}
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 script_bytes = f.read()
@@ -1153,16 +1154,21 @@ class VerifyCommand (BaseCommand):
                 relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 if not self.check_if_repeatable_script_installed(sha256sum, target_version, relative_script_path):
                     scripts_to_repeat.append(script_path)
-                    if not target_script_path is None:
-                        scripts_to_repeat_dict[sha256sum] = script_path
         if len(scripts_to_repeat) == 0:
             print(f"No changed repeatable scripts found for (re)installation.")
             return
         print(f"The repeatable scripts to (re)install: ")
+        scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         for item in scripts_to_repeat:
             relative_script_path = self.script_path_for_log(scripts_dir, item)
             print(f"[{relative_script_path}]")
         if not target_script_path is None:
+            scripts_to_repeat_dict = {}
+            for script_path in scripts_to_repeat:
+                with open(script_path, 'rb') as f:
+                    script_bytes = f.read()
+                    sha256sum = get_sha256sum_for_bytes(script_bytes)
+                    scripts_to_repeat_dict[sha256sum] = script_path
             self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, scripts_dir, target_script_path)
 
     def run(self):
