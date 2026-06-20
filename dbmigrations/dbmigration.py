@@ -380,35 +380,46 @@ class BaseCommand:
                     else:
                         dependency_path = start_path.joinpath(found_match)
                         result_list.append(dependency_path)
-            for dependency in result_list:
-                if not dependency.exists():
-                    raise CommandError(f"The script '{dependency}' specified in {script_path} as dependency does not exists.")
-                if not dependency.is_file():
-                    raise CommandError(f"The script '{dependency}' specified in {script_path} as dependency is not a file.")
         return result_list
-
-    def resolve_scripts_dependencies_inner_loop(self, reversed_deps, script_to_add, recursion_depth=0):
-        MAX_RECURSION_DEPTH = 25
-        if recursion_depth > MAX_RECURSION_DEPTH:
-            raise CommandError(f"Maximum recursion depth ({recursion_depth}) exceeded at '{script_to_add}' due to circular path references.")
+    
+    def resolve_scripts_dependencies_inner_recursive_loop(self, reversed_deps, script_to_add, visited=None):
+        # print(visited)
+        if visited is None:
+            visited = []
+        if script_to_add in visited:
+            cycle_path = " -> ".join([f"'{p.name}'" for p in visited]) + f" -> '{script_to_add.name}'"
+            raise CommandError(f"Circular dependency detected! Path loop: {cycle_path}")
         result_list = [script_to_add]
         if script_to_add in reversed_deps:
             deps = reversed_deps[script_to_add]
             for dependency in deps:
-                l = self.resolve_scripts_dependencies_inner_loop(reversed_deps, dependency, recursion_depth + 1)
-                result_list = [*result_list, *l] 
+                l = self.resolve_scripts_dependencies_inner_recursive_loop(
+                    reversed_deps, 
+                    dependency, 
+                    [*visited, script_to_add]
+                )
+                result_list = [*result_list, *l]
         return result_list
 
     def resolve_scripts_dependencies(self, base_dir, depth_within_base_dir, orig_script_list, changed_scripts):
+        resolved_changed_scripts = [p.resolve() for p in changed_scripts]     
+        resolved_orig_script_list = [p.resolve() for p in orig_script_list]     
         reversed_deps = collections.defaultdict(list)
-        for script_path in orig_script_list:
+        for script_path in resolved_orig_script_list:
             script_deps = self.get_script_dependencies(base_dir, depth_within_base_dir, script_path)
             for dependency in script_deps:
-                reversed_deps[dependency].append(script_path)
-        print(reversed_deps)     
+                resolved_dependency = dependency.resolve()
+                if not resolved_dependency.exists():
+                    raise CommandError(f"The script '{dependency}' specified in '{script_path}' as a dependency does not exist.")
+                if not resolved_dependency.is_file():
+                    raise CommandError(f"The script '{dependency}' specified in '{script_path}' as a dependency is not a valid file.")
+                if not resolved_dependency in resolved_orig_script_list:
+                    raise CommandError(f"The script '{dependency}' (specified in '{script_path}') was not found in '{SCRIPT_LIST_FILE_NAME}' or in the origin scripts folder.")
+                reversed_deps[resolved_dependency].append(script_path)
+        # print(reversed_deps)     
         result_list = []
-        for changed in changed_scripts:
-            l = self.resolve_scripts_dependencies_inner_loop(reversed_deps, changed)
+        for changed in resolved_changed_scripts:
+            l = self.resolve_scripts_dependencies_inner_recursive_loop(reversed_deps, changed)
             result_list = [*result_list, *l]
         # print(result_list)
         # make the list unique
