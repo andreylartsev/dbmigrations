@@ -379,7 +379,12 @@ class BaseCommand:
                         result_list.append(script_path)
                     else:
                         script_path = start_path.joinpath(dependency_path)
-                        result_list.append(script_path)                    
+                        result_list.append(script_path)
+            for dependency in result_list:
+                if not dependency.exists():
+                    raise CommandError(f"The script '{dependency}' specified in {script_path} as dependency does not exists.")
+                if not dependency.is_file():
+                    raise CommandError(f"The script '{dependency}' specified in {script_path} as dependency is not a file.")
         return result_list
 
     def resolve_scripts_dependencies_inner_loop(self, reversed_deps, script_to_add, recursion_depth=0):
@@ -400,7 +405,7 @@ class BaseCommand:
             script_deps = self.get_script_dependencies(base_dir, depth_within_base_dir, script_path)
             for dependency in script_deps:
                 reversed_deps[dependency].append(script_path)
-        # print(reversed_deps)     
+        print(reversed_deps)     
         result_list = []
         for changed in changed_scripts:
             l = self.resolve_scripts_dependencies_inner_loop(reversed_deps, changed)
