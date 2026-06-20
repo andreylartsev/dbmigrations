@@ -373,13 +373,13 @@ class BaseCommand:
             for line in lines:
                 match = re.search(DEPENDS_ON_PATTERN, line)
                 if match: 
-                    dependency_path = match.group(1)
-                    if dependency_path.startswith("@"):
-                        script_path = self.resolve_relative_script_path(base_dir, depth_within_base_dir, dependency_path)
-                        result_list.append(script_path)
+                    found_match = match.group(1)
+                    if found_match.startswith("@"):
+                        dependency_path = self.resolve_relative_script_path(base_dir, depth_within_base_dir, found_match)
+                        result_list.append(dependency_path)
                     else:
-                        script_path = start_path.joinpath(dependency_path)
-                        result_list.append(script_path)
+                        dependency_path = start_path.joinpath(found_match)
+                        result_list.append(dependency_path)
             for dependency in result_list:
                 if not dependency.exists():
                     raise CommandError(f"The script '{dependency}' specified in {script_path} as dependency does not exists.")
