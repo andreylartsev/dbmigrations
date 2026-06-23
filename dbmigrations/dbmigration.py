@@ -17,6 +17,7 @@ import subprocess
 import copy
 import re
 import collections
+from abc import ABC, abstractmethod
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
@@ -171,36 +172,25 @@ class ExternalTool:
         if result_code != self.success_result_code:
             raise CommandError(f"The tool '{self.tool_name}' returned unsuccessful result code {result_code}!")
 
-class BaseCommand:
-
-    def get_default_dbenv(self, toml_config):
-        if not DEFAULT_DBENV_CONFIG_ATTRIBUTE in toml_config:
-            raise CommandError(f"There is no '{DEFAULT_DBENV_CONFIG_ATTRIBUTE}' within the configuration file '{TOML_CONFIG_FILE}'.")
-        default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
-        return default_dbenv
-
-    def get_dbenv_config(self, toml_config, dbenv_param):
-        if not DBENVS_CONFIG_GROUP in toml_config:
-            raise CommandError(f"There is no configuration group'{DBENVS_CONFIG_GROUP}' within the configuration file '{TOML_CONFIG_FILE}'.")
-        dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
-        if not dbenv_param in dbenvs_config:
-            raise CommandError(f"There is no configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' within the configuration file '{TOML_CONFIG_FILE}'.")
-        config = copy.deepcopy(dbenvs_config[dbenv_param])
-        run_tests_by = config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
-        no_password = config.pop(NO_PASSWORD_ATTRIBUTE, False)
-        return config, run_tests_by, no_password
-
-    def check_if_version_control_tables_are_not_granted_to_public_for_select(self):
+class OwnMigration(ABC):    
+    @abstractmethod
+    def get_sql_to_check_if_need_migration(self):
+        pass
+    @abstractmethod
+    def get_migration_ddl(self):
+        pass
+    
+class MigrationToGrantSelectToVersionControlTablesToPublic (OwnMigration):
+    def get_sql_to_check_if_need_migration(self):
         sql = """
-            SELECT has_table_privilege(0, '{schema_name_identity}.dbmigration_versions', 'SELECT') 
-                AND has_table_privilege(0, '{schema_name_identity}.dbmigration_repeatable', 'SELECT');
+            SELECT NOT (
+                has_table_privilege(0, '{schema_name_identity}.dbmigration_versions', 'SELECT') 
+                AND has_table_privilege(0, '{schema_name_identity}.dbmigration_repeatable', 'SELECT') 
+            );            
         """
-        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name())
-        result = self.dbconn_get_single_value(formatted_sql, [])
-        return not result
-
-    def migration_to_grant_select_to_version_control_tables_to_public(self):
-        sql = """
+        return sql
+    def get_migration_ddl(self):
+        ddl = """
             DO $$
             BEGIN
                 RAISE NOTICE 'Start migration to grant SELECT privilege to version control tables to the PUBLIC role.';
@@ -210,29 +200,27 @@ class BaseCommand:
 
                 RAISE NOTICE 'The SELECT privilege has been granted.';
             END
-            $$;
+            $$;         
         """
-        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name())
-        self.dbconn_exec_with_no_result(formatted_sql, [])
+        return ddl 
 
-
-    def check_if_repeatable_table_dont_have_pk_v3(self):
+class MigrationToAddPkV3ToRepeatableTable (OwnMigration):
+    def get_sql_to_check_if_need_migration(self):
         sql = """
             SELECT NOT EXISTS (
                 SELECT 1 
                 FROM pg_catalog.pg_constraint con
                 JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
                 JOIN pg_catalog.pg_namespace nsp ON nsp.oid = rel.relnamespace
-                WHERE nsp.nspname = %s
+                WHERE nsp.nspname = {schema_name_str}
                 AND rel.relname = 'dbmigration_repeatable'
                 AND con.conname = 'dbmigration_repeatable_primary_key_3'
             );
         """
-        result = self.dbconn_get_single_value(sql, (self.args.schema_name,))
-        return result
-
-    def migration_to_add_pk_v3_to_repeatable_table(self):
-        sql = """
+        return sql
+    
+    def get_migration_ddl(self):
+        ddl = """
             DO $$
             DECLARE 
                 pk_name VARCHAR(128);
@@ -260,25 +248,22 @@ class BaseCommand:
             END
             $$;
         """
-        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
-        self.dbconn_exec_with_no_result(formatted_sql, [])
+        return ddl 
 
-    def check_if_version_id_column_is_missing_in_repeatable_table(self):
+class MigrationToAddVersionIdToRepeatableTable(OwnMigration):
+    def get_sql_to_check_if_need_migration(self):
         sql = """
             SELECT NOT EXISTS (
                 SELECT 1 
                 FROM information_schema.columns 
-                WHERE table_schema = %s 
+                WHERE table_schema = {schema_name_str}
                 AND table_name   = 'dbmigration_repeatable' 
                 AND column_name  = 'version_id' 
             ); 
         """
-        result = self.dbconn_get_single_value(sql, (self.args.schema_name,))
-        return result
-
-
-    def migration_to_add_version_id_to_repeatable_table(self):
-        sql = """
+        return sql
+    def get_migration_ddl(self):
+        ddl = """
             DO $$
             DECLARE 
                 pk_name VARCHAR(128);
@@ -305,8 +290,50 @@ class BaseCommand:
             END
             $$;
         """
-        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
-        self.dbconn_exec_with_no_result(formatted_sql, [])
+        return ddl
+
+class BaseCommand:
+
+    all_own_migrations: list[OwnMigration]
+
+    def apply_all_own_migrations(self):
+        for m in self.all_own_migrations:
+            if not isinstance(m, OwnMigration):
+                raise CommandError(f"Not a 'Migration' object found within the migrations collection")
+            sql = m.get_sql_to_check_if_need_migration()
+            formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
+            result = self.dbconn_get_single_value(formatted_sql, [])
+            if result:
+                ddl = m.get_migration_ddl()
+                formatted_ddl = self.format_sql(ddl, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
+                self.dbconn_exec_with_no_result(formatted_ddl, [])
+
+    def check_if_all_own_migrations_are_applied(self):
+        for m in self.all_own_migrations:
+            if not isinstance(m, OwnMigration):
+                raise CommandError(f"Not a 'Migration' object found within the migrations collection")
+            sql = m.get_sql_to_check_if_need_migration()
+            formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
+            result = self.dbconn_get_single_value(formatted_sql, [])
+            if result:
+                raise CommandError(f"Run either 'update' or 'init' subcommand to update version control tables within the schema")
+
+    def get_default_dbenv(self, toml_config):
+        if not DEFAULT_DBENV_CONFIG_ATTRIBUTE in toml_config:
+            raise CommandError(f"There is no '{DEFAULT_DBENV_CONFIG_ATTRIBUTE}' within the configuration file '{TOML_CONFIG_FILE}'.")
+        default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
+        return default_dbenv
+
+    def get_dbenv_config(self, toml_config, dbenv_param):
+        if not DBENVS_CONFIG_GROUP in toml_config:
+            raise CommandError(f"There is no configuration group'{DBENVS_CONFIG_GROUP}' within the configuration file '{TOML_CONFIG_FILE}'.")
+        dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
+        if not dbenv_param in dbenvs_config:
+            raise CommandError(f"There is no configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' within the configuration file '{TOML_CONFIG_FILE}'.")
+        config = copy.deepcopy(dbenvs_config[dbenv_param])
+        run_tests_by = config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
+        no_password = config.pop(NO_PASSWORD_ATTRIBUTE, False)
+        return config, run_tests_by, no_password
 
     def try_get_external_tool_name(self, dir):
         start_path = pathlib.Path(dir) 
@@ -667,6 +694,13 @@ class BaseCommand:
             raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
 
     def __init__(self, config, subparsers, command_name, command_help):
+
+        self.all_own_migrations = [
+            MigrationToAddVersionIdToRepeatableTable(),
+            MigrationToAddPkV3ToRepeatableTable(),
+            MigrationToGrantSelectToVersionControlTablesToPublic()
+        ]
+
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
         self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
@@ -944,12 +978,7 @@ class UpdateCommand (BaseCommand):
             if answer != 'y':
                 raise CommandError("Cancelled by user");
         self.do_initial_cross_checks()
-        if self.check_if_version_id_column_is_missing_in_repeatable_table():
-            self.migration_to_add_version_id_to_repeatable_table()
-        if self.check_if_repeatable_table_dont_have_pk_v3():
-            self.migration_to_add_pk_v3_to_repeatable_table()
-        if self.check_if_version_control_tables_are_not_granted_to_public_for_select():
-            self.migration_to_grant_select_to_version_control_tables_to_public()
+        self.apply_all_own_migrations()
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
             self.reapply_the_latest_version(self.scripts_dir)
@@ -1190,12 +1219,7 @@ class VerifyCommand (BaseCommand):
     def run(self):
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()
-        if self.check_if_version_id_column_is_missing_in_repeatable_table():
-            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
-        if self.check_if_repeatable_table_dont_have_pk_v3():
-            raise CommandError(f"It is required to update dbmigration_repeatable table to modify pk. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
-        if self.check_if_version_control_tables_are_not_granted_to_public_for_select():
-            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
+        self.check_if_all_own_migrations_are_applied()
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
         script_path = None
@@ -1289,12 +1313,10 @@ class InitCommand (BaseCommand):
         self.set_session_search_path(self.args.schema_name)
 
         if not self.check_if_schema_is_empty():
-            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_version_id_column_is_missing_in_repeatable_table():
-                self.migration_to_add_version_id_to_repeatable_table()
-            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_repeatable_table_dont_have_pk_v3():
-                self.migration_to_add_pk_v3_to_repeatable_table()
-            if self.check_if_version_table_exists("dbmigration_repeatable") and self.check_if_version_control_tables_are_not_granted_to_public_for_select():
-                self.migration_to_grant_select_to_version_control_tables_to_public()
+
+            if self.check_if_version_table_exists("dbmigration_versions") and self.check_if_version_table_exists("dbmigration_repeatable"):         
+                self.apply_all_own_migrations()
+            
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
             if self.check_if_version_table_exists("dbmigration_versions"):
@@ -1445,12 +1467,7 @@ class RunTestsCommand (BaseCommand):
 
     def run(self):
         self.do_initial_cross_checks()
-        if self.check_if_version_id_column_is_missing_in_repeatable_table():
-            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
-        if self.check_if_repeatable_table_dont_have_pk_v3():
-            raise CommandError(f"It is required to update dbmigration_repeatable table to modify pk. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
-        if self.check_if_version_control_tables_are_not_granted_to_public_for_select():
-            raise CommandError(f"It is required to update dbmigration_repeatable table. To apply automatic migration please execute either 'update' of 'init' subcommand with same schema name.")
+        self.check_if_all_own_migrations_are_applied();
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
 
