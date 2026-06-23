@@ -64,11 +64,13 @@ class CommandError(Exception):
     def __init__(self, message):
         super().__init__(message)
 
-def get_sha256sum_for_bytes(script_bytes):
-    hash_object = hashlib.sha256(script_bytes)
-    hex_dig = hash_object.hexdigest()
-    return hex_dig
-
+def get_git_blob_sha1_for_bytes(script_bytes):
+    content = script_bytes.replace(b'\r\n', b'\n')
+    header = f"blob {len(content)}\x00".encode('utf-8')
+    sha1 = hashlib.sha1()
+    sha1.update(header)
+    sha1.update(content)
+    return sha1.hexdigest()
 
 def read_as_trimmed_string(file_path):
     with open(file_path, 'rb') as f:
@@ -179,7 +181,36 @@ class OwnMigration(ABC):
     @abstractmethod
     def get_migration_ddl(self):
         pass
-    
+
+class MigrationToRenameSha256SumColumnToGitBlobSha1 (OwnMigration):
+    def get_sql_to_check_if_need_migration(self):
+        sql = """
+            SELECT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_schema = {schema_name_str} 
+                AND table_name = 'dbmigration_repeatable' 
+                AND column_name = 'sha256sum'
+            );         
+        """
+        return sql
+    def get_migration_ddl(self):
+        ddl = """
+            DO $$
+            BEGIN
+                RAISE NOTICE 'Start migration to rename sha256sum column within dbmigration_repeatable to git_blob_sha1.';
+
+                ALTER TABLE {schema_name_identity}.dbmigration_repeatable 
+                    RENAME COLUMN sha256sum TO git_blob_sha1;
+
+                RAISE NOTICE 'Renamed.';
+            END
+            $$;         
+        """
+        return ddl 
+
+
+
 class MigrationToGrantSelectToVersionControlTablesToPublic (OwnMigration):
     def get_sql_to_check_if_need_migration(self):
         sql = """
@@ -607,14 +638,14 @@ class BaseCommand:
             raise CommandError(f"Unable to get latest installed version")
         return value
 
-    def check_if_repeatable_script_installed(self, sha256sum, version, relative_path):
+    def check_if_repeatable_script_installed(self, git_blob_sha1, version, relative_path):
         sql = """
             SELECT EXISTS (
                 SELECT 1 
                 FROM {schema_name}.dbmigration_repeatable newer
                 WHERE newer.relative_path = {relative_path}
                 AND newer.version_id = {version_id}
-                AND newer.sha256sum = {sha256sum}
+                AND newer.git_blob_sha1 = {git_blob_sha1}
                 AND newer.created_at = (
                     SELECT current_rec.created_at 
                     FROM {schema_name}.dbmigration_repeatable current_rec
@@ -629,7 +660,7 @@ class BaseCommand:
                                         schema_name=self.get_schema_name(), 
                                         version_id=version, 
                                         relative_path=relative_path, 
-                                        sha256sum=sha256sum)
+                                        git_blob_sha1=git_blob_sha1)
         value = self.dbconn_get_single_value(formatted_sql, [])
         if value is None:
             raise CommandError(f"Unable to check if repeatable script was installed")
@@ -698,7 +729,8 @@ class BaseCommand:
         self.all_own_migrations = [
             MigrationToAddVersionIdToRepeatableTable(),
             MigrationToAddPkV3ToRepeatableTable(),
-            MigrationToGrantSelectToVersionControlTablesToPublic()
+            MigrationToGrantSelectToVersionControlTablesToPublic(),
+            MigrationToRenameSha256SumColumnToGitBlobSha1()
         ]
 
         self.config = config
@@ -941,12 +973,12 @@ class UpdateCommand (BaseCommand):
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 script_bytes = f.read()
-                sha256sum = get_sha256sum_for_bytes(script_bytes)
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
                 script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                 relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 if force_reapply:
                     scripts_to_repeat.append(script_path)
-                elif not self.check_if_repeatable_script_installed(sha256sum, target_version, relative_script_path):
+                elif not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
                     scripts_to_repeat.append(script_path)
         if len(scripts_to_repeat) == 0:
             print(f"No changed repeatable scripts found for (re)installation.")       
@@ -958,15 +990,15 @@ class UpdateCommand (BaseCommand):
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    sha256sum = get_sha256sum_for_bytes(script_bytes)
+                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
                     script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     print(f"Running script: [{relative_script_path}]...")
                     cur.execute("BEGIN")
                     cur.execute(script_text)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, version_id, relative_path) VALUES (%s, %s, %s)", 
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
                                                     schema_name=self.get_schema_name())                                  
-                    cur.execute(formatted_sql, (sha256sum, target_version, str(relative_script_path)))     
+                    cur.execute(formatted_sql, (git_blob_sha1, target_version, str(relative_script_path)))     
                     cur.execute("COMMIT")
                     print(f"Committed.")
         print(f"The repeatable scripts were applied.")       
@@ -1158,7 +1190,7 @@ class VerifyCommand (BaseCommand):
         with pathlib.Path(target_script_path).open("a") as target_file:
             formatted_sql_text = self.format_sql("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
             target_file.write(formatted_sql_text)
-            for sha256sum, script_path in scripts_dict.items():
+            for git_blob_sha1, script_path in scripts_dict.items():
                 with script_path.open("r") as source_file:
                     lines = source_file.readlines()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
@@ -1167,8 +1199,8 @@ class VerifyCommand (BaseCommand):
                     target_file.write(f"BEGIN;\n")
                     target_file.writelines(lines)
                     target_file.write(f"\n")
-                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (sha256sum, version_id, relative_path) VALUES ({sha256sum}, {version_id}, {relative_path});\n", 
-                                                         schema_name=self.get_schema_name(), sha256sum=sha256sum, version_id=target_version, relative_path=str(relative_script_path))
+                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
+                                                         schema_name=self.get_schema_name(), git_blob_sha1=git_blob_sha1, version_id=target_version, relative_path=str(relative_script_path))
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
 
@@ -1195,9 +1227,9 @@ class VerifyCommand (BaseCommand):
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 script_bytes = f.read()
-                sha256sum = get_sha256sum_for_bytes(script_bytes)
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
                 relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                if not self.check_if_repeatable_script_installed(sha256sum, target_version, relative_script_path):
+                if not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
                     scripts_to_repeat.append(script_path)
         if len(scripts_to_repeat) == 0:
             print(f"No changed repeatable scripts found for (re)installation.")
@@ -1212,8 +1244,8 @@ class VerifyCommand (BaseCommand):
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    sha256sum = get_sha256sum_for_bytes(script_bytes)
-                    scripts_to_repeat_dict[sha256sum] = script_path
+                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                    scripts_to_repeat_dict[git_blob_sha1] = script_path
             self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, scripts_dir, target_script_path)
 
     def run(self):
@@ -1286,12 +1318,12 @@ class InitCommand (BaseCommand):
                 version_id VARCHAR(64) NOT NULL,
                 relative_path VARCHAR(2048) NOT NULL,
                 created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CLOCK_TIMESTAMP(),
-                sha256sum VARCHAR(128) NOT NULL,
+                git_blob_sha1 VARCHAR(128) NOT NULL,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR(),
                 CONSTRAINT dbmigration_repeatable_primary_key_3 PRIMARY KEY(version_id, relative_path, created_at)
             );
-            INSERT INTO {schema_name}.dbmigration_repeatable (version_id, relative_path, sha256sum) VALUES ('000', 'test.sql', '0');
+            INSERT INTO {schema_name}.dbmigration_repeatable (version_id, relative_path, git_blob_sha1) VALUES ('000', 'test.sql', '0');
             DELETE FROM {schema_name}.dbmigration_repeatable WHERE version_id = '000';  
 
             GRANT SELECT ON TABLE {schema_name}.dbmigration_versions TO PUBLIC;
