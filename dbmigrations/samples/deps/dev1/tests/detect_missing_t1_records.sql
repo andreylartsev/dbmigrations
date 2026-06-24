@@ -1,5 +1,6 @@
 WITH required_records (v1) AS (
     VALUES 
+        (6),
         (4),
         (3),
         (2),

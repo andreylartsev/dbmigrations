@@ -181,6 +181,9 @@ class OwnMigration(ABC):
     @abstractmethod
     def get_migration_ddl(self):
         pass
+    @abstractmethod
+    def get_migration_desc(self):
+        pass
 
 class MigrationToRenameSha256SumColumnToGitBlobSha1 (OwnMigration):
     def get_sql_to_check_if_need_migration(self):
@@ -198,16 +201,15 @@ class MigrationToRenameSha256SumColumnToGitBlobSha1 (OwnMigration):
         ddl = """
             DO $$
             BEGIN
-                RAISE NOTICE 'Start migration to rename sha256sum column within dbmigration_repeatable to git_blob_sha1.';
-
                 ALTER TABLE {schema_name_identity}.dbmigration_repeatable 
                     RENAME COLUMN sha256sum TO git_blob_sha1;
-
-                RAISE NOTICE 'Renamed.';
             END
             $$;         
         """
         return ddl 
+    def get_migration_desc(self):
+        desc = "Migration to rename sha256sum column within dbmigration_repeatable to git_blob_sha1"
+        return desc
 
 
 
@@ -222,18 +224,14 @@ class MigrationToGrantSelectToVersionControlTablesToPublic (OwnMigration):
         return sql
     def get_migration_ddl(self):
         ddl = """
-            DO $$
-            BEGIN
-                RAISE NOTICE 'Start migration to grant SELECT privilege to version control tables to the PUBLIC role.';
-
-                GRANT SELECT ON TABLE {schema_name_identity}.dbmigration_versions TO PUBLIC;
-                GRANT SELECT ON TABLE {schema_name_identity}.dbmigration_repeatable TO PUBLIC;
-
-                RAISE NOTICE 'The SELECT privilege has been granted.';
-            END
-            $$;         
+            GRANT SELECT ON TABLE {schema_name_identity}.dbmigration_versions TO PUBLIC;
+            GRANT SELECT ON TABLE {schema_name_identity}.dbmigration_repeatable TO PUBLIC;
         """
         return ddl 
+
+    def get_migration_desc(self):
+        desc = "Migration to grant SELECT privilege to version control tables to the PUBLIC role."
+        return desc
 
 class MigrationToAddPkV3ToRepeatableTable (OwnMigration):
     def get_sql_to_check_if_need_migration(self):
@@ -256,8 +254,6 @@ class MigrationToAddPkV3ToRepeatableTable (OwnMigration):
             DECLARE 
                 pk_name VARCHAR(128);
             BEGIN
-                RAISE NOTICE 'Start migration of table dbmigration_repeatable to modify pk to version 3.';
-
                 SELECT constraint_name INTO pk_name
                 FROM information_schema.table_constraints
                 WHERE table_schema = {schema_name_str}
@@ -274,12 +270,13 @@ class MigrationToAddPkV3ToRepeatableTable (OwnMigration):
 
                 ALTER TABLE {schema_name_identity}.dbmigration_repeatable 
                     ADD CONSTRAINT dbmigration_repeatable_primary_key_3 PRIMARY KEY (relative_path, version_id, created_at);
-
-                RAISE NOTICE 'The new pk has been added.';
             END
             $$;
         """
-        return ddl 
+        return ddl    
+    def get_migration_desc(self):
+        desc = "Migration of table dbmigration_repeatable to modify pk to version 3."
+        return desc 
 
 class MigrationToAddVersionIdToRepeatableTable(OwnMigration):
     def get_sql_to_check_if_need_migration(self):
@@ -299,8 +296,6 @@ class MigrationToAddVersionIdToRepeatableTable(OwnMigration):
             DECLARE 
                 pk_name VARCHAR(128);
             BEGIN
-                RAISE NOTICE 'Start migration of table dbmigration_repeatable to add column version_id.';
-
                 ALTER TABLE {schema_name_identity}.dbmigration_repeatable ADD COLUMN version_id VARCHAR(64) NOT NULL DEFAULT '0';
                 
                 UPDATE {schema_name_identity}.dbmigration_repeatable SET version_id = (SELECT MAX(version_id) FROM {schema_name_identity}.dbmigration_versions);
@@ -316,12 +311,14 @@ class MigrationToAddVersionIdToRepeatableTable(OwnMigration):
                 END IF;
 
                 ALTER TABLE {schema_name_identity}.dbmigration_repeatable ADD PRIMARY KEY (sha256sum, version_id);
-                
-                RAISE NOTICE 'The column version_id has been added.';
             END
             $$;
         """
         return ddl
+    
+    def get_migration_desc(self):
+        desc = "Migration of table dbmigration_repeatable to add column version_id."
+        return desc 
 
 class BaseCommand:
 
@@ -336,8 +333,11 @@ class BaseCommand:
             result = self.dbconn_get_single_value(formatted_sql, [])
             if result:
                 ddl = m.get_migration_ddl()
+                desc = m.get_migration_desc()
                 formatted_ddl = self.format_sql(ddl, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
-                self.dbconn_exec_with_no_result(formatted_ddl, [])
+                print(f"Run migration: {desc}...", flush=True, end="")
+                self.dbconn_exec_with_no_result_in_tran(formatted_ddl, [])
+                print(f"Done.")
 
     def check_if_all_own_migrations_are_applied(self):
         for m in self.all_own_migrations:
@@ -347,7 +347,8 @@ class BaseCommand:
             formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
             result = self.dbconn_get_single_value(formatted_sql, [])
             if result:
-                raise CommandError(f"Run either 'update' or 'init' subcommand to update version control tables within the schema")
+                desc = m.get_migration_desc()
+                raise CommandError(f"Run either 'update' or 'init' subcommand to update version control tables within the schema. The following migration need to be applied: {desc}")
 
     def get_default_dbenv(self, toml_config):
         if not DEFAULT_DBENV_CONFIG_ATTRIBUTE in toml_config:
@@ -560,9 +561,12 @@ class BaseCommand:
             cur.execute(sql, params)
             row = cur.fetchone()
             return row[0] if not row is None else None
-    def dbconn_exec_with_no_result(self, sql, params):
+        
+    def dbconn_exec_with_no_result_in_tran(self, sql, params):
         with self.dbconn.cursor() as cur:
+            cur.execute("BEGIN")
             cur.execute(sql, params)
+            cur.execute("COMMIT")
 
     def dbconn_attr_as_utf_8(self, attr):
         if attr is None:
@@ -1032,7 +1036,8 @@ class VerifyCommand (BaseCommand):
     def make_dbconn_session_readonly(self):
         sql = """
             SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"""
-        self.dbconn_exec_with_no_result(sql, [])
+        with self.dbconn.cursor() as cur:
+            cur.execute(sql)
 
     def get_baseline_version_installed(self):
         sql = """
