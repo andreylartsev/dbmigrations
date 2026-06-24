@@ -1,1 +1,1 @@
-insert into t1 values (1) on conflict (v1) do nothing;
+insert into t1 values (1) on conflict (v1) do nothing; 
