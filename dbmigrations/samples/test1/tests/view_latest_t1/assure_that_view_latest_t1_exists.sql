@@ -1,5 +1,5 @@
 SELECT
-  1
+  v1 = NULL::int
 FROM
   latest_t1
 WHERE

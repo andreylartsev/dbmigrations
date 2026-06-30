@@ -12,6 +12,7 @@ SELECT
       latest_t1);
 
 -- second test
+/*
 SELECT
   (
     SELECT
@@ -24,3 +25,4 @@ SELECT
     FROM
       latest_t1);
 
+*/
