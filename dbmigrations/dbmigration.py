@@ -198,14 +198,10 @@ class MigrationCheckForOlderVersionControlTables (OwnMigration):
         """
         return sql
     def get_migration_ddl(self):
-        ddl = """
-            DO $$
-            BEGIN
-                RAISE EXCEPTION 'This version of dbmigration tools is incompatible with this schema. Please use the previous version available by tag 0.9.x or upgrade the current schema by deleting dbmigration_version and dbmigration_repeatable tables and running the update subcommand with --force-run-cleanup flag: i.e. dbmigration.py update <schema_name> <scripts_folder> --force-run-cleanup';
-            END
-            $$;         
-        """
-        return ddl 
+        raise CommandError(f"This version of dbmigration tools is incompatible with this schema.\n" 
+                            "Please use the previous version available by tag 0.9.x or upgrade the current schema by deleting dbmigration_version and dbmigration_repeatable tables and running the update subcommand with --force-run-cleanup flag: \n" 
+                            "i.e. dbmigration.py update <schema_name> <scripts_folder> --force-run-cleanup")
+                           
     def get_migration_desc(self):
         desc = "Check for older version control tables"
         return desc
@@ -488,6 +484,31 @@ class BaseCommand:
             raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return value
     
+    def get_scripts_path_environment_id(self):
+        NAME_LENGTH_LIMIT=64
+        if not hasattr(self.args, 'scripts_path'):
+            raise CommandError("The argument 'scripts_path' is undefined")
+        if len(self.args.scripts_path) == 0:
+            raise CommandError("The path that is specified by 'scripts_path' must not be empty string")
+        scripts_path = pathlib.Path(self.args.scripts_path)
+        if not scripts_path.exists():
+            raise CommandError("The path that is specified by 'scripts_path' argument does not exist")
+        if not scripts_path.is_dir():
+            raise CommandError("The path that is specified by 'scripts_path' argument is not a valid directory")
+        resolved_name = scripts_path.resolve().name
+        if len(resolved_name) > NAME_LENGTH_LIMIT:
+            raise CommandError(f"The length of the directory name specified by 'scripts_path' argument is more than {NAME_LENGTH_LIMIT} characters")
+        return resolved_name
+
+    def get_stored_environment_id(self):
+        sql = """
+                SELECT environment_id FROM {schema_name_identity}.dbmigration_environment ORDER BY created_at ASC LIMIT 1"""        
+        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name()) 
+        value = self.dbconn_get_single_value(formatted_sql, [])
+        if value is None:
+            raise CommandError(f"Unable to get stored environment id from the database schema")
+        return value
+    
     def get_search_path_for_scripts(self):
         scripts_dir = pathlib.Path(self.args.scripts_path)
         set_search_path_file = scripts_dir.joinpath(SEARCH_PATH_FILE_NAME)
@@ -616,8 +637,16 @@ class BaseCommand:
             self.set_session_search_path(search_path)
         else:
             print(f"Use the default users search path")     
-        
+
+    def check_if_stored_environment_id_matches_to_scripts_dir(self):
+        stored_environment_id = self.get_stored_environment_id()
+        scripts_environment_id = self.get_scripts_path_environment_id()
+        if stored_environment_id != scripts_environment_id:
+            raise CommandError(f"The stored environment id '{stored_environment_id}' in the target schema does not match the scripts directory '{self.scripts_dir}'")
+
     def check_if_all_version_control_tables_exists(self):
+        if not self.check_if_table_exists("dbmigration_environment"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_environment'")
         if not self.check_if_table_exists("dbmigration_versions"):
             raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
         if not self.check_if_table_exists("dbmigration_version_files"):
@@ -626,6 +655,8 @@ class BaseCommand:
             raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
     
     def check_if_all_version_control_tables_does_not_exists(self):
+        if self.check_if_table_exists("dbmigration_environment"):
+            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_environment'")
         if self.check_if_table_exists("dbmigration_versions"):
             raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_versions'")
         if self.check_if_table_exists("dbmigration_version_files"):
@@ -959,13 +990,15 @@ class UpdateCommand (BaseCommand):
         
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
-            self.check_if_all_version_control_tables_exists() 
+            self.check_if_all_version_control_tables_exists()
+            self.check_if_stored_environment_id_matches_to_scripts_dir() 
             self.reapply_the_latest_version(self.scripts_dir)
             self.apply_repeatable_scripts(self.scripts_dir, force_reapply=True)
             print(f"Reapplied.")
         else:
             print(f"Performing updates from scripts repository: '{self.scripts_dir}'")
             self.check_if_all_version_control_tables_exists() 
+            self.check_if_stored_environment_id_matches_to_scripts_dir() 
             self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
             self.apply_baseline_scripts(self.scripts_dir)
             self.apply_versioned_scripts(self.scripts_dir)
@@ -1216,6 +1249,7 @@ class VerifyCommand (BaseCommand):
         self.do_initial_cross_checks()        
         self.check_if_all_own_migrations_are_applied()
         self.check_if_all_version_control_tables_exists();
+        self.check_if_stored_environment_id_matches_to_scripts_dir() 
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
         script_path = None
@@ -1266,7 +1300,16 @@ class InitCommand (BaseCommand):
     
     def create_version_tracking_tables(self):
         sql_script = """
-            BEGIN;    
+            BEGIN;
+
+            CREATE TABLE {schema_name}.dbmigration_environment (
+                environment_id VARCHAR(64) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
+                created_from INET DEFAULT INET_CLIENT_ADDR(),
+                CONSTRAINT dbmigration_environment_primary_key PRIMARY KEY(environment_id) 
+            );
+            GRANT SELECT ON TABLE {schema_name}.dbmigration_environment TO PUBLIC;
                     
             CREATE TABLE {schema_name}.dbmigration_versions (
                 version_id VARCHAR(64) NOT NULL,
@@ -1281,7 +1324,7 @@ class InitCommand (BaseCommand):
             CREATE TABLE {schema_name}.dbmigration_version_files (
                 version_id VARCHAR(64) NOT NULL,
                 relative_path VARCHAR(2048) NOT NULL,
-                git_blob_sha1 VARCHAR(128) NOT NULL,
+                git_blob_sha1 VARCHAR(64) NOT NULL,
                 CONSTRAINT dbmigration_version_files_primary_key PRIMARY KEY(version_id, relative_path)
             );
             GRANT SELECT ON TABLE {schema_name}.dbmigration_version_files TO PUBLIC;
@@ -1297,24 +1340,18 @@ class InitCommand (BaseCommand):
             );
             GRANT SELECT ON TABLE {schema_name}.dbmigration_repeatable TO PUBLIC;
 
-            -- insert test data
-            INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ('000', true);
-            INSERT INTO {schema_name}.dbmigration_version_files (version_id, relative_path, git_blob_sha1) VALUES ('000', 'test.sql', '0');
-            INSERT INTO {schema_name}.dbmigration_repeatable (version_id, relative_path, git_blob_sha1) VALUES ('000', 'test.sql', '0');
-
-            -- delete test data
-            DELETE FROM {schema_name}.dbmigration_repeatable WHERE version_id = '000';  
-            DELETE FROM {schema_name}.dbmigration_version_files WHERE version_id = '000';
-            DELETE FROM {schema_name}.dbmigration_versions WHERE version_id = '000';
+            -- insert environment id
+            INSERT INTO {schema_name}.dbmigration_environment (environment_id) VALUES ({environment_id_str});
 
             COMMIT;
         """        
         with self.dbconn.cursor() as cur:
-            formatted_sql = self.format_sql(sql_script, schema_name=self.get_schema_name())
+            formatted_sql = self.format_sql(sql_script, schema_name=self.get_schema_name(), environment_id_str=self.get_scripts_path_environment_id())
             cur.execute(formatted_sql)
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "init", InitCommand.__doc__)
+        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.parser.add_argument("--force-init",  action="store_true", default=False, help="Force create version control tables even on non empty schema")
 
     def run(self):
@@ -1471,7 +1508,8 @@ class RunTestsCommand (BaseCommand):
     def run(self):
         self.do_initial_cross_checks()
         self.check_if_all_own_migrations_are_applied()
-        self.check_if_all_version_control_tables_exists()        
+        self.check_if_all_version_control_tables_exists() 
+        self.check_if_stored_environment_id_matches_to_scripts_dir()    
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
 
