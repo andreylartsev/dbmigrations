@@ -651,7 +651,8 @@ class BaseCommand:
         stored_environment_id = self.get_stored_environment_id()
         scripts_environment_id = self.get_scripts_path_environment_id()
         if stored_environment_id != scripts_environment_id:
-            raise CommandError(f"The stored environment id '{stored_environment_id}' in the target schema does not match the scripts directory '{self.scripts_dir}'")
+            raise CommandError(f"The stored environment ID '{stored_environment_id}' in the target schema does not match the scripts directory '{self.scripts_dir}'")
+        print(f"Target schema environment ID matches the scripts directory ID: {stored_environment_id}")
 
     def check_if_all_version_control_tables_exists(self):
         if not self.check_if_table_exists("dbmigration_environment"):
