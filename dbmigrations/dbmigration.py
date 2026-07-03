@@ -1485,6 +1485,7 @@ class RunTestsCommand (BaseCommand):
     def __init__(self, config, subparsers):       
         super().__init__(config, subparsers, "run-tests", RunTestsCommand.__doc__)
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
+        self.parser.add_argument("--skip-env-checks",  action="store_true", default=False, help="Skip version and environment ID checks to run tests in any plain environment not made by the tool itself")
     
     def __enter__(self):
         self.use_run_tests_by_user = True
@@ -1494,14 +1495,17 @@ class RunTestsCommand (BaseCommand):
         unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
         if not unit_tests_dir.exists():
             raise CommandError(f"The scripts path '{scripts_dir}' does not include '{TESTS_DIR_NAME}' subdirectory.")
-        target_version_file_path = unit_tests_dir.joinpath(TARGET_VERSION_FILE)
-        if not target_version_file_path.exists():
-            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in unit tests scripts subdirectory '{unit_tests_dir}'.")
-        target_version = read_as_trimmed_string(target_version_file_path)
-        latest_installed_version = self.get_latest_version_installed() 
-        if latest_installed_version != target_version:
-            raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
-        print(f"Target version matches the latest installed version '{target_version}'")    
+
+        if not self.args.skip_env_checks:
+            target_version_file_path = unit_tests_dir.joinpath(TARGET_VERSION_FILE)
+            if not target_version_file_path.exists():
+                raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in unit tests scripts subdirectory '{unit_tests_dir}'.")
+            target_version = read_as_trimmed_string(target_version_file_path)
+            latest_installed_version = self.get_latest_version_installed() 
+            if latest_installed_version != target_version:
+                raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
+            print(f"Target version matches the latest installed version '{target_version}'")
+
         scripts_sorted = self.get_sorted_scripts_from_dir(unit_tests_dir, TESTS_FILES_DEPTH)        
         self.run_test_scripts_each_in_own_tran(scripts_dir, scripts_sorted)
         if self.fail_count > 0:
@@ -1512,9 +1516,10 @@ class RunTestsCommand (BaseCommand):
 
     def run(self):
         self.do_initial_cross_checks()
-        self.check_if_all_own_migrations_are_applied()
-        self.check_if_all_version_control_tables_exists() 
-        self.check_if_stored_environment_id_matches_to_scripts_dir()    
+        if not self.args.skip_env_checks:
+            self.check_if_all_own_migrations_are_applied()
+            self.check_if_all_version_control_tables_exists() 
+            self.check_if_stored_environment_id_matches_to_scripts_dir()    
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
 
