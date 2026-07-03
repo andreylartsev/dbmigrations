@@ -18,6 +18,7 @@
 ./table_t2/detect_missing_t2_records.sql
 
 # and finally the tests of views
+./view_latest_t1/test_view_latest_t1.sql
 ./view_latest_t1/assure_that_view_latest_t1_exists.sql
 ./view_latest_t1/is_true_that_view_latest_t1_returns_max_value.sql
 

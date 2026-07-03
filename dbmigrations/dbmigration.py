@@ -59,6 +59,17 @@ VERSIONED_FILES_DEPTH = 2
 REPEATABLE_FILES_DEPTH = 1
 TESTS_FILES_DEPTH = 1
 
+NAME_LENGTH_LIMIT=64
+
+DEPENDS_ON_PATTERN = r'(?<=@depends_on)\s*(\S+)'
+
+IS_TRUE_THAT_TEST_PREFIX = "is_true_that_"
+DETECT_MISSING_TEST_PREFIX = "detect_missing_"
+ASSURE_THAT_TEST_PREFIX = "assure_that_"
+
+SETUP_TESTS_FILE_NAME = "_setup.sql"
+
+
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
     def __init__(self, message):
@@ -309,7 +320,6 @@ class BaseCommand:
         return result
 
     def get_script_dependencies(self, base_dir, depth_within_base_dir, script_path):
-        DEPENDS_ON_PATTERN = r'(?<=@depends_on)\s*(\S+)'
         if not script_path.exists():
             raise CommandError(f"The path {script_path} does not exists.")
         if not script_path.is_file():
@@ -485,7 +495,6 @@ class BaseCommand:
         return value
     
     def get_scripts_path_environment_id(self):
-        NAME_LENGTH_LIMIT=64
         if not hasattr(self.args, 'scripts_path'):
             raise CommandError("The argument 'scripts_path' is undefined")
         if len(self.args.scripts_path) == 0:
@@ -1377,18 +1386,12 @@ class TestFailed(Exception):
 class RunTestsCommand (BaseCommand):
     """Runs db unit test scripts to the target database schema."""
 
-    IS_TRUE_THAT_TEST_PREFIX = "is_true_that_"
-    DETECT_MISSING_TEST_PREFIX = "detect_missing_"
-    ASSURE_THAT_TEST_PREFIX = "assure_that_"
-
-    SETUP_TESTS_FILE_NAME = "_setup.sql"
-
     def run_conditional(self, cursor, scripts_dir, script_path, script_text):
         path = pathlib.Path(script_path)
         file_name = path.name
         relative_script_path = self.script_path_for_log(scripts_dir, script_path)
         print(f"Running test: '{relative_script_path}'...", end="", flush=True)
-        if file_name.startswith(self.IS_TRUE_THAT_TEST_PREFIX):
+        if file_name.startswith(IS_TRUE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
             result_number = 0
             for results in cursor.results():
@@ -1398,7 +1401,7 @@ class RunTestsCommand (BaseCommand):
                     value = row[0] if not row is None else False
                     if not value:
                         raise TestFailed(f"({result_number}) Expected true, got {value}!") 
-        elif file_name.startswith(self.DETECT_MISSING_TEST_PREFIX):
+        elif file_name.startswith(DETECT_MISSING_TEST_PREFIX):
             has_failed = False
             cursor.execute(script_text)
             result_number = 0
@@ -1415,8 +1418,10 @@ class RunTestsCommand (BaseCommand):
                     has_failed = True
             if has_failed:
                 raise TestFailed(f"Expected no results!")
-        else:
+        elif file_name.startswith(ASSURE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
+        else:
+            raise CommandError(f"Unable to detect test type from script name '{file_name}'. It should start with one of the following prefixes: {IS_TRUE_THAT_TEST_PREFIX},{DETECT_MISSING_TEST_PREFIX},{ASSURE_THAT_TEST_PREFIX}")
         print(f"PASS")
 
     def is_subpath_of(self, child, parent):
@@ -1449,7 +1454,7 @@ class RunTestsCommand (BaseCommand):
                             cur.execute(formatted_sql)
                             print(f"Rolled back to savepoint.")
                     
-                    if script_name == self.SETUP_TESTS_FILE_NAME:
+                    if script_name == SETUP_TESTS_FILE_NAME:
                         setup_folder = str(script_path.absolute().parent)
                         setup_folder_stack.append(setup_folder)
                         savepoint_id = self.make_savepoint_id(setup_folder)
