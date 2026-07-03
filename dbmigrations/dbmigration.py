@@ -636,7 +636,7 @@ class BaseCommand:
         print(f"Completed.")
 
     def do_initial_cross_checks(self):
-        self.scripts_dir = pathlib.Path(self.args.scripts_path)        
+        self.scripts_dir = pathlib.Path(self.args.scripts_path).resolve()        
         if not self.scripts_dir.exists():
             raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
         if not self.check_if_schema_exists():
