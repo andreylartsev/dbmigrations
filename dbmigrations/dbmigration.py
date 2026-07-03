@@ -1421,7 +1421,7 @@ class RunTestsCommand (BaseCommand):
         elif file_name.startswith(ASSURE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
         else:
-            raise CommandError(f"Unable to detect test type from script name '{file_name}'. It should start with one of the following prefixes: {IS_TRUE_THAT_TEST_PREFIX},{DETECT_MISSING_TEST_PREFIX},{ASSURE_THAT_TEST_PREFIX}")
+            raise TestFailed(f"Unable to detect test type from script name '{file_name}'. It should start with one of the following prefixes: '{IS_TRUE_THAT_TEST_PREFIX}','{DETECT_MISSING_TEST_PREFIX}','{ASSURE_THAT_TEST_PREFIX}'")
         print(f"PASS")
 
     def is_subpath_of(self, child, parent):
