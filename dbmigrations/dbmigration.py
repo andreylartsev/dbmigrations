@@ -1314,10 +1314,14 @@ class InitCommand (BaseCommand):
 
             CREATE TABLE {schema_name}.dbmigration_environment_id (
                 id VARCHAR(64) NOT NULL,
+                is_singleton BOOL NOT NULL DEFAULT TRUE, 
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR(),
-                CONSTRAINT dbmigration_environment_primary_key PRIMARY KEY(id) 
+                CONSTRAINT dbmigration_environment_primary_key PRIMARY KEY(id),
+                -- restricts insertion of any secondary records
+                CONSTRAINT dbmigration_is_singleton_must_be_true CHECK (is_singleton = TRUE),
+                CONSTRAINT dbmigration_table_must_contain_only_one_environment UNIQUE (is_singleton)
             );
             GRANT SELECT ON TABLE {schema_name}.dbmigration_environment_id TO PUBLIC;
                     
@@ -1357,7 +1361,7 @@ class InitCommand (BaseCommand):
             GRANT SELECT ON TABLE {schema_name}.dbmigration_repeatable_scripts TO PUBLIC;
 
             -- insert environment id
-            INSERT INTO {schema_name}.dbmigration_environment_id (id) VALUES ({environment_id_str});
+            INSERT INTO {schema_name}.dbmigration_environment_id (id, is_singleton) VALUES ({environment_id_str}, TRUE);
 
             COMMIT;
         """        
