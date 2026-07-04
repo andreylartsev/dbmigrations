@@ -204,7 +204,7 @@ class MigrationCheckForOlderVersionControlTables (OwnMigration):
                 WHERE table_schema = {schema_name_str} AND table_name = 'dbmigration_versions'
             ) AND NOT EXISTS (
                 SELECT 1 FROM information_schema.tables 
-                WHERE table_schema = {schema_name_str} AND table_name = 'dbmigration_version_files'
+                WHERE table_schema = {schema_name_str} AND table_name = 'dbmigration_version_scripts'
             ) AS conditions_met;     
         """
         return sql
@@ -511,7 +511,7 @@ class BaseCommand:
 
     def get_stored_environment_id(self):
         sql = """
-                SELECT environment_id FROM {schema_name_identity}.dbmigration_environment ORDER BY created_at ASC LIMIT 1"""        
+                SELECT id FROM {schema_name_identity}.dbmigration_environment_id ORDER BY created_at ASC LIMIT 1"""        
         formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name()) 
         value = self.dbconn_get_single_value(formatted_sql, [])
         if value is None:
@@ -569,13 +569,13 @@ class BaseCommand:
         sql = """
             SELECT EXISTS (
                 SELECT 1 
-                FROM {schema_name}.dbmigration_repeatable newer
+                FROM {schema_name}.dbmigration_repeatable_scripts newer
                 WHERE newer.relative_path = {relative_path}
                 AND newer.version_id = {version_id}
                 AND newer.git_blob_sha1 = {git_blob_sha1}
                 AND newer.created_at = (
                     SELECT current_rec.created_at 
-                    FROM {schema_name}.dbmigration_repeatable current_rec
+                    FROM {schema_name}.dbmigration_repeatable_scripts current_rec
                     WHERE current_rec.relative_path = {relative_path}
                         AND current_rec.version_id = {version_id}
                     ORDER BY current_rec.created_at DESC
@@ -655,24 +655,24 @@ class BaseCommand:
         print(f"Target schema environment ID matches the scripts directory ID: {stored_environment_id}")
 
     def check_if_all_version_control_tables_exists(self):
-        if not self.check_if_table_exists("dbmigration_environment"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_environment'")
+        if not self.check_if_table_exists("dbmigration_environment_id"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_environment_id'")
         if not self.check_if_table_exists("dbmigration_versions"):
             raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
-        if not self.check_if_table_exists("dbmigration_version_files"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_version_files'")
-        if not self.check_if_table_exists("dbmigration_repeatable"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable'")
+        if not self.check_if_table_exists("dbmigration_version_scripts"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_version_scripts'")
+        if not self.check_if_table_exists("dbmigration_repeatable_scripts"):
+            raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable_scripts'")
     
     def check_if_all_version_control_tables_does_not_exists(self):
-        if self.check_if_table_exists("dbmigration_environment"):
-            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_environment'")
+        if self.check_if_table_exists("dbmigration_environment_id"):
+            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_environment_id'")
         if self.check_if_table_exists("dbmigration_versions"):
             raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_versions'")
-        if self.check_if_table_exists("dbmigration_version_files"):
-            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_version_files'")
-        if self.check_if_table_exists("dbmigration_repeatable"):
-            raise CommandError(f"The schema '{self.args.schema_name}' already include repeatable scripts control table 'dbmigration_repeatable'")
+        if self.check_if_table_exists("dbmigration_version_scripts"):
+            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_version_scripts'")
+        if self.check_if_table_exists("dbmigration_repeatable_scripts"):
+            raise CommandError(f"The schema '{self.args.schema_name}' already include repeatable scripts control table 'dbmigration_repeatable_scripts'")
 
     def __init__(self, config, subparsers, command_name, command_help):
 
@@ -768,7 +768,7 @@ class UpdateCommand (BaseCommand):
                     script_bytes = f.read()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_files (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                         schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                     cur.execute(formatted_sql, (version, False))
             cur.execute("COMMIT")       
@@ -795,7 +795,7 @@ class UpdateCommand (BaseCommand):
                     script_bytes = f.read()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_files (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                         schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                     cur.execute(formatted_sql, [])        
             cur.execute("COMMIT")       
@@ -805,7 +805,7 @@ class UpdateCommand (BaseCommand):
         with self.dbconn.cursor() as cur:
             print(f"Reapply version {version}...")
             cur.execute("BEGIN")
-            formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_version_files WHERE version_id=%s", schema_name=self.get_schema_name())
+            formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_version_scripts WHERE version_id=%s", schema_name=self.get_schema_name())
             cur.execute(formatted_sql, (version,))    
             formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=self.get_schema_name())
             cur.execute(formatted_sql, (version,))    
@@ -823,7 +823,7 @@ class UpdateCommand (BaseCommand):
                     script_bytes = f.read()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_files (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                         schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                     cur.execute(formatted_sql, [])        
             cur.execute("COMMIT")       
@@ -847,7 +847,7 @@ class UpdateCommand (BaseCommand):
                     script_bytes = f.read()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_files (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                         schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                     cur.execute(formatted_sql, [])       
             cur.execute("COMMIT")       
@@ -977,7 +977,7 @@ class UpdateCommand (BaseCommand):
                     print(f"Running script: [{relative_script_path}]...")
                     cur.execute("BEGIN")
                     cur.execute(script_text)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
+                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
                                                     schema_name=self.get_schema_name())                                  
                     cur.execute(formatted_sql, (git_blob_sha1, target_version, str(relative_script_path)))     
                     cur.execute("COMMIT")
@@ -1091,7 +1091,7 @@ class VerifyCommand (BaseCommand):
                     script_bytes = f.read()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_files (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                         schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                     target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
@@ -1143,7 +1143,7 @@ class VerifyCommand (BaseCommand):
                     script_bytes = f.read()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_files (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                         schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                     target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
@@ -1205,7 +1205,7 @@ class VerifyCommand (BaseCommand):
                     target_file.write(f"BEGIN;\n")
                     target_file.writelines(lines)
                     target_file.write(f"\n")
-                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
+                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
                                                          schema_name=self.get_schema_name(), git_blob_sha1=git_blob_sha1, version_id=target_version, relative_path=str(relative_script_path))
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
@@ -1312,14 +1312,14 @@ class InitCommand (BaseCommand):
         sql_script = """
             BEGIN;
 
-            CREATE TABLE {schema_name}.dbmigration_environment (
-                environment_id VARCHAR(64) NOT NULL,
+            CREATE TABLE {schema_name}.dbmigration_environment_id (
+                id VARCHAR(64) NOT NULL,
                 created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR(),
-                CONSTRAINT dbmigration_environment_primary_key PRIMARY KEY(environment_id) 
+                CONSTRAINT dbmigration_environment_primary_key PRIMARY KEY(id) 
             );
-            GRANT SELECT ON TABLE {schema_name}.dbmigration_environment TO PUBLIC;
+            GRANT SELECT ON TABLE {schema_name}.dbmigration_environment_id TO PUBLIC;
                     
             CREATE TABLE {schema_name}.dbmigration_versions (
                 version_id VARCHAR(64) NOT NULL,
@@ -1331,27 +1331,33 @@ class InitCommand (BaseCommand):
             );
             GRANT SELECT ON TABLE {schema_name}.dbmigration_versions TO PUBLIC;
 
-            CREATE TABLE {schema_name}.dbmigration_version_files (
+            CREATE TABLE {schema_name}.dbmigration_version_scripts (
                 version_id VARCHAR(64) NOT NULL,
                 relative_path VARCHAR(2048) NOT NULL,
                 git_blob_sha1 VARCHAR(64) NOT NULL,
-                CONSTRAINT dbmigration_version_files_primary_key PRIMARY KEY(version_id, relative_path)
+                CONSTRAINT dbmigration_version_scripts_primary_key PRIMARY KEY(version_id, relative_path),
+                CONSTRAINT dbmigration_version_scripts_version_foreign_key FOREIGN KEY (version_id)
+                    REFERENCES {schema_name}.dbmigration_versions (version_id)
+                    ON DELETE CASCADE
             );
-            GRANT SELECT ON TABLE {schema_name}.dbmigration_version_files TO PUBLIC;
+            GRANT SELECT ON TABLE {schema_name}.dbmigration_version_scripts TO PUBLIC;
 
-            CREATE TABLE {schema_name}.dbmigration_repeatable (
+            CREATE TABLE {schema_name}.dbmigration_repeatable_scripts (
                 version_id VARCHAR(64) NOT NULL,
                 relative_path VARCHAR(2048) NOT NULL,
                 created_at TIMESTAMP(6) WITH TIME ZONE NOT NULL DEFAULT CLOCK_TIMESTAMP(),
-                git_blob_sha1 VARCHAR(128) NOT NULL,
+                git_blob_sha1 VARCHAR(64) NOT NULL,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR(),
-                CONSTRAINT dbmigration_repeatable_primary_key_3 PRIMARY KEY(version_id, relative_path, created_at)
+                CONSTRAINT dbmigration_repeatable_scripts_primary_key_3 PRIMARY KEY(version_id, relative_path, created_at),
+                CONSTRAINT dbmigration_repeatable_scripts_version_foreign_key FOREIGN KEY (version_id)
+                    REFERENCES {schema_name}.dbmigration_versions (version_id)
+                    ON DELETE CASCADE
             );
-            GRANT SELECT ON TABLE {schema_name}.dbmigration_repeatable TO PUBLIC;
+            GRANT SELECT ON TABLE {schema_name}.dbmigration_repeatable_scripts TO PUBLIC;
 
             -- insert environment id
-            INSERT INTO {schema_name}.dbmigration_environment (environment_id) VALUES ({environment_id_str});
+            INSERT INTO {schema_name}.dbmigration_environment_id (id) VALUES ({environment_id_str});
 
             COMMIT;
         """        
