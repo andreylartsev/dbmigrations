@@ -80,11 +80,11 @@ file_read_encoding_errors = "ignore"
 #executable = "/opt/homebrew/bin/psql"
 # args = ["-f", "${file}", "${dbname}"]
 executable = "C:/Users/andrey.larcev/NoInstaller/postgresql-18.3-2-windows-x64-binaries/pgsql/bin/psql.exe"
-args = ["-h", "${host}", "-p", "${port}", "-U", "${user}", "-d", "${dbname}", "-f", "${file}"]
+args = ["-h", "${host}", "-p", "${port}", "-U", "${user}", "--set=ON_ERROR_STOP=1", "-d", "${dbname}", "-f", "${file}"]
 success_result_code = 0
 
 [tools.pg_restore] 
 executable = "/opt/homebrew/bin/pg_restore"
-# args = ["-h", "${host}", "-U", "${user}", "-p", "${port}", "-d", "${dbname}", "${file}"]
-args = ["-d", "${dbname}", "${file}"]
+# args = ["-h", "${host}", "-U", "${user}", "--exit-on-error", "-p", "${port}", "-d", "${dbname}", "${file}"]
+args = ["--exit-on-error", "-d", "${dbname}", "${file}"]
 success_result_code = 0

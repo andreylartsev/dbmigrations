@@ -176,11 +176,17 @@ class ExternalTool:
             args=command_line, 
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT, 
-            text=True)
+            text=True,
+            encoding='utf-8')
         # Read and print output line by line as it happens
         for line in iter(process.stdout.readline, ''):
             print(line, end='') 
-        result_code = process.wait() # Ensure process finishes
+
+        remaining_stdout, _ = process.communicate()
+        if remaining_stdout:
+            print(remaining_stdout, end='')
+
+        result_code = process.returncode 
 
         if result_code != self.success_result_code:
             raise CommandError(f"The tool '{self.tool_name}' returned unsuccessful result code {result_code}!")
@@ -770,7 +776,7 @@ class UpdateCommand (BaseCommand):
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
                     formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                         schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
-                    cur.execute(formatted_sql, (version, False))
+                    cur.execute(formatted_sql, [])
             cur.execute("COMMIT")       
             print(f"Committed.")
 
