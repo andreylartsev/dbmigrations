@@ -87,10 +87,12 @@ def get_git_blob_sha1_for_bytes(script_bytes):
 
 def read_as_trimmed_string(file_path):
     with open(file_path, 'rb') as f:
-        file_bytes = f.read()
-        decoded_str = file_bytes.decode("utf-8-sig", "ignore")
-        trimmed_str = decoded_str.strip()
-        return trimmed_str
+        for binary_line in f:
+            decoded_str = binary_line.decode("utf-8-sig", "ignore")
+            trimmed_str = decoded_str.strip()
+            if trimmed_str:
+                return trimmed_str
+    raise CommandError(f"The file '{file_path}' must not be empty")
 
 def log_server_notices(diag):
     print(f"Server: {diag.severity} - {diag.message_primary}")
@@ -1329,7 +1331,7 @@ class InitCommand (BaseCommand):
             raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
         return (value == 0)
     
-    def create_version_tracking_tables(self):
+    def create_version_tracking_tables(self, environment_id):
         sql_script = """
             BEGIN;
 
@@ -1387,7 +1389,7 @@ class InitCommand (BaseCommand):
             COMMIT;
         """        
         with self.dbconn.cursor() as cur:
-            formatted_sql = self.format_sql(sql_script, schema_name=self.get_schema_name(), environment_id_str=self.get_scripts_path_environment_id())
+            formatted_sql = self.format_sql(sql_script, schema_name=self.get_schema_name(), environment_id_str=environment_id)
             cur.execute(formatted_sql)
 
     def __init__(self, config, subparsers): 
@@ -1406,8 +1408,10 @@ class InitCommand (BaseCommand):
             self.check_if_all_version_control_tables_does_not_exists()
             print(f"WARNING: Schema is not empty!")
 
-        print(f"Creating the version control tables...")
-        self.create_version_tracking_tables()
+        environment_id = self.get_scripts_path_environment_id()
+
+        print(f"Creating the version control tables with environment ID: '{environment_id}'")
+        self.create_version_tracking_tables(environment_id)
         print(f"Created.")
 
 class TestFailed(Exception):
