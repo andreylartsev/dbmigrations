@@ -54,6 +54,8 @@ VERSION_CLEANUP_FILE_NAME = "_cleanup.sql"
 SEARCH_PATH_FILE_NAME = "set_search_path.txt"
 DEFAULT_SEARCH_PATH = ":default"
 
+TARGET_ENVIRONMENT_ID_FILE_NAME = "target_environment_id.txt"
+
 BASELINE_FILES_DEPTH = 2
 VERSIONED_FILES_DEPTH = 2
 REPEATABLE_FILES_DEPTH = 1
@@ -85,9 +87,9 @@ def get_git_blob_sha1_for_bytes(script_bytes):
 
 def read_as_trimmed_string(file_path):
     with open(file_path, 'rb') as f:
-        bytes = f.read()
-        str = bytes.decode("utf-8", "ignore")
-        trimmed_str = str.strip()
+        file_bytes = f.read()
+        decoded_str = file_bytes.decode("utf-8-sig", "ignore")
+        trimmed_str = decoded_str.strip()
         return trimmed_str
 
 def log_server_notices(diag):
@@ -501,6 +503,7 @@ class BaseCommand:
         return value
     
     def get_scripts_path_environment_id(self):
+        environment_id = None
         if not hasattr(self.args, 'scripts_path'):
             raise CommandError("The argument 'scripts_path' is undefined")
         if len(self.args.scripts_path) == 0:
@@ -509,11 +512,23 @@ class BaseCommand:
         if not scripts_path.exists():
             raise CommandError("The path that is specified by 'scripts_path' argument does not exist")
         if not scripts_path.is_dir():
-            raise CommandError("The path that is specified by 'scripts_path' argument is not a valid directory")
-        resolved_name = scripts_path.resolve().name
-        if len(resolved_name) > NAME_LENGTH_LIMIT:
-            raise CommandError(f"The length of the directory name specified by 'scripts_path' argument is more than {NAME_LENGTH_LIMIT} characters")
-        return resolved_name
+            raise CommandError("The path that is specified by 'scripts_path' argument is not a valid directory")        
+        target_environment_id_file_name = scripts_path.joinpath(TARGET_ENVIRONMENT_ID_FILE_NAME)
+        if target_environment_id_file_name.exists():
+            environment_id = read_as_trimmed_string(target_environment_id_file_name)
+            if len(environment_id) == 0:
+                raise CommandError(f"The length of the environment ID must not be empty string")
+            if len(environment_id) > NAME_LENGTH_LIMIT:
+                raise CommandError(f"The length of the environment ID taken from '{target_environment_id_file_name}' exceeds the limit: {NAME_LENGTH_LIMIT} ")
+        # considering dir name as env id
+        else: 
+            resolved_path = scripts_path.resolve()
+            environment_id = resolved_path.name
+            if len(environment_id) == 0:
+                raise CommandError(f"The length of the environment ID must not be empty string")
+            if len(environment_id) > NAME_LENGTH_LIMIT:
+                raise CommandError(f"The length of the directory name specified by 'scripts_path' argument is more than {NAME_LENGTH_LIMIT} characters")
+        return environment_id
 
     def get_stored_environment_id(self):
         sql = """
