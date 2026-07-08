@@ -1376,7 +1376,7 @@ class InitCommand (BaseCommand):
                 git_blob_sha1 VARCHAR(64) NOT NULL,
                 created_by VARCHAR(64) NOT NULL DEFAULT SESSION_USER,
                 created_from INET DEFAULT INET_CLIENT_ADDR(),
-                CONSTRAINT dbmigration_repeatable_scripts_primary_key_3 PRIMARY KEY(version_id, relative_path, created_at),
+                CONSTRAINT dbmigration_repeatable_scripts_primary_key PRIMARY KEY(version_id, relative_path, created_at),
                 CONSTRAINT dbmigration_repeatable_scripts_version_foreign_key FOREIGN KEY (version_id)
                     REFERENCES {schema_name}.dbmigration_versions (version_id)
                     ON DELETE CASCADE
