@@ -1142,10 +1142,8 @@ class VerifyCommand (BaseCommand):
             encoding='utf-8-sig',
             cwd=str(repo_root_dir)
         )
-
         if completed_status_process.returncode != 0:
-            print(f"Warning: Unable to get git status for file '{relative_file_path}'")
-            return None
+            raise CommandError(f"Warning: Unable to get git status for file '{relative_file_path}'")
 
         status_output = completed_status_process.stdout.strip()
         # the file have local changes
@@ -1194,18 +1192,16 @@ class VerifyCommand (BaseCommand):
             text=True,
             encoding='utf-8-sig',
             cwd=str(repo_root_dir)
-        )
-        
+        )        
         if completed_log_process.returncode != 0:
-            print(f"Warning: Unable to get git log for file '{relative_file_path}'")
-            return None
+            raise CommandError(f"Warning: Unable to get git log for file '{relative_file_path}'")
             
         log_output = completed_log_process.stdout.strip()
         if not log_output:
             return {
                 "sha": UNCOMMITTED_SHA_LABEL,
                 "author": UNCOMMITTED_AUTHOR_LABEL,
-                "date": "----------",
+                "date": UNCOMMITTED_DATE_LABEL,
                 "message": "File is completely untracked by Git"
             }
             
