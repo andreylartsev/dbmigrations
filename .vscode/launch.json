@@ -9,7 +9,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "update", "test2", "./dbmigrations/samples/deps/dev1"
+                "verify", "esbdb_dbo", "../smft/ISI/smft-db/esbdb/dev_common/", "--dbenv", "test1"
             ],
         }
     ]

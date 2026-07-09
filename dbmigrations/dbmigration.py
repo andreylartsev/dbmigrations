@@ -1226,11 +1226,18 @@ class VerifyCommand (BaseCommand):
             commit_info = self.get_file_commit_history(git_cmd_path, resolved_repo_root, rel_path)            
             if commit_info:
                 msg_first_line = commit_info["message"].split('\n')[0].strip()
-                commit_key = (commit_info["sha"], commit_info["date"], commit_info["author"], msg_first_line)
+                commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_first_line)
             else:
-                commit_key = ("UNCOMMITTED", "----------", "Local Changes", "File has modifications not yet committed to Git")                
-            commits_group[commit_key].append(rel_path)        
-        for (sha, date, author, message), files in commits_group.items():
+                commit_key = ("----------", "Local Changes", "UNCOMMITTED", "File has modifications not yet committed to Git")                
+            commits_group[commit_key].append(rel_path)
+        
+        sorted_commits = sorted(
+            commits_group.items(), 
+            key=lambda x: x[0], 
+            reverse=True
+        )
+
+        for (date, author, sha, message), files in sorted_commits:
             print(f"[{sha}] {date} — {message}")
             print(f"  Author: {author}")
             for f in files:
@@ -1282,7 +1289,7 @@ class VerifyCommand (BaseCommand):
             "message": message
         }
 
-    def display_latest_deployment_grouped_by_git_commits(self, git_cmd_path, git_root_path, limit=10, window_minutes=30):
+    def display_recent_changes_grouped_by_git_commits(self, git_cmd_path, git_root_path, limit=10, window_minutes=30):
 
         if git_cmd_path is None:
             raise CommandError("get_oid_commit_history(): The argument 'git_cmd_path' must be provided")
@@ -1349,7 +1356,7 @@ class VerifyCommand (BaseCommand):
                 raise CommandError(f"Unable to find commit history for git sha1 {clean_oid}")
             
             msg_first_line = commit_info["message"].split('\n')[0].strip()
-            commit_key = (commit_info["sha"], commit_info["date"], commit_info["author"], msg_first_line)
+            commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_first_line)
                 
             commits_group[commit_key].append({
                 "path": relative_path,
@@ -1358,8 +1365,13 @@ class VerifyCommand (BaseCommand):
                 "oid": clean_oid[:8],
                 "applied_at": applied_at.strftime("%Y-%m-%d %H:%M:%S")
             })
-
-        for (sha, date, author, message), scripts in commits_group.items():
+        
+        sorted_commits = sorted(
+            commits_group.items(), 
+            key=lambda x: x[0], 
+            reverse=True
+        )
+        for (date, author, sha, message), scripts in sorted_commits:
             print(f"[{sha}] {date} — {message}")
             print(f"  Author: {author}")
             for s in scripts:
@@ -1587,7 +1599,7 @@ class VerifyCommand (BaseCommand):
             self.verify_versioned_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_repeatable_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             if git_root_path:
-                self.display_latest_deployment_grouped_by_git_commits(git_cmd_path, git_root_path, 100, 30)
+                self.display_recent_changes_grouped_by_git_commits(git_cmd_path, git_root_path, 100, 30)
             # finalize writing update script
             if not temp_script_path is None:
                 if temp_script_path.exists():
