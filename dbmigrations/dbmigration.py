@@ -343,7 +343,7 @@ class BaseCommand:
             raise CommandError(f"The path {script_path} is not a file.")
         start_path = pathlib.Path(base_dir)
         result_list = []
-        with script_path.open("r") as script_file:
+        with script_path.open("r", encoding="utf-8-sig", errors="ignore") as script_file:
             lines = script_file.readlines()
             for line in lines:
                 match = re.search(DEPENDS_ON_PATTERN, line)
@@ -413,7 +413,7 @@ class BaseCommand:
         script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
         sorted_files = []
         if script_list_file_path.exists():
-            with script_list_file_path.open("r") as script_list_file:
+            with script_list_file_path.open("r", encoding="utf-8-sig", errors="ignore") as script_list_file:
                 lines = script_list_file.readlines()
                 for line in lines:
                     trimmed_str = line.strip()
@@ -1356,14 +1356,14 @@ class VerifyCommand (BaseCommand):
                 "type": script_type,
                 "version": version_id,
                 "oid": clean_oid[:8],
-                "applied_at": applied_at.strftime("%H:%M:%S")
+                "applied_at": applied_at.strftime("%Y-%m-%d %H:%M:%S")
             })
 
         for (sha, date, author, message), scripts in commits_group.items():
             print(f"[{sha}] {date} — {message}")
             print(f"  Author: {author}")
             for s in scripts:
-                print(f"     [{s['applied_at']} | {s['version']:<6} | {s['path']} (OID: {s['oid']})]")
+                print(f"     [{s['applied_at']:<19} | {s['version']:<6} | {s['path']} (OID: {s['oid']})]")
 
 
     def __init__(self, config, subparsers): 
@@ -1383,7 +1383,7 @@ class VerifyCommand (BaseCommand):
             formatted_sql_text = self.format_sql("-- Baseline scripts for version {version_id}\n", version_id=version)
             target_file.write(formatted_sql_text)
             for script_path in scripts:
-                with script_path.open("r") as source_file:
+                with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))                    
@@ -1437,7 +1437,7 @@ class VerifyCommand (BaseCommand):
             target_file.write(formatted_sql_text)
             target_file.write(f"BEGIN;\n")
             for script_path in scripts:
-                with script_path.open("r") as source_file:
+                with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
@@ -1504,7 +1504,7 @@ class VerifyCommand (BaseCommand):
             formatted_sql_text = self.format_sql("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
             target_file.write(formatted_sql_text)
             for git_blob_sha1, script_path in scripts_dict.items():
-                with script_path.open("r") as source_file:
+                with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
