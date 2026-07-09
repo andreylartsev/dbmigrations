@@ -74,6 +74,10 @@ ASSURE_THAT_TEST_PREFIX = "assure_that_"
 
 SETUP_TESTS_FILE_NAME = "_setup.sql"
 
+UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
+UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
+UNCOMMITTED_DATE_LABEL = "-------"
+
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -1125,9 +1129,6 @@ class VerifyCommand (BaseCommand):
         return resolved_path
     
     def get_file_commit_history(self, git_cmd_path, repo_root_dir, relative_file_path):
-        UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
-        UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
-        UNCOMMITTED_DATE_LABEL = "-------"
 
         if git_cmd_path is None:
             raise CommandError("get_file_commit_history(): The argument 'git_cmd_path' must be provided")
@@ -1230,11 +1231,10 @@ class VerifyCommand (BaseCommand):
                 commit_key = ("UNCOMMITTED", "----------", "Local Changes", "File has modifications not yet committed to Git")                
             commits_group[commit_key].append(rel_path)        
         for (sha, date, author, message), files in commits_group.items():
-            print(f"{sha} {date} — {message}")
-            print(f"   Author: {author}")
-            print("   Affected files:")            
+            print(f"[{sha}] {date} — {message}")
+            print(f"  Author: {author}")
             for f in files:
-                print(f"     [{str(f).replace('\\', '/')}]")                
+                print(f"    [{str(f).replace('\\', '/')}]")                
 
     def display_verification_changes(self, scripts_dir, git_cmd_path, git_root_path, scripts_sorted):
         if git_root_path is None: 
@@ -1243,6 +1243,128 @@ class VerifyCommand (BaseCommand):
                 print(f"   [{relative_script_path}]")
         else:
             self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
+
+    def get_oid_commit_history(self, git_cmd_path, repo_root_dir, target_oid):
+
+        if git_cmd_path is None:
+            raise CommandError("get_oid_commit_history(): The argument 'git_cmd_path' must be provided")
+        if repo_root_dir is None:
+            raise CommandError("get_oid_commit_history(): The argument 'repo_root_dir' must be provided")
+        if target_oid is None or not str(target_oid).strip():
+            raise CommandError("get_oid_commit_history(): The argument 'target_oid' must be provided and not empty")
+
+        completed_log_process = subprocess.run(
+            [str(git_cmd_path), "log", "-1", f"--find-object={target_oid}", "--format=%H|%an|%ad|%s", "--date=short"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8-sig',
+            cwd=str(repo_root_dir)
+        )        
+        if completed_log_process.returncode != 0:
+            raise CommandError(f"Unable to get git log for OID '{target_oid}'")
+            
+        log_output = completed_log_process.stdout.strip()
+        
+        if not log_output:
+            return {
+                "sha": UNCOMMITTED_SHA_LABEL,
+                "author": UNCOMMITTED_AUTHOR_LABEL,
+                "date": UNCOMMITTED_DATE_LABEL,
+                "message": "Content hash (OID) is completely untracked or modified locally"
+            }
+            
+        sha, author, date, message = log_output.split('|', 3)
+        return {
+            "sha": sha[:8],
+            "author": author,
+            "date": date,
+            "message": message
+        }
+
+    def display_latest_deployment_grouped_by_git_commits(self, git_cmd_path, git_root_path, limit=10, window_minutes=30):
+
+        if git_cmd_path is None:
+            raise CommandError("get_oid_commit_history(): The argument 'git_cmd_path' must be provided")
+        if git_root_path is None:
+            raise CommandError("get_oid_commit_history(): The argument 'git_root_path' must be provided")
+
+        resolved_git_root_path = pathlib.Path(git_root_path).resolve()
+        commits_group = collections.defaultdict(list)
+        
+        sql = """
+            WITH latest_time AS (
+                SELECT COALESCE(MAX(applied_at), NOW()) AS max_at
+                FROM (
+                    SELECT MAX(v.created_at) AS applied_at FROM {schema_name}.dbmigration_versions v
+                    UNION ALL
+                    SELECT MAX(r.created_at) AS applied_at FROM {schema_name}.dbmigration_repeatable_scripts r
+                ) t
+            )
+            SELECT 
+                v.created_at AS applied_at,
+                'versioned' AS script_type,
+                s.version_id,
+                s.relative_path,
+                s.git_blob_sha1
+            FROM {schema_name}.dbmigration_version_scripts s
+            JOIN {schema_name}.dbmigration_versions v ON s.version_id = v.version_id
+            CROSS JOIN latest_time
+            WHERE v.created_at >= latest_time.max_at - ({window_minutes} || ' minutes')::interval
+
+            UNION ALL
+
+            SELECT 
+                r.created_at AS applied_at,
+                'repeatable' AS script_type,
+                r.version_id,
+                r.relative_path,
+                r.git_blob_sha1
+            FROM {schema_name}.dbmigration_repeatable_scripts r
+            CROSS JOIN latest_time
+            WHERE r.created_at >= latest_time.max_at - ({window_minutes} || ' minutes')::interval
+
+            ORDER BY applied_at DESC
+            LIMIT {limit};
+
+        """
+
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name(), limit=limit, window_minutes=window_minutes)
+        
+        cursor = self.dbconn.cursor()
+        cursor.execute(formatted_sql, [])
+        rows = cursor.fetchall()
+        
+        if not rows:
+            return
+
+        print(f"The list of recent changes were applied to the target schema:")
+
+        for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
+
+            clean_oid = git_blob_sha1.strip()
+            commit_info = self.get_oid_commit_history(git_cmd_path, resolved_git_root_path, clean_oid)
+
+            if not commit_info:
+                raise CommandError(f"Unable to find commit history for git sha1 {clean_oid}")
+            
+            msg_first_line = commit_info["message"].split('\n')[0].strip()
+            commit_key = (commit_info["sha"], commit_info["date"], commit_info["author"], msg_first_line)
+                
+            commits_group[commit_key].append({
+                "path": relative_path,
+                "type": script_type,
+                "version": version_id,
+                "oid": clean_oid[:8],
+                "applied_at": applied_at.strftime("%H:%M:%S")
+            })
+
+        for (sha, date, author, message), scripts in commits_group.items():
+            print(f"[{sha}] {date} — {message}")
+            print(f"  Author: {author}")
+            for s in scripts:
+                print(f"     [{s['applied_at']} | {s['version']:<6} | {s['path']} (OID: {s['oid']})]")
+
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
@@ -1464,7 +1586,8 @@ class VerifyCommand (BaseCommand):
             self.verify_baseline_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_versioned_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_repeatable_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
-
+            if git_root_path:
+                self.display_latest_deployment_grouped_by_git_commits(git_cmd_path, git_root_path, 100, 30)
             # finalize writing update script
             if not temp_script_path is None:
                 if temp_script_path.exists():
