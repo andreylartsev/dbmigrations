@@ -1213,36 +1213,6 @@ class VerifyCommand (BaseCommand):
             "message": message
         }
 
-    def get_file_commit_history_old(self, git_cmd_path, git_root_path, relative_file_path):
-        if git_cmd_path is None:
-            raise CommandError("get_file_commit_history(): The argument 'git_cmd_path' must be provided")
-        if git_root_path is None:
-            raise CommandError("get_file_commit_history(): The argument 'repo_root_dir' must be provided")
-            
-        completed_process = subprocess.run(
-            [str(git_cmd_path), "log", "-1", "--format=%H|%an|%ad|%s", "--date=short", "--", str(relative_file_path)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8-sig',
-            cwd=str(git_root_path)
-        )
-        
-        if completed_process.returncode != 0:
-            return None
-            
-        stdout_text = completed_process.stdout.strip()
-        if not stdout_text:
-            return None
-            
-        sha, author, date, message = stdout_text.split('|', 3)
-        return {
-            "sha": sha[:8], 
-            "author": author,
-            "date": date,
-            "message": message
-        }
-
     def display_verification_changes_by_commits(self, git_cmd_path, git_root_path, files_sorted):
         resolved_repo_root = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)        
