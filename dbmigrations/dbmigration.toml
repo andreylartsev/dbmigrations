@@ -4,6 +4,8 @@
 # - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 #
 default_dbenv = "local_windows"
+# you can specify the git command line here
+#git_cmd_path = "C:/Program Files/Git/cmd/git.exe"
 
 [dbenvs.local_windows]
 host = "localhost"

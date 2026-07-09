@@ -18,9 +18,12 @@ import copy
 import re
 import collections
 from abc import ABC, abstractmethod
+import shutil
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
+
+GIT_CMD_CONFIG_ATTRIBUTE = "git_cmd_path"
 
 DBENVS_CONFIG_GROUP = "dbenvs"
 DEFAULT_DBENV_CONFIG_ATTRIBUTE = "default_dbenv"
@@ -1080,6 +1083,200 @@ class VerifyCommand (BaseCommand):
         except Exception as e:
             raise CommandError(f"The specified script file '{script_path}' is not accessible for write")
 
+    def try_get_git_cmd_path(self, toml_config):
+        if GIT_CMD_CONFIG_ATTRIBUTE in toml_config:
+            cmd_path_str = toml_config[GIT_CMD_CONFIG_ATTRIBUTE]
+            cmd_path = pathlib.Path(cmd_path_str)
+            if not cmd_path.exists():
+                raise CommandError(f"The git cmd specified in {GIT_CMD_CONFIG_ATTRIBUTE} of TOML config does not exist! Comment it out if you are not sure where it is in the system")
+            return cmd_path
+        else:
+            cmd_path_str = shutil.which("git")
+            if cmd_path_str is None:
+                return None
+            cmd_path = pathlib.Path(cmd_path_str)
+            return cmd_path
+
+    def try_get_git_repo_root(self, git_cmd_path, scripts_dir):
+        if git_cmd_path is None:
+            raise CommandError("try_get_git_repo_root(): The argument 'git_cmd_path' must be provided")
+        if scripts_dir is None:
+            raise CommandError("try_get_git_repo_root(): The argument 'scripts_dir' must be provided")
+
+        resolved_scripts_dir = pathlib.Path(scripts_dir).resolve()
+        if not resolved_scripts_dir.exists():
+            raise CommandError(f"The specified directory '{scripts_dir}' does not exist!")
+        if not resolved_scripts_dir.is_dir():
+            raise CommandError(f"The specified path '{scripts_dir}' is not a directory!")
+        
+        completed_process = subprocess.run(
+            [str(git_cmd_path), "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8-sig',
+            cwd=str(resolved_scripts_dir)
+        )
+        if completed_process.returncode != 0:
+            return None
+                
+        stdout_text = completed_process.stdout.strip() 
+        resolved_path = pathlib.Path(stdout_text).resolve()
+        return resolved_path
+    
+    def get_file_commit_history(self, git_cmd_path, repo_root_dir, relative_file_path):
+        if git_cmd_path is None:
+            raise CommandError("get_file_commit_history(): The argument 'git_cmd_path' must be provided")
+        if repo_root_dir is None:
+            raise CommandError("get_file_commit_history(): The argument 'repo_root_dir' must be provided")
+
+        # 1. Проверяем локальный статус файла в Git (uncommitted / untracked)
+        completed_status_process = subprocess.run(
+            [str(git_cmd_path), "status", "--porcelain", str(relative_file_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8-sig',
+            cwd=str(repo_root_dir)
+        )
+
+        if completed_status_process.returncode != 0:
+            print(f"Warning: Unable to get git status for file '{relative_file_path}'")
+            return None
+
+        status_output = completed_status_process.stdout.strip()
+        # the file have local changes
+        if status_output:
+            status_code = status_output.lstrip()[:1]            
+            if status_code == "?":
+                return {
+                    "sha": "UNCOMMITTED",
+                    "author": "Local Changes",
+                    "date": "-----",
+                    "message": "File is completely untracked by Git"
+                }
+            elif status_code == "M":
+                return {
+                    "sha": "UNCOMMITTED",
+                    "author": "Local Changes",
+                    "date": "-----",
+                    "message": "File is modified"
+                }
+            elif status_code == "A":
+                return {
+                    "sha": "UNCOMMITTED",
+                    "author": "Local Changes",
+                    "date": "-----",
+                    "message": "File is modified"
+                }
+            elif status_code == "D":
+                return {
+                    "sha": "UNCOMMITTED",
+                    "author": "Local Changes",
+                    "date": "-----",
+                    "message": "File is deleted"
+                }
+            else:
+                return {
+                    "sha": "UNCOMMITTED",
+                    "author": "Local Changes",
+                    "date": "-----",
+                    "message": f"The status is UNKNOWN : {status_code}"
+                }
+
+        completed_log_process = subprocess.run(
+            [str(git_cmd_path), "log", "-1", "--format=%H|%an|%ad|%s", "--date=short", "--", str(relative_file_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8-sig',
+            cwd=str(repo_root_dir)
+        )
+        
+        if completed_log_process.returncode != 0:
+            print(f"Warning: Unable to get git log for file '{relative_file_path}'")
+            return None
+            
+        log_output = completed_log_process.stdout.strip()
+        if not log_output:
+            return {
+                "sha": "UNCOMMITTED",
+                "author": "Local Changes",
+                "date": "-----",
+                "message": "File is completely untracked by Git"
+            }
+            
+        sha, author, date, message = log_output.split('|', 3)
+        return {
+            "sha": sha[:8],
+            "author": author,
+            "date": date,
+            "message": message
+        }
+
+    def get_file_commit_history_old(self, git_cmd_path, git_root_path, relative_file_path):
+        if git_cmd_path is None:
+            raise CommandError("get_file_commit_history(): The argument 'git_cmd_path' must be provided")
+        if git_root_path is None:
+            raise CommandError("get_file_commit_history(): The argument 'repo_root_dir' must be provided")
+            
+        completed_process = subprocess.run(
+            [str(git_cmd_path), "log", "-1", "--format=%H|%an|%ad|%s", "--date=short", "--", str(relative_file_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8-sig',
+            cwd=str(git_root_path)
+        )
+        
+        if completed_process.returncode != 0:
+            return None
+            
+        stdout_text = completed_process.stdout.strip()
+        if not stdout_text:
+            return None
+            
+        sha, author, date, message = stdout_text.split('|', 3)
+        return {
+            "sha": sha[:8], 
+            "author": author,
+            "date": date,
+            "message": message
+        }
+
+    def display_verification_changes_by_commits(self, git_cmd_path, git_root_path, files_sorted):
+
+        resolved_repo_root = pathlib.Path(git_root_path).resolve()
+        commits_group = collections.defaultdict(list)        
+        for file_path in files_sorted:
+            abs_path = pathlib.Path(file_path).resolve()            
+            try:
+                rel_path = abs_path.relative_to(resolved_repo_root)
+            except ValueError:
+                rel_path = abs_path                
+            commit_info = self.get_file_commit_history(git_cmd_path, resolved_repo_root, rel_path)            
+            if commit_info:
+                msg_first_line = commit_info["message"].split('\n')[0].strip()
+                commit_key = (commit_info["sha"], commit_info["date"], commit_info["author"], msg_first_line)
+            else:
+                commit_key = ("UNCOMMITTED", "-----", "Local Changes", "File has modifications not yet committed to Git")                
+            commits_group[commit_key].append(rel_path)        
+        for (sha, date, author, message), files in commits_group.items():
+            sha_label = f"[{sha}]" if sha != "UNCOMMITTED" else f"[{sha}]"            
+            print(f"\n{sha_label} {date} — {message}")
+            print(f"      Author: {author}")
+            print("      Affected files:")            
+            for f in files:
+                print(f"        -> {str(f).replace('\\', '/')}")                
+
+    def display_verification_changes(self, scripts_dir, git_cmd_path, git_root_path, scripts_sorted):
+        if git_root_path is None: 
+            for item in scripts_sorted:
+                relative_script_path = self.script_path_for_log(scripts_dir, item)
+                print(f"[{relative_script_path}]")
+        else:
+            self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
+
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
         self.parser.add_argument("--build-update-script", type=str, default=None, help="the update script path if you want one as an additional result of the verify command")
@@ -1119,7 +1316,7 @@ class VerifyCommand (BaseCommand):
                     target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
-    def verify_baseline_scripts(self, scripts_dir, target_script_path):
+    def verify_baseline_scripts(self, scripts_dir, git_cmd_path, git_root_path, target_script_path):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
@@ -1135,10 +1332,9 @@ class VerifyCommand (BaseCommand):
         baseline_version = baseline_version_subdir.name
 
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH)
-        print(f"The baseline scripts to install: ")       
-        for item in scripts_sorted:
-            relative_script_path = self.script_path_for_log(scripts_dir, item)
-            print(f"[{relative_script_path}]")
+        print(f"The baseline scripts to install: ")
+        self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
+
         if not target_script_path is None:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, target_script_path)
         
@@ -1171,7 +1367,7 @@ class VerifyCommand (BaseCommand):
                     target_file.write(formatted_sql_text)
             target_file.write(f"COMMIT;\n")
 
-    def verify_versioned_scripts(self, scripts_dir, target_script_path):
+    def verify_versioned_scripts(self, scripts_dir, git_cmd_path, git_root_path, target_script_path):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
@@ -1208,9 +1404,7 @@ class VerifyCommand (BaseCommand):
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
-            for item in scripts_sorted:
-                relative_script_path = self.script_path_for_log(scripts_dir, item)
-                print(f"[{relative_script_path}]")
+            self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
             if not target_script_path is None:
                 version_id = script_version_dir.name
                 self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, target_script_path)   
@@ -1233,7 +1427,7 @@ class VerifyCommand (BaseCommand):
                     target_file.write(formatted_sql_text)
                     target_file.write(f"COMMIT;\n")
 
-    def verify_repeatable_scripts(self, scripts_dir, target_script_path):
+    def verify_repeatable_scripts(self, scripts_dir, git_cmd_path, git_root_path, target_script_path):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
@@ -1265,9 +1459,7 @@ class VerifyCommand (BaseCommand):
             return
         print(f"The repeatable scripts to (re)install: ")
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
-        for item in scripts_to_repeat:
-            relative_script_path = self.script_path_for_log(scripts_dir, item)
-            print(f"[{relative_script_path}]")
+        self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_to_repeat)
         if not target_script_path is None:
             scripts_to_repeat_dict = {}
             for script_path in scripts_to_repeat:
@@ -1285,6 +1477,11 @@ class VerifyCommand (BaseCommand):
         self.check_if_stored_environment_id_matches_to_scripts_dir() 
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
+        git_root_path = None
+        git_cmd_path = self.try_get_git_cmd_path(self.config)
+        if not git_cmd_path is None:
+            git_root_path = self.try_get_git_repo_root(git_cmd_path, self.scripts_dir)
+
         script_path = None
         temp_script_path = None
         if not self.args.build_update_script is None:
@@ -1294,9 +1491,9 @@ class VerifyCommand (BaseCommand):
             search_path = self.get_search_path_for_scripts()
             self.write_search_path(search_path, temp_script_path)      
         try:            
-            self.verify_baseline_scripts(self.scripts_dir, temp_script_path)
-            self.verify_versioned_scripts(self.scripts_dir, temp_script_path)
-            self.verify_repeatable_scripts(self.scripts_dir, temp_script_path)
+            self.verify_baseline_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
+            self.verify_versioned_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
+            self.verify_repeatable_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
 
             # finalize writing update script
             if not temp_script_path is None:
