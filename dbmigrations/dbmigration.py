@@ -1197,7 +1197,7 @@ class VerifyCommand (BaseCommand):
         )
         
         if completed_log_process.returncode != 0:
-            print(f"Warning: Unable to get git log for file '{relativez_file_path}'")
+            print(f"Warning: Unable to get git log for file '{relative_file_path}'")
             return None
             
         log_output = completed_log_process.stdout.strip()
