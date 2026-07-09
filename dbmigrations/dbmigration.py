@@ -1125,12 +1125,15 @@ class VerifyCommand (BaseCommand):
         return resolved_path
     
     def get_file_commit_history(self, git_cmd_path, repo_root_dir, relative_file_path):
+        UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
+        UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
+        UNCOMMITTED_DATE_LABEL = "-------"
+
         if git_cmd_path is None:
             raise CommandError("get_file_commit_history(): The argument 'git_cmd_path' must be provided")
         if repo_root_dir is None:
             raise CommandError("get_file_commit_history(): The argument 'repo_root_dir' must be provided")
 
-        # 1. Проверяем локальный статус файла в Git (uncommitted / untracked)
         completed_status_process = subprocess.run(
             [str(git_cmd_path), "status", "--porcelain", str(relative_file_path)],
             stdout=subprocess.PIPE,
@@ -1150,37 +1153,37 @@ class VerifyCommand (BaseCommand):
             status_code = status_output.lstrip()[:1]            
             if status_code == "?":
                 return {
-                    "sha": "UNCOMMITTED",
-                    "author": "Local Changes",
-                    "date": "-----",
+                    "sha": UNCOMMITTED_SHA_LABEL,
+                    "author": UNCOMMITTED_AUTHOR_LABEL,
+                    "date": UNCOMMITTED_DATE_LABEL,
                     "message": "File is completely untracked by Git"
                 }
             elif status_code == "M":
                 return {
-                    "sha": "UNCOMMITTED",
-                    "author": "Local Changes",
-                    "date": "-----",
+                    "sha": UNCOMMITTED_SHA_LABEL,
+                    "author": UNCOMMITTED_AUTHOR_LABEL,
+                    "date": UNCOMMITTED_DATE_LABEL,
                     "message": "File is modified"
                 }
             elif status_code == "A":
                 return {
-                    "sha": "UNCOMMITTED",
-                    "author": "Local Changes",
-                    "date": "-----",
-                    "message": "File is modified"
+                    "sha": UNCOMMITTED_SHA_LABEL,
+                    "author": UNCOMMITTED_AUTHOR_LABEL,
+                    "date": UNCOMMITTED_DATE_LABEL,
+                    "message": "File is added"
                 }
             elif status_code == "D":
                 return {
-                    "sha": "UNCOMMITTED",
-                    "author": "Local Changes",
-                    "date": "-----",
+                    "sha": UNCOMMITTED_SHA_LABEL,
+                    "author": UNCOMMITTED_AUTHOR_LABEL,
+                    "date": UNCOMMITTED_DATE_LABEL,
                     "message": "File is deleted"
                 }
             else:
                 return {
-                    "sha": "UNCOMMITTED",
-                    "author": "Local Changes",
-                    "date": "-----",
+                    "sha": UNCOMMITTED_SHA_LABEL,
+                    "author": UNCOMMITTED_AUTHOR_LABEL,
+                    "date": UNCOMMITTED_DATE_LABEL,
                     "message": f"The status is UNKNOWN : {status_code}"
                 }
 
@@ -1194,15 +1197,15 @@ class VerifyCommand (BaseCommand):
         )
         
         if completed_log_process.returncode != 0:
-            print(f"Warning: Unable to get git log for file '{relative_file_path}'")
+            print(f"Warning: Unable to get git log for file '{relativez_file_path}'")
             return None
             
         log_output = completed_log_process.stdout.strip()
         if not log_output:
             return {
-                "sha": "UNCOMMITTED",
-                "author": "Local Changes",
-                "date": "-----",
+                "sha": UNCOMMITTED_SHA_LABEL,
+                "author": UNCOMMITTED_AUTHOR_LABEL,
+                "date": "----------",
                 "message": "File is completely untracked by Git"
             }
             
@@ -1245,7 +1248,6 @@ class VerifyCommand (BaseCommand):
         }
 
     def display_verification_changes_by_commits(self, git_cmd_path, git_root_path, files_sorted):
-
         resolved_repo_root = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)        
         for file_path in files_sorted:
@@ -1259,26 +1261,26 @@ class VerifyCommand (BaseCommand):
                 msg_first_line = commit_info["message"].split('\n')[0].strip()
                 commit_key = (commit_info["sha"], commit_info["date"], commit_info["author"], msg_first_line)
             else:
-                commit_key = ("UNCOMMITTED", "-----", "Local Changes", "File has modifications not yet committed to Git")                
+                commit_key = ("UNCOMMITTED", "----------", "Local Changes", "File has modifications not yet committed to Git")                
             commits_group[commit_key].append(rel_path)        
         for (sha, date, author, message), files in commits_group.items():
-            sha_label = f"[{sha}]" if sha != "UNCOMMITTED" else f"[{sha}]"            
-            print(f"\n{sha_label} {date} — {message}")
-            print(f"      Author: {author}")
-            print("      Affected files:")            
+            print(f"{sha} {date} — {message}")
+            print(f"   Author: {author}")
+            print("   Affected files:")            
             for f in files:
-                print(f"        -> {str(f).replace('\\', '/')}")                
+                print(f"     [{str(f).replace('\\', '/')}]")                
 
     def display_verification_changes(self, scripts_dir, git_cmd_path, git_root_path, scripts_sorted):
         if git_root_path is None: 
             for item in scripts_sorted:
                 relative_script_path = self.script_path_for_log(scripts_dir, item)
-                print(f"[{relative_script_path}]")
+                print(f"   [{relative_script_path}]")
         else:
             self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
+        self.parser.add_argument("--skip-git-checks",  action="store_true", default=False, help="skip grouping changes by git commits")
         self.parser.add_argument("--build-update-script", type=str, default=None, help="the update script path if you want one as an additional result of the verify command")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.latest_version_in_scripts = None
@@ -1478,9 +1480,11 @@ class VerifyCommand (BaseCommand):
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
         git_root_path = None
-        git_cmd_path = self.try_get_git_cmd_path(self.config)
-        if not git_cmd_path is None:
-            git_root_path = self.try_get_git_repo_root(git_cmd_path, self.scripts_dir)
+        git_cmd_path = None
+        if not self.args.skip_git_checks:
+            git_cmd_path = self.try_get_git_cmd_path(self.config)
+            if not git_cmd_path is None:
+                git_root_path = self.try_get_git_repo_root(git_cmd_path, self.scripts_dir)
 
         script_path = None
         temp_script_path = None
