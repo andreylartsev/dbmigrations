@@ -1388,7 +1388,7 @@ class VerifyCommand (BaseCommand):
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
         self.parser.add_argument("--skip-git-checks",  action="store_true", default=False, help="skip grouping changes by git commits")
-        self.parser.add_argument("--skip-recent-changes",  action="store_true", default=False, help="skip grouping changes by git commits")
+        self.parser.add_argument("--skip-display-recent-changes",  action="store_true", default=False, help="skip grouping changes by git commits")
         self.parser.add_argument("--build-update-script", type=str, default=None, help="the update script path if you want one as an additional result of the verify command")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.latest_version_in_scripts = None
@@ -1606,7 +1606,7 @@ class VerifyCommand (BaseCommand):
             self.verify_baseline_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_versioned_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_repeatable_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
-            if not self.args.skip_recent_changes:
+            if not self.args.skip_display_recent_changes:
                 self.display_recent_changes(git_cmd_path, git_root_path, RECENT_CHANGES_LIMIT, RECENT_CHANGES_WINDOW_MINUTES)
             # finalize writing update script
             if not temp_script_path is None:
