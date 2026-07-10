@@ -78,6 +78,8 @@ UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
 UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
 UNCOMMITTED_DATE_LABEL = "-------"
 
+RECENT_CHANGES_WINDOW_MINUTES = 30
+RECENT_CHANGES_LIMIT = 1000
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -1247,7 +1249,11 @@ class VerifyCommand (BaseCommand):
         if git_root_path is None: 
             for item in scripts_sorted:
                 relative_script_path = self.script_path_for_log(scripts_dir, item)
-                print(f"   [{relative_script_path}]")
+                with open(item, 'rb') as f:
+                    script_bytes = f.read()
+                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                    short_oid = git_blob_sha1[:8]
+                print(f"  [{relative_script_path} (OID: {short_oid})]")
         else:
             self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
 
@@ -1289,16 +1295,7 @@ class VerifyCommand (BaseCommand):
             "message": message
         }
 
-    def display_recent_changes_grouped_by_git_commits(self, git_cmd_path, git_root_path, limit=10, window_minutes=30):
-
-        if git_cmd_path is None:
-            raise CommandError("get_oid_commit_history(): The argument 'git_cmd_path' must be provided")
-        if git_root_path is None:
-            raise CommandError("get_oid_commit_history(): The argument 'git_root_path' must be provided")
-
-        resolved_git_root_path = pathlib.Path(git_root_path).resolve()
-        commits_group = collections.defaultdict(list)
-        
+    def get_recent_changes_from_db(self, limit=10, window_minutes=30):
         sql = """
             WITH latest_time AS (
                 SELECT COALESCE(MAX(applied_at), NOW()) AS max_at
@@ -1336,16 +1333,24 @@ class VerifyCommand (BaseCommand):
 
         """
 
-        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name(), limit=limit, window_minutes=window_minutes)
-        
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name(), limit=limit, window_minutes=window_minutes)        
         cursor = self.dbconn.cursor()
         cursor.execute(formatted_sql, [])
         rows = cursor.fetchall()
-        
-        if not rows:
-            return
+        return rows
 
-        print(f"The list of recent changes were applied to the target schema:")
+
+    def display_recent_changes_grouped_by_git_commits(self, git_cmd_path, git_root_path, rows):
+
+        if rows is None:
+            raise CommandError("get_oid_commit_history(): The argument 'rows' must be provided")
+        if git_cmd_path is None:
+            raise CommandError("get_oid_commit_history(): The argument 'git_cmd_path' must be provided")
+        if git_root_path is None:
+            raise CommandError("get_oid_commit_history(): The argument 'git_root_path' must be provided")
+
+        resolved_git_root_path = pathlib.Path(git_root_path).resolve()
+        commits_group = collections.defaultdict(list)
 
         for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
 
@@ -1377,10 +1382,28 @@ class VerifyCommand (BaseCommand):
             for s in scripts:
                 print(f"     [{s['applied_at']:<19} | {s['version']:<6} | {s['path']} (OID: {s['oid']})]")
 
+    def display_recent_changes(self, git_cmd_path, git_root_path, limit=10, window_minutes=30):
+        
+        rows = self.get_recent_changes_from_db(limit, window_minutes)
+        if not rows:
+            return
+        print(f"The list of recent changes were applied to the target schema:")
+
+        if git_root_path is None:
+            for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
+                date_str = applied_at.strftime("%Y-%m-%d %H:%M:%S")
+                clean_oid = git_blob_sha1.strip()[:8]
+                clean_path = str(relative_path).replace('\\', '/')                
+                print(f"  [{date_str} | {script_type:<10} | {version_id:<6} | {clean_path} (OID: {clean_oid})]")
+        else:
+            self.display_recent_changes_grouped_by_git_commits(git_cmd_path, git_root_path, rows)
+
+
 
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
         self.parser.add_argument("--skip-git-checks",  action="store_true", default=False, help="skip grouping changes by git commits")
+        self.parser.add_argument("--skip-recent-changes",  action="store_true", default=False, help="skip grouping changes by git commits")
         self.parser.add_argument("--build-update-script", type=str, default=None, help="the update script path if you want one as an additional result of the verify command")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.latest_version_in_scripts = None
@@ -1598,8 +1621,8 @@ class VerifyCommand (BaseCommand):
             self.verify_baseline_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_versioned_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_repeatable_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
-            if git_root_path:
-                self.display_recent_changes_grouped_by_git_commits(git_cmd_path, git_root_path, 100, 30)
+            if not self.args.skip_recent_changes:
+                self.display_recent_changes(git_cmd_path, git_root_path, RECENT_CHANGES_WINDOW_MINUTES, RECENT_CHANGES_LIMIT)
             # finalize writing update script
             if not temp_script_path is None:
                 if temp_script_path.exists():
