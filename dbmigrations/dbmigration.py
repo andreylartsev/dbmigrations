@@ -1388,7 +1388,7 @@ class VerifyCommand (BaseCommand):
     def __init__(self, config, subparsers): 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
         self.parser.add_argument("--skip-git-checks",  action="store_true", default=False, help="skip grouping changes by git commits")
-        self.parser.add_argument("--skip-display-recent-changes",  action="store_true", default=False, help="skip grouping changes by git commits")
+        self.parser.add_argument("--skip-display-recent-changes",  action="store_true", default=False, help="skip display recent changes stored within target db schema")
         self.parser.add_argument("--build-update-script", type=str, default=None, help="the update script path if you want one as an additional result of the verify command")
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.latest_version_in_scripts = None
