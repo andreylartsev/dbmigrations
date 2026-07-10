@@ -1151,42 +1151,22 @@ class VerifyCommand (BaseCommand):
         status_output = completed_status_process.stdout.strip()
         # the file have local changes
         if status_output:
-            status_code = status_output.lstrip()[:1]            
+            status_code = status_output.lstrip()[:1]
+            message =  f"The status is UNKNOWN : {status_code}"           
             if status_code == "?":
-                return {
-                    "sha": UNCOMMITTED_SHA_LABEL,
-                    "author": UNCOMMITTED_AUTHOR_LABEL,
-                    "date": UNCOMMITTED_DATE_LABEL,
-                    "message": "File is completely untracked by Git"
-                }
+                message = "File is completely untracked by Git"
             elif status_code == "M":
-                return {
-                    "sha": UNCOMMITTED_SHA_LABEL,
-                    "author": UNCOMMITTED_AUTHOR_LABEL,
-                    "date": UNCOMMITTED_DATE_LABEL,
-                    "message": "File is modified"
-                }
+                message = "File is modified"
             elif status_code == "A":
-                return {
-                    "sha": UNCOMMITTED_SHA_LABEL,
-                    "author": UNCOMMITTED_AUTHOR_LABEL,
-                    "date": UNCOMMITTED_DATE_LABEL,
-                    "message": "File is added"
-                }
+                message = "File is added"
             elif status_code == "D":
-                return {
-                    "sha": UNCOMMITTED_SHA_LABEL,
-                    "author": UNCOMMITTED_AUTHOR_LABEL,
-                    "date": UNCOMMITTED_DATE_LABEL,
-                    "message": "File is deleted"
-                }
-            else:
-                return {
-                    "sha": UNCOMMITTED_SHA_LABEL,
-                    "author": UNCOMMITTED_AUTHOR_LABEL,
-                    "date": UNCOMMITTED_DATE_LABEL,
-                    "message": f"The status is UNKNOWN : {status_code}"
-                }
+                message = "File is deleted"
+            return {
+                "sha": UNCOMMITTED_SHA_LABEL,
+                "author": UNCOMMITTED_AUTHOR_LABEL,
+                "date": UNCOMMITTED_DATE_LABEL,
+                "message": message
+            }
 
         completed_log_process = subprocess.run(
             [str(git_cmd_path), "log", "-1", "--format=%H|%an|%ad|%s", "--date=short", "--", str(relative_file_path)],
@@ -1230,8 +1210,13 @@ class VerifyCommand (BaseCommand):
                 msg_first_line = commit_info["message"].split('\n')[0].strip()
                 commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_first_line)
             else:
-                commit_key = ("----------", "Local Changes", "UNCOMMITTED", "File has modifications not yet committed to Git")                
-            commits_group[commit_key].append(rel_path)
+                commit_key = ("----------", "Local Changes", "UNCOMMITTED", "File has modifications not yet committed to Git")
+            
+            with open(abs_path, 'rb') as f:
+                script_bytes = f.read()
+            current_oid = get_git_blob_sha1_for_bytes(script_bytes)[:8]
+
+            commits_group[commit_key].append((rel_path, current_oid))
         
         sorted_commits = sorted(
             commits_group.items(), 
@@ -1242,8 +1227,8 @@ class VerifyCommand (BaseCommand):
         for (date, author, sha, message), files in sorted_commits:
             print(f"[{sha}] {date} — {message}")
             print(f"  Author: {author}")
-            for f in files:
-                print(f"    [{str(f).replace('\\', '/')}]")                
+            for f, oid in files:
+                print(f"    [{str(f).replace('\\', '/')} (OID: {oid})]")                
 
     def display_verification_changes(self, scripts_dir, git_cmd_path, git_root_path, scripts_sorted):
         if git_root_path is None: 
