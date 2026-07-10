@@ -1607,7 +1607,7 @@ class VerifyCommand (BaseCommand):
             self.verify_versioned_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             self.verify_repeatable_scripts(self.scripts_dir, git_cmd_path, git_root_path, temp_script_path)
             if not self.args.skip_recent_changes:
-                self.display_recent_changes(git_cmd_path, git_root_path, RECENT_CHANGES_WINDOW_MINUTES, RECENT_CHANGES_LIMIT)
+                self.display_recent_changes(git_cmd_path, git_root_path, RECENT_CHANGES_LIMIT, RECENT_CHANGES_WINDOW_MINUTES)
             # finalize writing update script
             if not temp_script_path is None:
                 if temp_script_path.exists():
