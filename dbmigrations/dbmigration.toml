@@ -7,6 +7,7 @@ default_dbenv = "local_windows"
 # you can specify the git command line here
 #git_cmd_path = "C:/Program Files/Git/cmd/git.exe"
 
+
 [dbenvs.local_windows]
 host = "localhost"
 port = 5432
