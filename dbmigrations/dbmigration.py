@@ -1105,9 +1105,9 @@ class VerifyCommand (BaseCommand):
 
     def try_get_git_repo_root(self, git_cmd_path, scripts_dir):
         if git_cmd_path is None:
-            raise CommandError("try_get_git_repo_root(): The argument 'git_cmd_path' must be provided")
+            raise ValueError("Argument 'git_cmd_path' must be provided")
         if scripts_dir is None:
-            raise CommandError("try_get_git_repo_root(): The argument 'scripts_dir' must be provided")
+            raise ValueError("Argument 'scripts_dir' must be provided")
 
         resolved_scripts_dir = pathlib.Path(scripts_dir).resolve()
         if not resolved_scripts_dir.exists():
@@ -1146,7 +1146,7 @@ class VerifyCommand (BaseCommand):
             cwd=str(repo_root_dir)
         )
         if completed_status_process.returncode != 0:
-            raise CommandError(f"Warning: Unable to get git status for file '{relative_file_path}'")
+            raise CommandError(f"Unable to get git status for file '{relative_file_path}'")
 
         status_output = completed_status_process.stdout.strip()
         # the file have local changes
