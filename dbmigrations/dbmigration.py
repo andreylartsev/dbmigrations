@@ -1197,6 +1197,13 @@ class VerifyCommand (BaseCommand):
         }
 
     def display_verification_changes_by_commits(self, git_cmd_path, git_root_path, files_sorted):
+        if git_cmd_path is None:
+            raise ValueError("Argument 'git_cmd_path' must be provided")
+        if git_root_path is None:
+            raise ValueError("Argument 'git_root_path' must be provided")
+        if not isinstance(files_sorted, collections.abc.Iterable):
+            raise TypeError("Argument 'files_sorted' must be an Iterable collection")
+
         resolved_repo_root = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)        
         for file_path in files_sorted:
@@ -1228,7 +1235,7 @@ class VerifyCommand (BaseCommand):
             print(f"[{sha}] {date} — {message}")
             print(f"  Author: {author}")
             for f, oid in files:
-                print(f"    [{str(f).replace('\\', '/')} (OID: {oid})]")                
+                print(f"    [{f.as_posix()} (OID: {oid})]")                
 
     def display_verification_changes(self, scripts_dir, git_cmd_path, git_root_path, scripts_sorted):
         if git_root_path is None: 
@@ -1236,23 +1243,25 @@ class VerifyCommand (BaseCommand):
                 relative_script_path = self.script_path_for_log(scripts_dir, item)
                 with open(item, 'rb') as f:
                     script_bytes = f.read()
-                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    short_oid = git_blob_sha1[:8]
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                short_oid = git_blob_sha1[:8]
                 print(f"  [{relative_script_path} (OID: {short_oid})]")
         else:
             self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
 
     def get_oid_commit_history(self, git_cmd_path, repo_root_dir, target_oid):
-
         if git_cmd_path is None:
-            raise CommandError("get_oid_commit_history(): The argument 'git_cmd_path' must be provided")
+            raise ValueError("Argument 'git_cmd_path' must be provided")
         if repo_root_dir is None:
-            raise CommandError("get_oid_commit_history(): The argument 'repo_root_dir' must be provided")
-        if target_oid is None or not str(target_oid).strip():
-            raise CommandError("get_oid_commit_history(): The argument 'target_oid' must be provided and not empty")
+            raise ValueError("Argument 'repo_root_dir' must be provided")
+        if target_oid is None:
+            raise ValueError("Argument 'target_oid' must be provided")
+        clean_oid = str(target_oid).strip()
+        if not clean_oid:
+            raise ValueError("Argument 'target_oid' must not be empty")
 
         completed_log_process = subprocess.run(
-            [str(git_cmd_path), "log", "-1", f"--find-object={target_oid}", "--format=%H|%an|%ad|%s", "--date=short"],
+            [str(git_cmd_path), "log", "-1", f"--find-object={clean_oid}", "--format=%H|%an|%ad|%s", "--date=short", "--"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -1260,7 +1269,7 @@ class VerifyCommand (BaseCommand):
             cwd=str(repo_root_dir)
         )        
         if completed_log_process.returncode != 0:
-            raise CommandError(f"Unable to get git log for OID '{target_oid}'")
+            raise CommandError(f"Unable to get git log for OID '{clean_oid}'")
             
         log_output = completed_log_process.stdout.strip()
         
@@ -1271,8 +1280,13 @@ class VerifyCommand (BaseCommand):
                 "date": UNCOMMITTED_DATE_LABEL,
                 "message": "Content hash (OID) is completely untracked or modified locally"
             }
-            
-        sha, author, date, message = log_output.split('|', 3)
+        
+        log_output_parts = log_output.split('|', 3)
+        
+        if len(log_output_parts) != 4:
+            raise CommandError(f"Unexpected git log output format for OID '{clean_oid}': {log_output}")
+  
+        sha, author, date, message = log_output_parts
         return {
             "sha": sha[:8],
             "author": author,
@@ -1326,13 +1340,12 @@ class VerifyCommand (BaseCommand):
 
 
     def display_recent_changes_grouped_by_git_commits(self, git_cmd_path, git_root_path, rows):
-
-        if rows is None:
-            raise CommandError("get_oid_commit_history(): The argument 'rows' must be provided")
         if git_cmd_path is None:
-            raise CommandError("get_oid_commit_history(): The argument 'git_cmd_path' must be provided")
+            raise ValueError("Argument 'git_cmd_path' must be provided")
         if git_root_path is None:
-            raise CommandError("get_oid_commit_history(): The argument 'git_root_path' must be provided")
+            raise CommandError("Argument 'git_root_path' must be provided")
+        if rows is None:
+            raise CommandError("Argument 'rows' must be provided")
 
         resolved_git_root_path = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)
