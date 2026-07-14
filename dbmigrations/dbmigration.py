@@ -1133,9 +1133,9 @@ class VerifyCommand (BaseCommand):
     def get_file_commit_history(self, git_cmd_path, repo_root_dir, relative_file_path):
 
         if git_cmd_path is None:
-            raise CommandError("get_file_commit_history(): The argument 'git_cmd_path' must be provided")
+            raise ValueError("Argument 'git_cmd_path' must be provided")
         if repo_root_dir is None:
-            raise CommandError("get_file_commit_history(): The argument 'repo_root_dir' must be provided")
+            raise ValueError("Argument 'repo_root_dir' must be provided")
 
         completed_status_process = subprocess.run(
             [str(git_cmd_path), "status", "--porcelain", str(relative_file_path)],
@@ -1187,8 +1187,13 @@ class VerifyCommand (BaseCommand):
                 "date": UNCOMMITTED_DATE_LABEL,
                 "message": "File is completely untracked by Git"
             }
-            
-        sha, author, date, message = log_output.split('|', 3)
+        
+        log_output_parts = log_output.split('|', 3)
+        
+        if len(log_output_parts) != 4:
+            raise CommandError(f"Unexpected git log output format for file '{relative_file_path}': {log_output}")
+  
+        sha, author, date, message = log_output_parts        
         return {
             "sha": sha[:8],
             "author": author,
@@ -1214,8 +1219,8 @@ class VerifyCommand (BaseCommand):
                 rel_path = abs_path                
             commit_info = self.get_file_commit_history(git_cmd_path, resolved_repo_root, rel_path)            
             if commit_info:
-                msg_first_line = commit_info["message"].split('\n')[0].strip()
-                commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_first_line)
+                msg_clean = " ".join(line.strip() for line in commit_info["message"].splitlines() if line.strip())
+                commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_clean)
             else:
                 commit_key = ("----------", "Local Changes", "UNCOMMITTED", "File has modifications not yet committed to Git")
             
