@@ -761,7 +761,12 @@ class BaseCommand:
             self.dbconn_settings["password"]=password
         else:
             self.dbconn_settings.pop("password", None)
-        self.dbconn = psycopg.connect(**self.dbconn_settings)
+        try:
+            self.dbconn = psycopg.connect(**self.dbconn_settings)
+        except psycopg.Error as pg_error:
+            error_message = str(pg_error)
+            raise CommandError(f"Unable to establish connection to database server. Inner error: {error_message}")
+
         print(f"Opened db connection: '{self.dbconn_get_connection_str(self.dbconn)}'")
         self.dbconn.add_notice_handler(log_server_notices)
         self.dbconn.autocommit = True 

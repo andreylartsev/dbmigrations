@@ -43,6 +43,7 @@ dbname = "test1"
 user = "dbinstall"
 run_tests_by = "zapkesb"
 no_password = false 
+connect_timeout = 5
 # sslmode = "prefer"
 
 [dbenvs.dev_korotin]
