@@ -19,6 +19,7 @@ import re
 import collections
 from abc import ABC, abstractmethod
 import shutil
+import traceback
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
@@ -1923,6 +1924,7 @@ def main():
     except Exception as e:
         error_type_name = type(e).__name__ 
         print(f"Error: {error_type_name}:", e)
+        traceback.print_exc()
         return 1
 
 if __name__ == "__main__":
