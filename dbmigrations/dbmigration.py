@@ -5,7 +5,6 @@ Simple database migrations tool
 #
 # prerequire packages listed in requirements.txt
 # 
-
 import sys
 import argparse
 import tomllib
@@ -1052,6 +1051,123 @@ class UpdateCommand (BaseCommand):
             self.apply_versioned_scripts(self.scripts_dir)
             self.apply_repeatable_scripts(self.scripts_dir, force_reapply=self.args.force_reapply_all_repeatable)
             print(f"Updated.")
+
+class ScriptBuilder:
+
+    def __init__(self, script_path: pathlib.Path | str):
+        self.target_script_path = pathlib.Path(script_path)
+        self.temp_script_path = pathlib.Path(script_path).with_suffix(".temp")
+        self.written_body_bytes = 0
+        self.temp_file = None
+    
+    def check(self):
+        assert self.target_script_path is not None, "self.target_script_path must be initialized"
+        assert isinstance(self.target_script_path, pathlib.Path), "self.target_script_path must be a pathlib.Path"
+
+        if not self.target_script_path.parent.exists():
+            raise CommandError(
+                f"The parent directory '{self.target_script_path.parent}' does not exist"
+            )
+        try:
+            self.target_script_path.touch(exist_ok=False)
+        except FileExistsError:
+            raise CommandError(
+                f"The specified script file '{self.target_script_path}' already exists"
+            )
+        except PermissionError:
+            raise CommandError(
+                f"The specified script file '{self.target_script_path}' is not accessible for write"
+            )
+        except OSError as e:
+            raise CommandError(
+                f"System error while verifying path '{self.target_script_path}': {e}"
+            )        
+        try:
+            self.temp_script_path.open("w").close()
+        except Exception as e:
+            raise CommandError(
+                f"Unable to write to temporary target script file '{self.temp_script_path}'"
+            )
+
+    def __enter__(self):
+        assert self.temp_script_path is not None, "self.temp_script_path must be initialized"
+        assert isinstance(self.temp_script_path, pathlib.Path), "self.temp_script_path must be a pathlib.Path"
+        self.temp_file = self.temp_script_path.open("a", encoding="utf-8")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.temp_file and not self.temp_file.closed:
+            self.temp_file.close()        
+        if exc_type is not None:
+            try:
+                self.temp_script_path.unlink()
+            except Exception:
+                pass 
+            try:
+                self.target_script_path.unlink()
+            except Exception:
+                pass 
+        return False 
+
+    def write_header(self, s: str):
+        assert self.temp_file is not None, "The temporary file is not initialized yet. Ensure you are inside the 'with' context."
+        assert not self.temp_file.closed, "The temporary file is not opened. Ensure you are inside the 'with' context."
+        self.temp_file.write(s)
+
+    def write_body(self, s: str):
+        assert self.temp_file is not None, "The temporary file is not initialized yet. Ensure you are inside the 'with' context."
+        assert not self.temp_file.closed, "The temporary file is not opened. Ensure you are inside the 'with' context."
+
+        written = self.temp_file.write(s)
+        if written > 0:
+            self.written_body_bytes += written
+
+    def write_body_lines(self, lines):
+        assert self.temp_file is not None, "The temporary file is not initialized yet. Ensure you are inside the 'with' context."
+        assert not self.temp_file.closed, "The temporary file is not opened. Ensure you are inside the 'with' context."
+        for s in lines:
+            written = self.temp_file.write(s)
+            if written > 0:
+                self.written_body_bytes += written
+    
+    def cleanup(self):
+        if self.temp_file and not self.temp_file.closed:
+            self.temp_file.close()
+
+        if self.temp_script_path is not None:
+            try:
+                self.temp_script_path.unlink()
+            except Exception as e:
+                message = str(e)
+                print(f"Warning: Unable cleanup temporary file '{self.temp_script_path}'. Inner error: {message}")
+        else:
+            print(f"Warning: The temporary script path is not initialized")
+
+        if self.target_script_path is not None:
+            try:
+                self.target_script_path.unlink()
+            except Exception as e:
+                message = str(e)
+                print(f"Warning: Unable cleanup target file '{self.target_script_path}'. Inner error: {message}")
+        else:
+            print(f"Warning: The target script path is not initialized")
+
+    def finalize(self):
+        assert isinstance(self.temp_script_path, pathlib.Path)
+        assert isinstance(self.target_script_path, pathlib.Path)
+
+        if self.temp_file and not self.temp_file.closed:
+            self.temp_file.close()
+
+        try:
+            if self.target_script_path.exists():
+                self.target_script_path.unlink()
+            self.temp_script_path.rename(self.target_script_path)
+        except Exception as e:
+            message = str(e)
+            raise CommandError(
+                f"Unable to rename temporary file '{self.temp_script_path}' to the target script file {self.target_script_path}. Inner error: {message}"
+            )
 
 class VerifyCommand (BaseCommand):
     """Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."""
