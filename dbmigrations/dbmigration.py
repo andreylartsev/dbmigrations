@@ -791,9 +791,9 @@ class UpdateCommand (BaseCommand):
     def run_baseline_scripts_with_external_tool(self, version, scripts_dir, scripts, tool):
          print(f"Running baseline scripts with external tool '{tool.exec_path}'")
          with self.dbconn.cursor() as cur:
+            script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+            print(f"Running script: [{script_path_for_log}]...")
             for script_path in scripts:
-                script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
-                print(f"Running script: [{script_path_for_log}]...")
                 tool.run(script_path)
             print(f"Setting the baseline version '{version}'...")
             cur.execute("BEGIN")
@@ -801,40 +801,40 @@ class UpdateCommand (BaseCommand):
                                             schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, True))
             for script_path in scripts:
+                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                        schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
-                    cur.execute(formatted_sql, [])
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
+                cur.execute(formatted_sql, [])
             cur.execute("COMMIT")       
             print(f"Committed.")
 
     def run_baseline_scripts_each_in_own_tran(self, version, scripts_dir, scripts):
          with self.dbconn.cursor() as cur:
             for script_path in scripts:
+                script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                print(f"Running script: [{script_path_for_log}]...")
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
-                    print(f"Running script: [{script_path_for_log}]...")
                     script_text = f.read()
-                    cur.execute("BEGIN")
-                    cur.execute(script_text)                                  
-                    cur.execute("COMMIT")       
-                    print(f"Committed.")
+                cur.execute("BEGIN")
+                cur.execute(script_text)                                  
+                cur.execute("COMMIT")       
+                print(f"Committed.")
             print(f"Setting the baseline version as '{version}'.")
             cur.execute("BEGIN")
             formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
                                             schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, True))
             for script_path in scripts:
+                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                        schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
-                    cur.execute(formatted_sql, [])        
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
+                cur.execute(formatted_sql, [])        
             cur.execute("COMMIT")       
             print(f"Committed.")
 
@@ -847,22 +847,22 @@ class UpdateCommand (BaseCommand):
             formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=self.get_schema_name())
             cur.execute(formatted_sql, (version,))    
             for script_path in scripts:
+                script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                print(f"Running script: [{script_path_for_log}]...")
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
-                    print(f"Running script: [{script_path_for_log}]...")
                     script_text = f.read()
-                    cur.execute(script_text)                                  
+                cur.execute(script_text)                                  
             formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
                                             schema_name=self.get_schema_name())                                  
             cur.execute(formatted_sql, (version, False))
             for script_path in scripts:
+                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                        schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
-                    cur.execute(formatted_sql, [])        
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
+                cur.execute(formatted_sql, [])        
             cur.execute("COMMIT")       
             print(f"Committed.")
 
@@ -871,22 +871,22 @@ class UpdateCommand (BaseCommand):
             print(f"Apply version {version}...")
             cur.execute("BEGIN")
             for script_path in scripts:
+                script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                print(f"Running script: [{script_path_for_log}]...")
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
-                    print(f"Running script: [{script_path_for_log}]...")
                     script_text = f.read()
-                    cur.execute(script_text)
+                cur.execute(script_text)
             formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, %s)", 
                                             schema_name=self.get_schema_name())
             cur.execute(formatted_sql, (version, False))       
             for script_path in scripts:
+                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                        schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
-                    cur.execute(formatted_sql, [])       
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
+                cur.execute(formatted_sql, [])
             cur.execute("COMMIT")       
             print(f"Committed.")
 
@@ -991,13 +991,13 @@ class UpdateCommand (BaseCommand):
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 script_bytes = f.read()
-                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
-                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                if force_reapply:
-                    scripts_to_repeat.append(script_path)
-                elif not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
-                    scripts_to_repeat.append(script_path)
+            git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+            script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
+            relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+            if force_reapply:
+                scripts_to_repeat.append(script_path)
+            elif not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
+                scripts_to_repeat.append(script_path)
         if len(scripts_to_repeat) == 0:
             print(f"No changed repeatable scripts found for (re)installation.")       
             return
@@ -1006,19 +1006,19 @@ class UpdateCommand (BaseCommand):
         print(f"Apply repeatable scripts...")       
         with self.dbconn.cursor() as cur:
             for script_path in scripts_to_repeat:
+                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+                print(f"Running script: [{relative_script_path}]...")
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
-                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                    print(f"Running script: [{relative_script_path}]...")
-                    cur.execute("BEGIN")
-                    cur.execute(script_text)
-                    formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
-                                                    schema_name=self.get_schema_name())                                  
-                    cur.execute(formatted_sql, (git_blob_sha1, target_version, str(relative_script_path)))     
-                    cur.execute("COMMIT")
-                    print(f"Committed.")
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
+                cur.execute("BEGIN")
+                cur.execute(script_text)
+                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
+                                                schema_name=self.get_schema_name())                                  
+                cur.execute(formatted_sql, (git_blob_sha1, target_version, str(relative_script_path)))     
+                cur.execute("COMMIT")
+                print(f"Committed.")
         print(f"The repeatable scripts were applied.")       
 
     def run(self):
@@ -1659,18 +1659,18 @@ class VerifyCommand (BaseCommand):
             formatted_sql_text = self.format_sql("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
             script_builder.write_body(formatted_sql_text)
             for git_blob_sha1, script_path in scripts_dict.items():
+                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+                formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
+                script_builder.write_body(formatted_sql_text)
+                script_builder.write_body(f"BEGIN;\n")
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
-                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                    formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
-                    script_builder.write_body(formatted_sql_text)
-                    script_builder.write_body(f"BEGIN;\n")
-                    script_builder.write_body_lines(lines)
-                    script_builder.write_body(f"\n")
-                    formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
-                                                         schema_name=self.get_schema_name(), git_blob_sha1=git_blob_sha1, version_id=target_version, relative_path=str(relative_script_path))
-                    script_builder.write_body(formatted_sql_text)
-                    script_builder.write_body(f"COMMIT;\n")
+                script_builder.write_body_lines(lines)
+                script_builder.write_body(f"\n")
+                formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
+                                                        schema_name=self.get_schema_name(), git_blob_sha1=git_blob_sha1, version_id=target_version, relative_path=str(relative_script_path))
+                script_builder.write_body(formatted_sql_text)
+                script_builder.write_body(f"COMMIT;\n")
 
     def verify_repeatable_scripts(self, scripts_dir, git_cmd_path, git_root_path, script_builder):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
@@ -1695,10 +1695,10 @@ class VerifyCommand (BaseCommand):
         for script_path in repeatable_scripts_sorted:
             with open(script_path, 'rb') as f:
                 script_bytes = f.read()
-                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                if not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
-                    scripts_to_repeat.append(script_path)
+            git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+            relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+            if not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
+                scripts_to_repeat.append(script_path)
         if len(scripts_to_repeat) == 0:
             print(f"No changed repeatable scripts found for (re)installation.")
             return
@@ -1710,8 +1710,8 @@ class VerifyCommand (BaseCommand):
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
-                    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                    scripts_to_repeat_dict[git_blob_sha1] = script_path
+                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+                scripts_to_repeat_dict[git_blob_sha1] = script_path
             self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, scripts_dir, script_builder)
 
     def run(self):
@@ -1920,45 +1920,45 @@ class RunTestsCommand (BaseCommand):
             cur.execute("BEGIN") # start global tran for tests
             setup_folder_stack = []            
             for script_path in scripts:
+                script_name = script_path.name
                 with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
                     script_text = f.read()
-                    script_name = script_path.name
 
-                    if len(setup_folder_stack) > 0:
-                        script_folder = str(script_path.absolute().parent)
-                        latest_item = setup_folder_stack[-1]
-                        if not self.is_subpath_of(script_folder, latest_item):
-                            setup_folder_stack.pop()
-                            savepoint_id = self.make_savepoint_id(setup_folder)
-                            formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
-                            cur.execute(formatted_sql)
-                            print(f"Rolled back to savepoint.")
-                    
-                    if script_name == SETUP_TESTS_FILE_NAME:
-                        setup_folder = str(script_path.absolute().parent)
-                        setup_folder_stack.append(setup_folder)
+                if len(setup_folder_stack) > 0:
+                    script_folder = str(script_path.absolute().parent)
+                    latest_item = setup_folder_stack[-1]
+                    if not self.is_subpath_of(script_folder, latest_item):
+                        setup_folder_stack.pop()
                         savepoint_id = self.make_savepoint_id(setup_folder)
-                        formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
-                        print(f"Make savepoint...")
+                        formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
                         cur.execute(formatted_sql)
-                        relative_script_path = self.script_path_for_log(scripts_dir, script_path)
-                        print(f"Running setup: '{relative_script_path}'...", end="", flush=True)
-                        cur.execute(script_text)
-                        print(f"DONE")
-                        continue
-                    else:
-                        cur.execute("SAVEPOINT savepoint_test_boundary")
-                        try:
-                            self.run_conditional(cur, scripts_dir, script_path, script_text)
-                            self.pass_count += 1
-                        except TestFailed as e:
-                            self.fail_count += 1
-                            print(f"FAIL.", e)
-                        except Exception as e:
-                            self.fail_count += 1
-                            error_type_name = type(e).__name__ 
-                            print(f"FAIL. {error_type_name}:", e)
-                        cur.execute("ROLLBACK TO SAVEPOINT savepoint_test_boundary")
+                        print(f"Rolled back to savepoint.")
+                
+                if script_name == SETUP_TESTS_FILE_NAME:
+                    setup_folder = str(script_path.absolute().parent)
+                    setup_folder_stack.append(setup_folder)
+                    savepoint_id = self.make_savepoint_id(setup_folder)
+                    formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
+                    print(f"Make savepoint...")
+                    cur.execute(formatted_sql)
+                    relative_script_path = self.script_path_for_log(scripts_dir, script_path)
+                    print(f"Running setup: '{relative_script_path}'...", end="", flush=True)
+                    cur.execute(script_text)
+                    print(f"DONE")
+                    continue
+                else:
+                    cur.execute("SAVEPOINT savepoint_test_boundary")
+                    try:
+                        self.run_conditional(cur, scripts_dir, script_path, script_text)
+                        self.pass_count += 1
+                    except TestFailed as e:
+                        self.fail_count += 1
+                        print(f"FAIL.", e)
+                    except Exception as e:
+                        self.fail_count += 1
+                        error_type_name = type(e).__name__ 
+                        print(f"FAIL. {error_type_name}:", e)
+                    cur.execute("ROLLBACK TO SAVEPOINT savepoint_test_boundary")
 
             cur.execute("ROLLBACK") # rollback global tran for tests
 
