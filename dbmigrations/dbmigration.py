@@ -735,19 +735,19 @@ class BaseCommand:
         self.parser.add_argument("-n","--no-password",  action="store_true", default=self.no_password, help="dont ask user password")
         self.parser.set_defaults(call=self) 
     def __enter__(self):
-        if not self.args.dbenv is None:
+        if self.args.dbenv is not None:
             self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(self.config, self.args.dbenv)  
-        if not self.args.host is None:
+        if self.args.host is not None:
             self.dbconn_settings["host"]=self.args.host
-        if not self.args.port is None:
+        if self.args.port is not None:
             self.dbconn_settings["port"]=self.args.port
         
-        if not self.args.user is None:
+        if self.args.user is not None:
             self.dbconn_settings["user"]=self.args.user
-        elif not self.run_tests_by is None and self.use_run_tests_by_user:
+        elif self.run_tests_by is not None and self.use_run_tests_by_user:
             self.dbconn_settings["user"]=self.run_tests_by
         
-        if not self.args.dbname is None:
+        if self.args.dbname is not None:
             self.dbconn_settings["dbname"]=self.args.dbname
         if not self.args.no_password and not self.no_password:
             password = None
@@ -774,7 +774,7 @@ class BaseCommand:
         if exc_type is not None:
             self.dbconn.rollback()
             print(f"Rolled back transaction.")
-        if not self.dbconn is None:
+        if self.dbconn is not None:
             self.dbconn.close()
             print(f"Closed db connection.")
         return False # propagate the exception
