@@ -1542,26 +1542,26 @@ class VerifyCommand (BaseCommand):
             formatted_sql_text = self.format_sql("SELECT pg_catalog.set_config('search_path', {search_path}, false);\n", search_path=search_path)
             builder.write_header(formatted_sql_text)
 
-    def write_baseline_scripts(self, version, scripts_dir, scripts, builder):
-        assert builder is not None
-        with builder:
+    def write_baseline_scripts(self, version, scripts_dir, scripts, script_builder):
+        assert script_builder is not None
+        with script_builder:
             formatted_sql_text = self.format_sql("-- Baseline scripts for version {version_id}\n", version_id=version)
-            builder.write_body(formatted_sql_text)
+            script_builder.write_body(formatted_sql_text)
             for script_path in scripts:
                 relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                 formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))                    
-                builder.write_body(formatted_sql_text)
-                builder.write_body(f"BEGIN;\n")
-                builder.write_body_lines(lines)
-                builder.write_body(f"\n")
-                builder.write_body(f"COMMIT;\n")
+                script_builder.write_body(formatted_sql_text)
+                script_builder.write_body(f"BEGIN;\n")
+                script_builder.write_body_lines(lines)
+                script_builder.write_body(f"\n")
+                script_builder.write_body(f"COMMIT;\n")
 
-            builder.write_body(f"BEGIN;\n")
+            script_builder.write_body(f"BEGIN;\n")
             formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", 
                                                  schema_name=self.get_schema_name(), version_id=version)
-            builder.write_body(formatted_sql_text)
+            script_builder.write_body(formatted_sql_text)
             for script_path in scripts:
                 relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with open(script_path, 'rb') as f:
@@ -1569,10 +1569,10 @@ class VerifyCommand (BaseCommand):
                 git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
                 formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                     schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
-                builder.write_body(formatted_sql_text)
-            builder.write_body(f"COMMIT;\n")
+                script_builder.write_body(formatted_sql_text)
+            script_builder.write_body(f"COMMIT;\n")
 
-    def verify_baseline_scripts(self, scripts_dir, git_cmd_path, git_root_path, target_script_path):
+    def verify_baseline_scripts(self, scripts_dir, git_cmd_path, git_root_path, script_builder):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
@@ -1591,29 +1591,29 @@ class VerifyCommand (BaseCommand):
         print(f"The baseline scripts to install: ")
         self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
 
-        if not target_script_path is None:
-            self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, target_script_path)
+        if not script_builder is None:
+            self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
         
         # remember latest version in scripts for the further use in verify_repeatable()
         self.latest_version_in_scripts = baseline_version
 
-    def write_versioned_scripts(self, version, scripts_dir, scripts, builder):
-        assert builder is not None
-        with builder:
+    def write_versioned_scripts(self, version, scripts_dir, scripts, script_builder):
+        assert script_builder is not None
+        with script_builder:
             formatted_sql_text = self.format_sql("-- Versioned scripts for version {version_id}\n", version_id=version)
-            builder.write_body(formatted_sql_text)
-            builder.write_body(f"BEGIN;\n")
+            script_builder.write_body(formatted_sql_text)
+            script_builder.write_body(f"BEGIN;\n")
             for script_path in scripts:
                 relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                 formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
-                builder.write_body(formatted_sql_text)
-                builder.write_body_lines(lines)
-                builder.write_body(f"\n")
+                script_builder.write_body(formatted_sql_text)
+                script_builder.write_body_lines(lines)
+                script_builder.write_body(f"\n")
             formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, FALSE);\n", 
                                                  schema_name=self.get_schema_name(), version_id=version)
-            builder.write_body(formatted_sql_text)
+            script_builder.write_body(formatted_sql_text)
             for script_path in scripts:
                 relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                 with open(script_path, 'rb') as f:
@@ -1621,10 +1621,10 @@ class VerifyCommand (BaseCommand):
                 git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
                 formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                     schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
-                builder.write_body(formatted_sql_text)
-            builder.write_body(f"COMMIT;\n")
+                script_builder.write_body(formatted_sql_text)
+            script_builder.write_body(f"COMMIT;\n")
 
-    def verify_versioned_scripts(self, scripts_dir, git_cmd_path, git_root_path, target_script_path):
+    def verify_versioned_scripts(self, scripts_dir, git_cmd_path, git_root_path, script_builder):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
@@ -1662,30 +1662,30 @@ class VerifyCommand (BaseCommand):
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
             self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
-            if not target_script_path is None:
+            if not script_builder is None:
                 version_id = script_version_dir.name
-                self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, target_script_path)   
+                self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, script_builder)   
 
-    def write_repeatable_scripts(self, target_version, scripts_dict, scripts_dir, builder):
-        assert builder is not None
-        with builder:
+    def write_repeatable_scripts(self, target_version, scripts_dict, scripts_dir, script_builder):
+        assert script_builder is not None
+        with script_builder:
             formatted_sql_text = self.format_sql("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
-            builder.write_body(formatted_sql_text)
+            script_builder.write_body(formatted_sql_text)
             for git_blob_sha1, script_path in scripts_dict.items():
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                     relative_script_path = self.script_path_for_log(scripts_dir, script_path)
                     formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
-                    builder.write_body(formatted_sql_text)
-                    builder.write_body(f"BEGIN;\n")
-                    builder.write_body_lines(lines)
-                    builder.write_body(f"\n")
+                    script_builder.write_body(formatted_sql_text)
+                    script_builder.write_body(f"BEGIN;\n")
+                    script_builder.write_body_lines(lines)
+                    script_builder.write_body(f"\n")
                     formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
                                                          schema_name=self.get_schema_name(), git_blob_sha1=git_blob_sha1, version_id=target_version, relative_path=str(relative_script_path))
-                    builder.write_body(formatted_sql_text)
-                    builder.write_body(f"COMMIT;\n")
+                    script_builder.write_body(formatted_sql_text)
+                    script_builder.write_body(f"COMMIT;\n")
 
-    def verify_repeatable_scripts(self, scripts_dir, git_cmd_path, git_root_path, target_script_path):
+    def verify_repeatable_scripts(self, scripts_dir, git_cmd_path, git_root_path, script_builder):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
@@ -1718,14 +1718,14 @@ class VerifyCommand (BaseCommand):
         print(f"The repeatable scripts to (re)install: ")
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_to_repeat)
-        if not target_script_path is None:
+        if not script_builder is None:
             scripts_to_repeat_dict = {}
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
                     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
                     scripts_to_repeat_dict[git_blob_sha1] = script_path
-            self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, scripts_dir, target_script_path)
+            self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, scripts_dir, script_builder)
 
     def run(self):
         self.make_dbconn_session_readonly()
@@ -1762,7 +1762,7 @@ class VerifyCommand (BaseCommand):
                     print(f"The update script is written to '{script_path}'.")
                 else:
                     script_builder.cleanup()
-                    print(f"Nothing to write to update script '{script_path}'")                
+                    print(f"No updates to write for script '{script_path}'. Temp file cleaned up")                
         except Exception:
             if script_builder is not None:
                 script_builder.cleanup()
