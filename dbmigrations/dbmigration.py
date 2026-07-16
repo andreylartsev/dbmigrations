@@ -1578,7 +1578,7 @@ class VerifyCommand (BaseCommand):
         print(f"The baseline scripts to install: ")
         self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
 
-        if not script_builder is None:
+        if script_builder is not None:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
         
         # remember latest version in scripts for the further use in verify_repeatable()
@@ -1649,7 +1649,7 @@ class VerifyCommand (BaseCommand):
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
             self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
-            if not script_builder is None:
+            if script_builder is not None:
                 version_id = script_version_dir.name
                 self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, script_builder)   
 
@@ -1705,7 +1705,7 @@ class VerifyCommand (BaseCommand):
         print(f"The repeatable scripts to (re)install: ")
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_to_repeat)
-        if not script_builder is None:
+        if script_builder is not None:
             scripts_to_repeat_dict = {}
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
