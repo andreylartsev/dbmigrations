@@ -478,7 +478,7 @@ class BaseCommand:
         with self.dbconn.cursor() as cur:
             cur.execute(sql, params)
             row = cur.fetchone()
-            return row[0] if not row is None else None
+            return row[0] if row is not None else None
         
     def dbconn_exec_with_no_result_in_tran(self, sql, params):
         with self.dbconn.cursor() as cur:
@@ -771,7 +771,7 @@ class BaseCommand:
         self.dbconn.autocommit = True 
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if not exc_type is None:
+        if exc_type is not None:
             self.dbconn.rollback()
             print(f"Rolled back transaction.")
         if not self.dbconn is None:
@@ -918,7 +918,7 @@ class UpdateCommand (BaseCommand):
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
         
         external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
-        if not external_tool_name is None:
+        if external_tool_name is not None:
             tool = ExternalTool(external_tool_name, self.args.schema_name, self.dbconn_settings, self.config)
             self.run_baseline_scripts_with_external_tool(baseline_version, scripts_dir, scripts_sorted, tool)
         else:
@@ -1726,7 +1726,7 @@ class VerifyCommand (BaseCommand):
         git_cmd_path = None
         if not self.args.skip_git_checks:
             git_cmd_path = self.try_get_git_cmd_path(self.config)
-            if not git_cmd_path is None:
+            if git_cmd_path is not None:
                 git_root_path = self.try_get_git_repo_root(git_cmd_path, self.scripts_dir)
 
         script_builder = None
@@ -1878,7 +1878,7 @@ class RunTestsCommand (BaseCommand):
                 result_number += 1
                 if cursor.rowcount > 0:
                     row = cursor.fetchone()
-                    value = row[0] if not row is None else False
+                    value = row[0] if row is not None else False
                     if not value:
                         raise TestFailed(f"({result_number}) Expected true, got {value}!") 
         elif file_name.startswith(DETECT_MISSING_TEST_PREFIX):
