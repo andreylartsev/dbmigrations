@@ -153,15 +153,15 @@ class ExternalTool:
         self.schema_name = schema_name
         self.dbconn_config = dbconn_config
 
-        if not TOOLS_CONFIG_GROUP in toml_config:
+        if TOOLS_CONFIG_GROUP not in toml_config:
             raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
         tools_config = toml_config[TOOLS_CONFIG_GROUP]
         
-        if not tool_name in tools_config:
+        if tool_name not in tools_config:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
         tool_config = tools_config[tool_name]
 
-        if not TOOL_EXEC_ATTRIBUTE in tool_config:
+        if TOOL_EXEC_ATTRIBUTE not in tool_config:
             raise CommandError(f"There is no attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
         exec_attribute = tool_config[TOOL_EXEC_ATTRIBUTE]
         exec_path = pathlib.Path(exec_attribute)
@@ -171,11 +171,11 @@ class ExternalTool:
             raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' is not a file.")
         self.exec_path = exec_path
 
-        if not TOOL_ARGS_ATTRIBUTE in tool_config:
+        if TOOL_ARGS_ATTRIBUTE not in tool_config:
             raise CommandError(f"There is no attribute '{TOOL_ARGS_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
         self.args = tool_config[TOOL_ARGS_ATTRIBUTE]
 
-        if not TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE in tool_config:
+        if TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE not in tool_config:
             raise CommandError(f"There is no attribute '{TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
         self.success_result_code = tool_config[TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE]
 
@@ -270,16 +270,16 @@ class BaseCommand:
                 raise CommandError(f"Run 'update' subcommand to update version control tables within the schema. The following migration need to be applied: {desc}")
 
     def get_default_dbenv(self, toml_config):
-        if not DEFAULT_DBENV_CONFIG_ATTRIBUTE in toml_config:
+        if DEFAULT_DBENV_CONFIG_ATTRIBUTE not in toml_config:
             raise CommandError(f"There is no '{DEFAULT_DBENV_CONFIG_ATTRIBUTE}' within the configuration file '{TOML_CONFIG_FILE}'.")
         default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
         return default_dbenv
 
     def get_dbenv_config(self, toml_config, dbenv_param):
-        if not DBENVS_CONFIG_GROUP in toml_config:
+        if DBENVS_CONFIG_GROUP not in toml_config:
             raise CommandError(f"There is no configuration group'{DBENVS_CONFIG_GROUP}' within the configuration file '{TOML_CONFIG_FILE}'.")
         dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
-        if not dbenv_param in dbenvs_config:
+        if dbenv_param not in dbenvs_config:
             raise CommandError(f"There is no configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' within the configuration file '{TOML_CONFIG_FILE}'.")
         config = copy.deepcopy(dbenvs_config[dbenv_param])
         run_tests_by = config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
@@ -296,10 +296,10 @@ class BaseCommand:
         if not use_tool_file_name.exists():
             return None
         tool_name = read_as_trimmed_string(use_tool_file_name)
-        if not TOOLS_CONFIG_GROUP in self.config:
+        if TOOLS_CONFIG_GROUP not in self.config:
             raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
         tools_config = self.config[TOOLS_CONFIG_GROUP]        
-        if not tool_name in tools_config:
+        if tool_name not in tools_config:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
         return tool_name
     
@@ -390,7 +390,7 @@ class BaseCommand:
                     raise CommandError(f"The script '{dependency}' specified in '{script_path}' as a dependency does not exist.")
                 if not resolved_dependency.is_file():
                     raise CommandError(f"The script '{dependency}' specified in '{script_path}' as a dependency is not a valid file.")
-                if not resolved_dependency in resolved_orig_script_list:
+                if resolved_dependency not in resolved_orig_script_list:
                     raise CommandError(f"The script '{dependency}' (specified in '{script_path}') was not found in '{SCRIPT_LIST_FILE_NAME}' or in the origin scripts folder.")
                 reversed_deps[resolved_dependency].append(script_path)
         # print(reversed_deps)     
