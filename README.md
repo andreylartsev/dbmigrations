@@ -58,7 +58,7 @@ Note: All required packages are listed in requirements.txt
 ```  
 PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.12.exe -m venv .venv
 PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.12.exe -m pip install --upgrade pip
-PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.12.exe -m pip install requirements.txt
+PS C:\Users\andrey.larcev\Projects\dbmigrations> python3.12.exe -m pip install -r requirements.txt
 PS C:\Users\andrey.larcev\Projects\dbmigrations>  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 PS C:\Users\andrey.larcev\Projects\dbmigrations> .\.venv\Scripts\Activate.ps1
 (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations>

@@ -1229,10 +1229,8 @@ class VerifyCommand (BaseCommand):
             return cmd_path
 
     def try_get_git_repo_root(self, git_cmd_path, scripts_dir):
-        if git_cmd_path is None:
-            raise ValueError("Argument 'git_cmd_path' must be provided")
-        if scripts_dir is None:
-            raise ValueError("Argument 'scripts_dir' must be provided")
+        assert git_cmd_path is not None
+        assert scripts_dir is not None
 
         resolved_scripts_dir = pathlib.Path(scripts_dir).resolve()
         if not resolved_scripts_dir.exists():
@@ -1256,11 +1254,8 @@ class VerifyCommand (BaseCommand):
         return resolved_path
     
     def get_file_commit_history(self, git_cmd_path, repo_root_dir, relative_file_path):
-
-        if git_cmd_path is None:
-            raise ValueError("Argument 'git_cmd_path' must be provided")
-        if repo_root_dir is None:
-            raise ValueError("Argument 'repo_root_dir' must be provided")
+        assert git_cmd_path is not None
+        assert repo_root_dir is not None
 
         completed_status_process = subprocess.run(
             [str(git_cmd_path), "status", "--porcelain", str(relative_file_path)],
@@ -1327,12 +1322,9 @@ class VerifyCommand (BaseCommand):
         }
 
     def display_verification_changes_by_commits(self, git_cmd_path, git_root_path, files_sorted):
-        if git_cmd_path is None:
-            raise ValueError("Argument 'git_cmd_path' must be provided")
-        if git_root_path is None:
-            raise ValueError("Argument 'git_root_path' must be provided")
-        if not isinstance(files_sorted, collections.abc.Iterable):
-            raise TypeError("Argument 'files_sorted' must be an Iterable collection")
+        assert git_cmd_path is not None
+        assert git_root_path is not None
+        assert isinstance(files_sorted, collections.abc.Iterable)
 
         resolved_repo_root = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)        
@@ -1470,12 +1462,9 @@ class VerifyCommand (BaseCommand):
 
 
     def display_recent_changes_grouped_by_git_commits(self, git_cmd_path, git_root_path, rows):
-        if git_cmd_path is None:
-            raise ValueError("Argument 'git_cmd_path' must be provided")
-        if git_root_path is None:
-            raise CommandError("Argument 'git_root_path' must be provided")
-        if rows is None:
-            raise CommandError("Argument 'rows' must be provided")
+        assert git_cmd_path is not None
+        assert git_root_path is not None
+        assert rows is not None
 
         resolved_git_root_path = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)
