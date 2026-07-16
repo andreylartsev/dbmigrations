@@ -1372,12 +1372,10 @@ class VerifyCommand (BaseCommand):
             self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
 
     def get_oid_commit_history(self, git_cmd_path, repo_root_dir, target_oid):
-        if git_cmd_path is None:
-            raise ValueError("Argument 'git_cmd_path' must be provided")
-        if repo_root_dir is None:
-            raise ValueError("Argument 'repo_root_dir' must be provided")
-        if target_oid is None:
-            raise ValueError("Argument 'target_oid' must be provided")
+        assert git_cmd_path is not None
+        assert repo_root_dir is not None
+        assert target_oid is not None
+        
         clean_oid = str(target_oid).strip()
         if not clean_oid:
             raise ValueError("Argument 'target_oid' must not be empty")
