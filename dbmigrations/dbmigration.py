@@ -763,10 +763,10 @@ class BaseCommand:
         except psycopg.Error as pg_error:
             error_message = str(pg_error)
             raise CommandError(f"Unable to establish connection to database server. Inner error: {error_message}")
-
         print(f"Opened db connection: '{self.dbconn_get_connection_str(self.dbconn)}'")
         self.dbconn.add_notice_handler(log_server_notices)
         self.dbconn.autocommit = True 
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is not None:
@@ -776,8 +776,10 @@ class BaseCommand:
             self.dbconn.close()
             print(f"Closed db connection.")
         return False # propagate the exception
+    
     def run(self):
         pass
+    
     def __call__(self, args):
         self.args = args
         with self:
@@ -1967,7 +1969,7 @@ class RunTestsCommand (BaseCommand):
     
     def __enter__(self):
         self.use_run_tests_by_user = True
-        super().__enter__()
+        return super().__enter__()
 
     def run_unit_test_scripts(self, scripts_dir):
         unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
@@ -2033,6 +2035,10 @@ def main():
     except CommandError as e:    
         error_type_name = type(e).__name__ 
         print(f"Command error:", e)
+        return 1
+    except psycopg.Error as e:    
+        error_type_name = type(e).__name__ 
+        print(f"Server error:", e)
         return 1
     except Exception as e:
         error_type_name = type(e).__name__ 
