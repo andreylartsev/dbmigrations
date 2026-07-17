@@ -106,8 +106,6 @@ def read_as_trimmed_string(file_path):
 def log_server_notices(diag):
     print(f"Server: {diag.severity} - {diag.message_primary}")
 
-import sys
-
 def get_char():
     if sys.platform == "win32":
         import msvcrt
