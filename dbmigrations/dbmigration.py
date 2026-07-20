@@ -164,9 +164,9 @@ class ExternalTool:
         exec_attribute = tool_config[TOOL_EXEC_ATTRIBUTE]
         exec_path = pathlib.Path(exec_attribute)
         if not exec_path.exists():
-            raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' does not exists.")
+            raise CommandError(f"The path '{exec_path}' specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' does not exists.")
         if not exec_path.is_file():
-            raise CommandError(f"There path specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' is not a file.")
+            raise CommandError(f"The path '{exec_path}' specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' is not a file.")
         self.exec_path = exec_path
 
         if TOOL_ARGS_ATTRIBUTE not in tool_config:
@@ -188,7 +188,7 @@ class ExternalTool:
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT, 
             text=True,
-            encoding='utf-8')
+            encoding='utf-8-sig')
         # Read and print output line by line as it happens
         for line in iter(process.stdout.readline, ''):
             print(line, end='') 
@@ -791,9 +791,9 @@ class UpdateCommand (BaseCommand):
     def run_baseline_scripts_with_external_tool(self, version, scripts_dir, scripts, tool):
          print(f"Running baseline scripts with external tool '{tool.exec_path}'")
          with self.dbconn.cursor() as cur:
-            script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
-            print(f"Running script: [{script_path_for_log}]...")
             for script_path in scripts:
+                script_path_for_log = self.script_path_for_log(scripts_dir, script_path)
+                print(f"Running script: [{script_path_for_log}]...")
                 tool.run(script_path)
             print(f"Setting the baseline version '{version}'...")
             cur.execute("BEGIN")
