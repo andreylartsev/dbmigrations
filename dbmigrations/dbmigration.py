@@ -1371,14 +1371,10 @@ class VerifyCommand (BaseCommand):
                 print(f"    [{f.as_posix()} (OID: {oid})]")                
 
     def display_verification_changes(self, scripts_dir, git_cmd_path, git_root_path, scripts_sorted):
-        if git_root_path is None: 
-            for item in scripts_sorted:
-                relative_script_path = get_script_path_for_log(scripts_dir, item)
-                with open(item, 'rb') as f:
-                    script_bytes = f.read()
-                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                short_oid = git_blob_sha1[:8]
-                print(f"  [{relative_script_path} (OID: {short_oid})]")
+        if git_root_path is None:
+            script_infos = [get_script_info(scripts_dir, s) for s in scripts_sorted] 
+            for i in script_infos:
+                print(f"  {i!r}")
         else:
             self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
 
