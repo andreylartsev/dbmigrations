@@ -108,18 +108,23 @@ class ScriptInfo(NamedTuple):
     script_path : pathlib.Path
     relative_path : str
     oid : str
+    text : str
     def __repr__(self) -> str:
         short_oid = self.oid[:8]
         return f"[{self.relative_path} (OID: {short_oid})]"
 
-def get_script_info(scripts_dir, script_path):
+def get_script_info(scripts_dir, script_path, decode_and_store_text = False, encoding="utf-8-sig", encoding_errors="ignore"):
     relative_script_path = get_script_path_for_log(scripts_dir, script_path)
     with open(script_path, 'rb') as f:
         script_bytes = f.read()
     git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+    text = ""
+    if decode_and_store_text:
+        text = script_bytes.decode(encoding, encoding_errors)
     result = ScriptInfo(script_path=script_path, 
-                      relative_path=relative_script_path, 
-                      oid=git_blob_sha1)
+                      relative_path=relative_script_path,
+                      oid=git_blob_sha1,
+                      text=text)
     return result
 
 def read_as_trimmed_string(file_path):
@@ -1012,22 +1017,20 @@ class UpdateCommand (BaseCommand):
             print(f"No changed repeatable scripts found for (re)installation.")       
             return
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
-        print(f"Found {len(scripts_to_repeat)} scripts to re-run")
+        script_infos = [
+            get_script_info(scripts_dir, s, decode_and_store_text=True, 
+                            encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) 
+                            for s in scripts_to_repeat]
+        print(f"Found {len(script_infos)} scripts to re-run")
         print(f"Apply repeatable scripts...")       
         with self.dbconn.cursor() as cur:
-            for script_path in scripts_to_repeat:
-                relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-                with open(script_path, 'rb') as f:
-                    script_bytes = f.read()
-                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                short_sha = git_blob_sha1[:8]
-                print(f"Running script: [{relative_script_path} (OID: {short_sha})]...")
-                script_text = script_bytes.decode(self.file_read_encoding, errors=self.file_read_encoding_errors)
+            for i in script_infos:
+                print(f"Running script: {i!r}...")
                 cur.execute("BEGIN")
-                cur.execute(script_text)
-                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
-                                                schema_name=self.get_schema_name())                                  
-                cur.execute(formatted_sql, (git_blob_sha1, target_version, str(relative_script_path)))     
+                cur.execute(i.text)
+                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path})", 
+                                                schema_name=self.get_schema_name(), git_blob_sha1=i.oid, version_id=target_version, relative_path=i.relative_path)                                  
+                cur.execute(formatted_sql, [])     
                 cur.execute("COMMIT")
                 print(f"Committed.")
         print(f"The repeatable scripts were applied.")       
