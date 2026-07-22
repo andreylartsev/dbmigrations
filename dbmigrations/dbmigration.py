@@ -136,7 +136,7 @@ def read_as_trimmed_string(file_path):
                 return trimmed_str
     raise CommandError(f"The file '{file_path}' must not be empty")
 
-def resolve_relative_script_path(self, start_path, depth_within_base_dir, path_str):
+def resolve_relative_script_path(start_path, depth_within_base_dir, path_str):
     if not path_str.startswith("@"):
         raise CommandError(f"The relative environment path must start with @ symbol, but '{path_str}' was found")
     start = path_str.find("@") + 1
