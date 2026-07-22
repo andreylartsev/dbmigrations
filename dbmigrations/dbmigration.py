@@ -136,6 +136,32 @@ def read_as_trimmed_string(file_path):
                 return trimmed_str
     raise CommandError(f"The file '{file_path}' must not be empty")
 
+def resolve_relative_script_path(self, start_path, depth_within_base_dir, path_str):
+    if not path_str.startswith("@"):
+        raise CommandError(f"The relative environment path must start with @ symbol, but '{path_str}' was found")
+    start = path_str.find("@") + 1
+    end = path_str.find(os.path.sep, start)
+    if end == -1:
+        end = path_str.find("/", start)
+        if end == -1:
+            script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
+            raise CommandError(f"No path separator found after environment name in path '{path_str}' specified in file '{script_list_file_path}'.")
+    env_name = path_str[start:end]
+    script_sub_path = path_str[end + 1:]
+    result = start_path
+    # walk back
+    for i in range(depth_within_base_dir + 1):
+        result = result.joinpath("..")
+    # add a referencing env name
+    result = result.joinpath(env_name)
+    # walk forward
+    last_parts = start_path.parts[-depth_within_base_dir:]
+    for part in last_parts:
+        result = result.joinpath(part)
+    # add extra path specified after env name
+    result = result.joinpath(script_sub_path)
+    return result
+
 def log_server_notices(diag):
     print(f"Server: {diag.severity} - {diag.message_primary}")
 
@@ -333,41 +359,7 @@ class BaseCommand:
         if tool_name not in tools_config:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
         return tool_name
-    
-    def script_path_for_log(self, scripts_dir, script_path):
-        dir = pathlib.Path(scripts_dir).parent.resolve()
-        file = pathlib.Path(script_path).resolve()
-        if file.is_relative_to(dir):
-            result = file.relative_to(dir)
-        else:
-            result = script_path
-        return result.as_posix()
 
-    def resolve_relative_script_path(self, start_path, depth_within_base_dir, path_str):
-        if not path_str.startswith("@"):
-            raise CommandError(f"The relative environment path must start with @ symbol, but '{path_str}' was found")
-        start = path_str.find("@") + 1
-        end = path_str.find(os.path.sep, start)
-        if end == -1:
-            end = path_str.find("/", start)
-            if end == -1:
-                script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
-                raise CommandError(f"No path separator found after environment name in path '{path_str}' specified in file '{script_list_file_path}'.")
-        env_name = path_str[start:end]
-        script_sub_path = path_str[end + 1:]
-        result = start_path
-        # walk back
-        for i in range(depth_within_base_dir + 1):
-            result = result.joinpath("..")
-        # add a referencing env name
-        result = result.joinpath(env_name)
-        # walk forward
-        last_parts = start_path.parts[-depth_within_base_dir:]
-        for part in last_parts:
-            result = result.joinpath(part)
-        # add extra path specified after env name
-        result = result.joinpath(script_sub_path)
-        return result
 
     def get_script_dependencies(self, base_dir, depth_within_base_dir, script_path):
         if not script_path.exists():
@@ -383,7 +375,7 @@ class BaseCommand:
                 if match: 
                     found_match = match.group(1)
                     if found_match.startswith("@"):
-                        dependency_path = self.resolve_relative_script_path(base_dir, depth_within_base_dir, found_match)
+                        dependency_path = resolve_relative_script_path(base_dir, depth_within_base_dir, found_match)
                         result_list.append(dependency_path)
                     else:
                         dependency_path = start_path.joinpath(found_match)
@@ -456,7 +448,7 @@ class BaseCommand:
                         print(f"Skip: {trimmed_str}")
                         continue
                     if trimmed_str.startswith("@"):
-                        script_path = self.resolve_relative_script_path(base_dir, depth_within_base_dir, trimmed_str)
+                        script_path = resolve_relative_script_path(base_dir, depth_within_base_dir, trimmed_str)
                     else:
                         script_path = start_path.joinpath(trimmed_str)
                     script_name = script_path.name
