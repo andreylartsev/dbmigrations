@@ -26,7 +26,7 @@ def setup_database_session():
     )
     
     # Verify that the schema was recreated successfully before running any test dependencies
-    assert result.returncode == 1, f"Database schema preparation failed: {result.stderr}"
+    assert result.returncode == 0, f"Database schema preparation failed: {result.stderr}"
     assert "DROP SCHEMA" in result.stdout
     assert "CREATE SCHEMA" in result.stdout
     

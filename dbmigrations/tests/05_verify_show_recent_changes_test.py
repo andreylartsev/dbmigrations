@@ -15,8 +15,9 @@ def test_dbmigration_verify_success():
         PYTHON_EXE,
         str(DBMIGRATION_PY_PATH),
         "verify",
-        "test3",                         # Target schema 'test3' from console
-        str(target_sample_path)
+        TARGET_SCHEMA,                         # Target schema 'test3' from console
+        str(target_sample_path),
+        "--dbenv", DB_ENV              # Assuming you still need --dbenv in your test setup
     ]
     
     # Run the database migration script in verify mode

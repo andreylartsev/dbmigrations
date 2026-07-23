@@ -15,7 +15,7 @@ def test_dbmigration_force_reapply_latest_success():
         PYTHON_EXE,
         str(DBMIGRATION_PY_PATH),
         "update",
-        "test3",                         # Using target schema 'test3' from console
+        TARGET_SCHEMA,                         # Using target schema 'test3' from console
         str(target_sample_path),
         "--dbenv", DB_ENV,              # Assuming you still need --dbenv in your test setup
         "--skip-confirmation",
