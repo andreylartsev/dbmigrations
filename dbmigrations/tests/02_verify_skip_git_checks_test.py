@@ -4,7 +4,7 @@ import pytest
 # Import predefined paths and variables from the private configuration module
 from _config import DBMIGRATION_PY_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
 
-def test_dbmigration_verify_success():
+def test_dbmigration_verify_skip_git_checks_success():
     """Test checks the successful verification of the migration scripts via the verify subcommand."""
     
     # Construct the path to the specific samples folder

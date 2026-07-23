@@ -1360,7 +1360,7 @@ class VerifyCommand (BaseCommand):
         )
 
         for (date, author, sha, message), files in sorted_commits:
-            print(f"[{sha}] {date} — {message}")
+            print(f"[{sha}] {date} - {message}")
             print(f"  Author: {author}")
             for f, oid in files:
                 print(f"    [{f.as_posix()} (OID: {oid})]")                
@@ -1494,7 +1494,7 @@ class VerifyCommand (BaseCommand):
             reverse=True
         )
         for (date, author, sha, message), scripts in sorted_commits:
-            print(f"[{sha}] {date} — {message}")
+            print(f"[{sha}] {date} - {message}")
             print(f"  Author: {author}")
             for s in scripts:
                 print(f"     [{s['applied_at']:<19} | {s['version']:<6} | {s['path']} (OID: {s['oid']})]")

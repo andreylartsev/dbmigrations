@@ -39,19 +39,19 @@ dbenvs = toml_config[DBENVS_CONFIG_GROUP]
 
 assert DB_ENV in dbenvs, f"There is no configuration group '{DBENVS_CONFIG_GROUP}.{DB_ENV}' within the configuration file '{TOML_CONFIG_FILE}'."
 
-dbenv_config = dbenvs[DB_ENV]
+DBCONN_CONFIG = dbenvs[DB_ENV]
 
-# Optional attributes
-RUN_TESTS_BY = dbenv_config.get(RUN_TESTS_BY_ATTRIBUTE, None)
-NO_PASSWORD = dbenv_config.get(NO_PASSWORD_ATTRIBUTE, False)
+# Get and remove optional attributes so that DBCONN_CONFIG is usable with psycopg.connect()
+RUN_TESTS_BY = DBCONN_CONFIG.pop(RUN_TESTS_BY_ATTRIBUTE, None)
+NO_PASSWORD = DBCONN_CONFIG.pop(NO_PASSWORD_ATTRIBUTE, False)
 
 SAMPLES_PATH = TESTS_DIR.parent.joinpath("samples")
 
 # Database connection settings
-DB_USER = dbenv_config["user"]
-DB_NAME = dbenv_config["dbname"]
-DB_HOST = dbenv_config["host"]
-DB_PORT = dbenv_config["port"]
+DB_USER = DBCONN_CONFIG["user"]
+DB_NAME = DBCONN_CONFIG["dbname"]
+DB_HOST = DBCONN_CONFIG["host"]
+DB_PORT = DBCONN_CONFIG["port"]
 
 # Target schema to recreate
 TARGET_SCHEMA = "test3"
