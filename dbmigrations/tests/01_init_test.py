@@ -2,7 +2,7 @@ import subprocess
 import re
 import pytest
 # Import predefined paths and variables from the private configuration module
-from _config import DBMIGRATION_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
+from _config import DBMIGRATION_PY_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
 
 def test_dbmigration_init_success():
     """Test checks the successful migration structure initialization using the --dbenv flag."""
@@ -13,7 +13,7 @@ def test_dbmigration_init_success():
     # Construct the CLI command using variables from the configuration file
     command = [
         PYTHON_EXE,
-        str(DBMIGRATION_PATH),
+        str(DBMIGRATION_PY_PATH),
         "init",
         TARGET_SCHEMA,
         str(target_sample_path),
@@ -29,9 +29,12 @@ def test_dbmigration_init_success():
     )
     
     # Print tool output execution logs for manual check inside pytest -v -s
-    print("\n=== MIGRATION INIT OUTPUT ===")
-    print("STDOUT:", result.stdout)
-    print("STDERR:", result.stderr)
+    # Print outputs for manual verification via pytest -v -s
+    print("=== STDOUT ===")
+    print(result.stdout)
+    print("=== STDERR ===")
+    print(result.stderr)
+
     
     # 1. Verify the process exit code status (0 means success)
     assert result.returncode == 0, f"Script execution failed with error: {result.stderr}"
