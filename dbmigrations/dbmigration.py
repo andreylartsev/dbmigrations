@@ -515,7 +515,7 @@ class BaseCommand:
         else:
             return attr.decode('utf-8')
 
-    def dbconn_get_connection_str(self, dbconn):
+    def dbconn_get_connection_string(self, dbconn):
         info = dbconn.pgconn
         result = f"{self.dbconn_attr_as_utf_8(info.user)}@{self.dbconn_attr_as_utf_8(info.host)}:{self.dbconn_attr_as_utf_8(info.port)}/{self.dbconn_attr_as_utf_8(info.db)}"
         return result
@@ -788,7 +788,7 @@ class BaseCommand:
         except psycopg.Error as pg_error:
             error_message = str(pg_error)
             raise CommandError(f"Unable to establish connection to database server. Inner error: {error_message}")
-        print(f"Opened db connection: '{self.dbconn_get_connection_str(self.dbconn)}'")
+        print(f"Opened db connection: '{self.dbconn_get_connection_string(self.dbconn)}'")
         self.dbconn.add_notice_handler(log_server_notices)
         self.dbconn.autocommit = True 
         return self
