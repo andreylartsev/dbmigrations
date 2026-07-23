@@ -1,47 +1,52 @@
 import subprocess
-import sys
 import re
 import pytest
-
-PYTHON_EXE = sys.executable
-SCRIPT_PATH = r"./../dbmigration.py"
-SAMPLE_PATH = r"./../samples/test1/"
+# Import predefined paths and variables from the private configuration module
+from _config import DBMIGRATION_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
 
 def test_dbmigration_init_success():
-    """Тест проверяет успешную инициализацию структуры миграций в схеме test3."""
+    """Test checks the successful migration structure initialization using the --dbenv flag."""
     
-    # Формируем команду на основе вашего вывода
+    # Construct the path to the specific samples folder
+    target_sample_path = SAMPLES_PATH.joinpath("test1")
+    
+    # Construct the CLI command using variables from the configuration file
     command = [
         PYTHON_EXE,
-        SCRIPT_PATH,
+        str(DBMIGRATION_PATH),
         "init",
-        "test3",
-        SAMPLE_PATH
+        TARGET_SCHEMA,
+        str(target_sample_path),
+        "--dbenv", DB_ENV
     ]
     
-    # Запускаем скрипт миграций
+    # Run the database migration script
     result = subprocess.run(
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8"  # Важно для корректного чтения строк
+        encoding="utf-8-sig"  # Handles Windows console BOM character matching properly
     )
     
-    # 1. Проверяем код возврата (0 — успех)
-    assert result.returncode == 0, f"Скрипт завершился с ошибкой: {result.stderr}"
+    # Print tool output execution logs for manual check inside pytest -v -s
+    print("\n=== MIGRATION INIT OUTPUT ===")
+    print("STDOUT:", result.stdout)
+    print("STDERR:", result.stderr)
     
-    # 2. Проверяем статические строки вывода (stdout)
+    # 1. Verify the process exit code status (0 means success)
+    assert result.returncode == 0, f"Script execution failed with error: {result.stderr}"
+    
+    # 2. Verify dynamic database connection string format output log via regex match
     db_conn_pattern = r"Opened db connection: '\S+@\S+:\d+/\S+'"
-
     assert re.search(db_conn_pattern, result.stdout) is not None, \
-        f"Строка подключения к БД не найдена или имеет неверный формат в выводе: {result.stdout}"
+        f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
-    #assert "Opened db connection: 'postgres@localhost:5432/test1'" in result.stdout
-    assert "Set session search path to 'test3'." in result.stdout
+    # 3. Verify standard static output application log statements
+    assert f"Set session search path to '{TARGET_SCHEMA}'." in result.stdout
     assert "Created." in result.stdout
     assert "Closed db connection." in result.stdout
     
-    # 3. Проверяем динамическую строку с UUID через регулярное выражение
-    # Паттерн ищет текст создания таблиц и валидный UUID формат (8-4-4-4-12 символов)
+    # 4. Verify version control environment ID dynamically using the UUID pattern structure
     uuid_pattern = r"Creating the version control tables with environment ID: '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}'"
-    assert re.search(uuid_pattern, result.stdout) is not None, "Строка с UUID среды не найдена или формат UUID неверный"
+    assert re.search(uuid_pattern, result.stdout) is not None, \
+        "Environment tracking ID was not found or its UUID syntax format is invalid"

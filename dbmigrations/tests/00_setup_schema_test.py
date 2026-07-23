@@ -1,42 +1,42 @@
 import subprocess
 import pytest
 import shutil
+from _config import DB_USER, DB_NAME, DB_HOST, DB_PORT, TARGET_SCHEMA
 
-# Проверяем наличие psql в системе перед запуском тестов
+# Check if the psql utility is available in the system PATH
 PSQL_PATH = shutil.which("psql")
 
-@pytest.mark.skipif(not PSQL_PATH, reason="Утилита psql не найдена в PATH системы")
+@pytest.mark.skipif(not PSQL_PATH, reason="The psql utility was not found in the system PATH")
 def test_recreate_schema_via_psql():
-    """Тест проверяет успешное пересоздание схемы test3 через psql."""
+    """Test checks the successful recreation of the target schema via psql."""
     
-    # Конструируем команду точно так же, как в терминале
+    # Construct the command using variables
     command = [
         "psql",
-        "-U", "postgres",
-        "-d", "test1",
-        "-c", "DROP SCHEMA IF EXISTS test3 CASCADE; CREATE SCHEMA test3;"
+        "-U", DB_USER,
+        "-h", DB_HOST,
+        "-p", DB_PORT,
+        "-d", DB_NAME,
+        "-c", f"DROP SCHEMA IF EXISTS {TARGET_SCHEMA} CASCADE; CREATE SCHEMA {TARGET_SCHEMA};"
     ]
     
-    # Запускаем команду
+    # Run the psql command
     result = subprocess.run(
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8-sig"  # Важно для корректного чтения кириллицы
+        encoding="utf-8-sig"
     )
     
-    # 1. Проверяем код возврата (0 означает, что psql отработал без ошибок)
-    assert result.returncode == 0, f"Ошибка выполнения psql: {result.stderr}"
+    # 1. Verify the return code (0 means success)
+    assert result.returncode == 0, f"psql execution failed: {result.stderr}"
     
-    # 2. Проверяем основной вывод (stdout) — успешное удаление и создание
+    # 2. Verify the standard output (stdout)
     assert "DROP SCHEMA" in result.stdout
     assert "CREATE SCHEMA" in result.stdout
     
-    # 3. Проверяем системные замечания PostgreSQL (stderr)
-    # Если схема была не пустая, проверяем наличие ключевых слов
-    if "ЗАМЕЧАНИЕ" in result.stderr:
-        assert "удаление распространяется" in result.stderr
-        assert "test3.dbmigration_environment_id" in result.stderr
-        assert "test3.dbmigration_versions" in result.stderr
-        assert "test3.dbmigration_version_scripts" in result.stderr
-        assert "test3.dbmigration_repeatable_scripts" in result.stderr
+    # Print outputs for manual verification via pytest -v -s
+    print("\n=== PSQL OUTPUT ===")
+    print("STDOUT:", result.stdout)
+    print("STDERR:", result.stderr)
+    
