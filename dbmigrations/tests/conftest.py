@@ -5,6 +5,8 @@ from typing import NamedTuple, Any, Dict
 import pytest
 import psycopg  
 
+DEFAULT_TARGET_SCHEMA_NAME = "test3"
+
 # 1. Define the Immutable Configuration Structure
 class TestConfig(NamedTuple):
     DB_USER: str | None
@@ -21,9 +23,17 @@ class TestConfig(NamedTuple):
     RUN_TESTS_BY: Any
     NO_PASSWORD: bool
 
+def pytest_addoption(parser):
+    """Add custom named option to pytest."""
+    parser.addoption(
+        "--schema",
+        action="store",
+        default=DEFAULT_TARGET_SCHEMA_NAME, 
+        help="Target database schema to recreate and test"
+    )
 
 # 2. Config Loader Function
-def load_config_parameters() -> TestConfig:
+def load_config_parameters(target_schema) -> TestConfig:
     """Reads the TOML file and runtime environment to build the AppConfig named tuple."""
     python_exe = sys.executable
 
@@ -60,7 +70,7 @@ def load_config_parameters() -> TestConfig:
     # Shallow copy the dict to prevent mutating the original TOML structure on subsequent calls
     dbconn_config = dbenvs[db_env].copy()
 
-    print(f"load_config_parameters: {dbconn_config=}")
+    #print(f"load_config_parameters: {dbconn_config=}")
 
     # Get and remove optional attributes so that DBCONN_CONFIG is usable with psycopg.connect()
     run_tests_by = dbconn_config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
@@ -73,9 +83,6 @@ def load_config_parameters() -> TestConfig:
     db_name = dbconn_config.get("dbname", "postgres")
     db_host = dbconn_config.get("host", None)
     db_port = dbconn_config.get("port", None)
-
-    # Target schema to recreate
-    target_schema = "test3"
 
     return TestConfig(
         DB_USER=db_user,
@@ -96,10 +103,11 @@ def load_config_parameters() -> TestConfig:
 
 # 3. Pytest Fixture providing the NamedTuple to tests
 @pytest.fixture(scope="session")
-def cfg() -> TestConfig:
+def cfg(request) -> TestConfig:
     """Provides a session-wide named tuple instance containing all settings."""
-    return load_config_parameters()
-
+    schema_from_cli = request.config.getoption("--schema")
+    return load_config_parameters(target_schema=schema_from_cli)
+ 
 
 # 4. Session Setup Fixture
 @pytest.fixture(scope="session", autouse=True)
@@ -109,8 +117,12 @@ def setup_database_session(cfg: TestConfig):
     with psycopg.connect(**cfg.DBCONN_CONFIG) as conn:
         conn.autocommit = True  
         with conn.cursor() as cur:
-            cur.execute(f"DROP SCHEMA IF EXISTS {cfg.TARGET_SCHEMA} CASCADE;")
-            cur.execute(f"CREATE SCHEMA {cfg.TARGET_SCHEMA};")
+            cur.execute(
+                psycopg.sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE;").format(psycopg.sql.Identifier(cfg.TARGET_SCHEMA))
+            )
+            cur.execute(
+                psycopg.sql.SQL("CREATE SCHEMA {};").format(psycopg.sql.Identifier(cfg.TARGET_SCHEMA))
+            )
             
     print(f"\n[SESSION SETUP] Target schema '{cfg.TARGET_SCHEMA}' has been successfully recreated via psycopg.")
     yield

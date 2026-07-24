@@ -41,7 +41,7 @@ def test_dbmigration_verify_success(cfg):
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify target schema setup and verification initialization logs
-    assert "Set session search path to 'test3'." in result.stdout
+    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     assert "Performing a cross-check for consistency" in result.stdout
     assert "Completed." in result.stdout

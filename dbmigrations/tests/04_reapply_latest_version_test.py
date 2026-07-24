@@ -43,7 +43,7 @@ def test_dbmigration_force_reapply_latest_success(cfg):
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify target schema setup and reapply initialization logs
-    assert "Set session search path to 'test3'." in result.stdout
+    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Performing reapply latest version from scripts repository:" in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     
