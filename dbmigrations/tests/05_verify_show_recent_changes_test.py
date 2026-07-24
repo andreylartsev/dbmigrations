@@ -1,23 +1,20 @@
 import subprocess
 import re
-import pytest
-# Import predefined paths and variables from the private configuration module
-from _config import DBMIGRATION_PY_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
 
-def test_dbmigration_verify_success():
+def test_dbmigration_verify_success(cfg):
     """Test checks the successful execution of the verify subcommand and its changelog output structure."""
     
     # Construct the path to the specific samples folder
-    target_sample_path = SAMPLES_PATH.joinpath("test1")
+    target_sample_path = cfg.SAMPLES_PATH.joinpath("test1")
     
     # Construct the CLI command for the verify action
     command = [
-        PYTHON_EXE,
-        str(DBMIGRATION_PY_PATH),
+        cfg.PYTHON_EXE,
+        str(cfg.DBMIGRATION_PY_PATH),
         "verify",
-        TARGET_SCHEMA,                         # Target schema 'test3' from console
+        cfg.TARGET_SCHEMA,                         # Target schema 'test3' from console
         str(target_sample_path),
-        "--dbenv", DB_ENV              # Assuming you still need --dbenv in your test setup
+        "--dbenv", cfg.DB_ENV              # Assuming you still need --dbenv in your test setup
     ]
     
     # Run the database migration script in verify mode

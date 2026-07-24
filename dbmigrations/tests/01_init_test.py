@@ -1,23 +1,20 @@
 import subprocess
 import re
-import pytest
-# Import predefined paths and variables from the private configuration module
-from _config import DBMIGRATION_PY_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
 
-def test_dbmigration_init_success():
+def test_dbmigration_init_success(cfg):
     """Test checks the successful migration structure initialization using the --dbenv flag."""
     
     # Construct the path to the specific samples folder
-    target_sample_path = SAMPLES_PATH.joinpath("test1")
+    target_sample_path = cfg.SAMPLES_PATH.joinpath("test1")
     
     # Construct the CLI command using variables from the configuration file
     command = [
-        PYTHON_EXE,
-        str(DBMIGRATION_PY_PATH),
+        cfg.PYTHON_EXE,
+        str(cfg.DBMIGRATION_PY_PATH),
         "init",
-        TARGET_SCHEMA,
+        cfg.TARGET_SCHEMA,
         str(target_sample_path),
-        "--dbenv", DB_ENV
+        "--dbenv", cfg.DB_ENV
     ]
     
     # Run the database migration script
@@ -45,7 +42,7 @@ def test_dbmigration_init_success():
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify standard static output application log statements
-    assert f"Set session search path to '{TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Created." in result.stdout
     assert "Closed db connection." in result.stdout
     

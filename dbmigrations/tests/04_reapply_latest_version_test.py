@@ -1,23 +1,20 @@
 import subprocess
 import re
-import pytest
-# Import predefined paths and variables from the private configuration module
-from _config import DBMIGRATION_PY_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
 
-def test_dbmigration_force_reapply_latest_success():
+def test_dbmigration_force_reapply_latest_success(cfg):
     """Test checks the successful execution of the update subcommand with --force-reapply-latest-version flag."""
     
     # Construct the path to the specific samples folder
-    target_sample_path = SAMPLES_PATH.joinpath("test1")
+    target_sample_path = cfg.SAMPLES_PATH.joinpath("test1")
     
     # Construct the CLI command using the exact parameter structure from your console output
     command = [
-        PYTHON_EXE,
-        str(DBMIGRATION_PY_PATH),
+        cfg.PYTHON_EXE,
+        str(cfg.DBMIGRATION_PY_PATH),
         "update",
-        TARGET_SCHEMA,                         # Using target schema 'test3' from console
+        cfg.TARGET_SCHEMA,                         # Using target schema 'test3' from console
         str(target_sample_path),
-        "--dbenv", DB_ENV,              # Assuming you still need --dbenv in your test setup
+        "--dbenv", cfg.DB_ENV,              # Assuming you still need --dbenv in your test setup
         "--skip-confirmation",
         "--force-reapply-latest-version" # New flag under test
     ]

@@ -1,23 +1,20 @@
 import subprocess
 import re
-import pytest
-# Import predefined paths and variables from the private configuration module
-from _config import DBMIGRATION_PY_PATH, SAMPLES_PATH, PYTHON_EXE, TARGET_SCHEMA, DB_ENV
 
-def test_dbmigration_update_success():
+def test_dbmigration_update_success(cfg):
     """Test checks the successful execution of the update subcommand with database modifications."""
     
     # Construct the path to the specific samples folder
-    target_sample_path = SAMPLES_PATH.joinpath("test1")
+    target_sample_path = cfg.SAMPLES_PATH.joinpath("test1")
     
     # Construct the CLI command for the update action using your exact parameter structure
     command = [
-        PYTHON_EXE,
-        str(DBMIGRATION_PY_PATH),
+        cfg.PYTHON_EXE,
+        str(cfg.DBMIGRATION_PY_PATH),
         "update",
-        TARGET_SCHEMA,
+        cfg.TARGET_SCHEMA,
         str(target_sample_path),
-        "--dbenv", DB_ENV,
+        "--dbenv", cfg.DB_ENV,
         "--skip-confirmation"
     ]
     
@@ -47,7 +44,7 @@ def test_dbmigration_update_success():
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify target schema setup and initial consistency checks logs
-    assert f"Set session search path to '{TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Performing updates from scripts repository:" in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     assert "Completed." in result.stdout
