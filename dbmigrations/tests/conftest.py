@@ -1,21 +1,19 @@
 import sys
-import shutil
 import tomllib
 from pathlib import Path
 from typing import NamedTuple, Any, Dict
-import subprocess
 import pytest
+import psycopg  
 
 # 1. Define the Immutable Configuration Structure
 class TestConfig(NamedTuple):
-    DB_USER: str
+    DB_USER: str | None
     DB_NAME: str
-    DB_HOST: str
-    DB_PORT: int
+    DB_HOST: str | None
+    DB_PORT: int | None
     TARGET_SCHEMA: str
     DB_ENV: str
     PYTHON_EXE: str
-    PSQL_EXE: Path
     DBMIGRATION_PY_PATH: Path
     TESTS_DIR: Path
     SAMPLES_PATH: Path
@@ -29,17 +27,14 @@ def load_config_parameters() -> TestConfig:
     """Reads the TOML file and runtime environment to build the AppConfig named tuple."""
     python_exe = sys.executable
 
-    psql_exe_str = shutil.which("psql")
-    assert psql_exe_str, "psql utility not found"
-    psql_exe = Path(psql_exe_str)
-    assert psql_exe.exists(), "psql utility does not exist"
-
     tests_dir = Path(__file__).parent
     dbmigration_py = "dbmigration.py"
     dbmigration_py_path = tests_dir.parent / dbmigration_py
 
     toml_config_file = "dbmigration.toml"
     toml_config_path = tests_dir.parent / toml_config_file
+
+    assert toml_config_path.exists(), f"TOML {toml_config_path} configuration file does not exists"
 
     with open(toml_config_path, 'rb') as f:
         toml_config = tomllib.load(f)
@@ -65,6 +60,8 @@ def load_config_parameters() -> TestConfig:
     # Shallow copy the dict to prevent mutating the original TOML structure on subsequent calls
     dbconn_config = dbenvs[db_env].copy()
 
+    print(f"load_config_parameters: {dbconn_config=}")
+
     # Get and remove optional attributes so that DBCONN_CONFIG is usable with psycopg.connect()
     run_tests_by = dbconn_config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
     no_password = dbconn_config.pop(NO_PASSWORD_ATTRIBUTE, False)
@@ -72,10 +69,10 @@ def load_config_parameters() -> TestConfig:
     samples_path = tests_dir.parent.joinpath("samples")
 
     # Database connection settings
-    db_user = dbconn_config["user"]
-    db_name = dbconn_config["dbname"]
-    db_host = dbconn_config["host"]
-    db_port = dbconn_config["port"]
+    db_user = dbconn_config.get("user", None)
+    db_name = dbconn_config.get("dbname", "postgres")
+    db_host = dbconn_config.get("host", None)
+    db_port = dbconn_config.get("port", None)
 
     # Target schema to recreate
     target_schema = "test3"
@@ -84,11 +81,10 @@ def load_config_parameters() -> TestConfig:
         DB_USER=db_user,
         DB_NAME=db_name,
         DB_HOST=db_host,
-        DB_PORT=int(db_port),
+        DB_PORT=int(db_port) if db_port is not None else None,
         TARGET_SCHEMA=target_schema,
         DB_ENV=db_env,
         PYTHON_EXE=python_exe,
-        PSQL_EXE=psql_exe,
         DBMIGRATION_PY_PATH=dbmigration_py_path,
         TESTS_DIR=tests_dir,
         SAMPLES_PATH=samples_path,
@@ -107,29 +103,14 @@ def cfg() -> TestConfig:
 
 # 4. Session Setup Fixture
 @pytest.fixture(scope="session", autouse=True)
-def setup_database_session():
+def setup_database_session(cfg: TestConfig):
     """Recreates the target database schema exactly ONCE before the entire test suite starts."""
-    cfg = load_config_parameters()
     
-    command = [
-        str(cfg.PSQL_EXE),
-        "-U", cfg.DB_USER,
-        "-h", cfg.DB_HOST,
-        "-p", str(cfg.DB_PORT),
-        "-d", cfg.DB_NAME,
-        "-c", f"DROP SCHEMA IF EXISTS {cfg.TARGET_SCHEMA} CASCADE; CREATE SCHEMA {cfg.TARGET_SCHEMA};"
-    ]
-    
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        encoding="utf-8-sig"
-    )
-    
-    assert result.returncode == 0, f"Database schema preparation failed: {result.stderr}"
-    assert "DROP SCHEMA" in result.stdout
-    assert "CREATE SCHEMA" in result.stdout
-    
-    print(f"\n[SESSION SETUP] Target schema '{cfg.TARGET_SCHEMA}' has been successfully recreated via psql.")
+    with psycopg.connect(**cfg.DBCONN_CONFIG) as conn:
+        conn.autocommit = True  
+        with conn.cursor() as cur:
+            cur.execute(f"DROP SCHEMA IF EXISTS {cfg.TARGET_SCHEMA} CASCADE;")
+            cur.execute(f"CREATE SCHEMA {cfg.TARGET_SCHEMA};")
+            
+    print(f"\n[SESSION SETUP] Target schema '{cfg.TARGET_SCHEMA}' has been successfully recreated via psycopg.")
     yield
