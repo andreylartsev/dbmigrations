@@ -27,10 +27,10 @@ def test_dbmigration_run_tests_failure(cfg):
     )
     
     # Print outputs for manual verification via pytest -v -s
-    print("=== STDOUT ===")
-    print(result.stdout)
+    print("\n=== STDOUT ===")
+    print(result.stdout or "EMPTY")
     print("=== STDERR ===")
-    print(result.stderr)
+    print(result.stderr or "EMPTY")
 
     # 1. Verify the process exit code status (Should be non-zero because tests failed)
     assert result.returncode != 0, "Script was expected to fail, but exit code is 0"

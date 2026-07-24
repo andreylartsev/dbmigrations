@@ -27,10 +27,10 @@ def test_dbmigration_init_success(cfg):
     
     # Print tool output execution logs for manual check inside pytest -v -s
     # Print outputs for manual verification via pytest -v -s
-    print("=== STDOUT ===")
-    print(result.stdout)
+    print("\n=== STDOUT ===")
+    print(result.stdout or "EMPTY")
     print("=== STDERR ===")
-    print(result.stderr)
+    print(result.stderr or "EMPTY")
 
     
     # 1. Verify the process exit code status (0 means success)

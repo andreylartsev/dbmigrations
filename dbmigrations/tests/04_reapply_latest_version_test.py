@@ -29,10 +29,10 @@ def test_dbmigration_force_reapply_latest_success(cfg):
     )
     
     # Print outputs for manual verification via pytest -v -s
-    print("=== STDOUT ===")
-    print(result.stdout)
+    print("\n=== STDOUT ===")
+    print(result.stdout or "EMPTY")
     print("=== STDERR ===")
-    print(result.stderr)
+    print(result.stderr or "EMPTY")
 
     # 1. Verify the process exit code status
     assert result.returncode == 0, f"Script execution failed with error: {result.stderr}"
