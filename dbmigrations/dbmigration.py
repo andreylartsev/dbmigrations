@@ -1470,16 +1470,12 @@ class VerifyCommand (BaseCommand):
         commits_group = collections.defaultdict(list)
 
         for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
-
             clean_oid = git_blob_sha1.strip()
             commit_info = self.get_oid_commit_history(git_cmd_path, resolved_git_root_path, clean_oid)
-
             if not commit_info:
-                raise CommandError(f"Unable to find commit history for git sha1 {clean_oid}")
-            
-            msg_first_line = commit_info["message"].split('\n')[0].strip()
-            commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_first_line)
-                
+                raise CommandError(f"Unable to find commit history for git sha1 {clean_oid}")            
+            msg_clean = " ".join(line.strip() for line in commit_info["message"].splitlines() if line.strip())
+            commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_clean)                
             commits_group[commit_key].append({
                 "path": relative_path,
                 "type": script_type,
