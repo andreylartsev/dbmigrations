@@ -127,9 +127,9 @@ def get_script_info(scripts_dir, script_path, decode_and_store_text = False, enc
     if decode_and_store_text:
         text = script_bytes.decode(encoding, encoding_errors)
     result = ScriptInfo(script_path=script_path, 
-                      relative_path=relative_script_path,
-                      oid=git_blob_sha1,
-                      text=text)
+                    relative_path=relative_script_path,
+                    oid=git_blob_sha1,
+                    text=text)
     return result
 
 class CommitInfo(NamedTuple):
@@ -216,6 +216,598 @@ def get_char():
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return char
+
+class GitChecker:
+    
+    def __init__(self, cmd_path : Path, repo_root: Path):
+        self.git_cmd_path = cmd_path
+        self.repo_root_dir = repo_root
+
+    @classmethod
+    def try_get_git_checker(cls, toml_config : dict, scripts_dir : Path) -> Self | None:
+        cmd_path = cls._try_get_git_cmd_path(toml_config)
+        if not cmd_path:
+            return None
+        repo_root = cls._try_get_git_repo_root(cmd_path, scripts_dir)
+        if not repo_root:
+            return None
+        return cls(
+            git_cmd_path=cmd_path,
+            repo_root_dir=repo_root
+        )
+
+    @staticmethod
+    def _try_get_git_cmd_path(toml_config):
+        if GIT_CMD_CONFIG_ATTRIBUTE in toml_config:
+            cmd_path_str = toml_config[GIT_CMD_CONFIG_ATTRIBUTE]
+            cmd_path = pathlib.Path(cmd_path_str)
+            if not cmd_path.exists():
+                raise CommandError(f"The git cmd specified in {GIT_CMD_CONFIG_ATTRIBUTE} of TOML config does not exist! Comment it out if you are not sure where it is in the system")
+            return cmd_path
+        else:
+            cmd_path_str = shutil.which("git")
+            if cmd_path_str is None:
+                return None
+            cmd_path = pathlib.Path(cmd_path_str)
+            return cmd_path
+
+    @staticmethod
+    def _try_get_git_repo_root(git_cmd_path : Path, scripts_dir : Path) -> Path | None:
+        assert git_cmd_path is not None
+        assert scripts_dir is not None
+
+        resolved_scripts_dir = pathlib.Path(scripts_dir).resolve()
+        if not resolved_scripts_dir.exists():
+            raise CommandError(f"The specified directory '{scripts_dir}' does not exist!")
+        if not resolved_scripts_dir.is_dir():
+            raise CommandError(f"The specified path '{scripts_dir}' is not a directory!")
+        
+        completed_process = subprocess.run(
+            [str(git_cmd_path), "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8-sig',
+            cwd=str(resolved_scripts_dir)
+        )
+        if completed_process.returncode != 0:
+            return None
+                
+        stdout_text = completed_process.stdout.strip() 
+        resolved_path = pathlib.Path(stdout_text).resolve()
+        return resolved_path
+
+    def get_batch_files_commit_history(
+        self, 
+        relative_file_paths: list[Path]
+    ) -> list[CommitInfo]:
+        
+        # Validation of input parameters to prevent hidden bugs and crashes
+        if not self.git_cmd_path or not self.git_cmd_path.exists():
+            raise ValueError(f"Invalid Git executable path: '{self.git_cmd_path}'")
+            
+        if not self.repo_root_dir or not self.repo_root_dir.is_dir():
+            raise ValueError(f"Invalid repository root directory: '{self.repo_root_dir}'")
+            
+        if not relative_file_paths:
+            return []
+
+        # Internal map for O(1) lookups during Git output parsing
+        result_map: dict[Path, CommitInfo] = {}
+        
+        # Normalize paths to POSIX format for cross-platform matching with Git output
+        search_paths_set = {p.as_posix() for p in relative_file_paths}
+        path_mapping = {p.as_posix(): p for p in relative_file_paths}
+
+        # =========================================================================
+        # STEP 1: Global status check for the entire repository (1 subprocess call)
+        # =========================================================================
+        completed_status_process = subprocess.run(
+            [str(self.git_cmd_path), "status", "--porcelain"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8-sig',
+            cwd=str(self.repo_root_dir)
+        )
+        if completed_status_process.returncode != 0:
+            raise CommandError("Unable to get batch git status")
+
+        if completed_status_process.stdout:
+            for line in completed_status_process.stdout.splitlines():
+                if len(line) < 4:
+                    continue
+                
+                status_code = line[:2]
+                # Convert the path from Git output to POSIX standard
+                git_file_path_str = Path(line[3:].strip('"')).as_posix()
+                
+                if git_file_path_str in search_paths_set:
+                    orig_path = path_mapping[git_file_path_str]
+                    
+                    if "??" in status_code:
+                        result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is untracked by Git")
+                    elif "M" in status_code or "R" in status_code:
+                        result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is modified")
+                    elif "A" in status_code:
+                        result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is added")
+                    elif "D" in status_code:
+                        result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is deleted")
+                    else:
+                        raise CommandError(f"Got unknown git status '{status_code}' for file '{orig_path}'")
+                    
+                    # Remove from further search since the status is determined
+                    search_paths_set.remove(git_file_path_str)
+
+        # EARLY RETURN: If all files had local changes, we can return immediately
+        if not search_paths_set:
+            return list(result_map.values())
+
+        # =========================================================================
+        # STEP 2: Safe dynamic chunked log query based on command-line length limits
+        # =========================================================================
+        clean_files_list = list(search_paths_set)
+        
+        # Windows command line limit for cmd.exe is 8191 chars. 
+        # We use 7000 as a safe limit including git executable and all flags.
+        MAX_CMD_LEN = 7000
+        
+        # Base command structure that will be reused
+        base_cmd = [
+            str(self.git_cmd_path), "log", 
+            "--format=COMMIT:%H|%an|%aI|%B", 
+            "--name-only", 
+            "--"
+        ]
+        # Calculate length of the base command if it were joined by spaces
+        base_cmd_len = sum(len(arg) + 1 for arg in base_cmd)
+        
+        current_chunk_args = []
+        current_chunk_len = base_cmd_len
+        
+        chunks = []
+        
+        # Dynamically group files into chunks based on characters length
+        for file_str in clean_files_list:
+            os_specific_path = str(path_mapping[file_str])
+            # +1 accounts for the space separator between arguments
+            arg_len = len(os_specific_path) + 1 
+
+            if base_cmd_len + arg_len > MAX_CMD_LEN:
+                raise ValueError(
+                    f"The file path is too long to be processed via CLI! "
+                    f"Length of command with this file ({base_cmd_len + arg_len} chars) "
+                    f"exceeds the safe limit of {MAX_CMD_LEN} chars. "
+                    f"Path: '{os_specific_path}'"
+                )
+            
+            if current_chunk_len + arg_len > MAX_CMD_LEN:
+                # If adding this file exceeds the limit, save current chunk and start a new one
+                if current_chunk_args:
+                    chunks.append(current_chunk_args)
+                current_chunk_args = [os_specific_path]
+                current_chunk_len = base_cmd_len + arg_len
+            else:
+                current_chunk_args.append(os_specific_path)
+                current_chunk_len += arg_len
+        
+        # Append the last remaining chunk
+        if current_chunk_args:
+            chunks.append(current_chunk_args)
+
+        # Process each dynamically sized chunk
+        for chunk_args in chunks:
+            cmd = base_cmd + chunk_args
+
+            completed_log_process = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding='utf-8-sig',
+                cwd=str(self.repo_root_dir)
+            )        
+            if completed_log_process.returncode != 0:
+                raise CommandError("Unable to get batch git log for a dynamic chunk")
+                
+            log_output = completed_log_process.stdout.strip()
+            if not log_output:
+                continue
+                
+            current_commit_parts = None
+            
+            # Parsing current chunk log output top-to-bottom
+            for line in log_output.splitlines():
+                line_stripped = line.strip()
+                if not line_stripped:
+                    continue
+                
+                if line_stripped.startswith("COMMIT:"):
+                    current_commit_parts = line_stripped[7:].split('|', 3)
+
+                    if len(current_commit_parts) != 4:
+                        raise CommandError(f"Unexpected git log format for file '{orig_path}'")                            
+                else:
+                    # Convert the path from Git output to POSIX standard
+                    file_name_norm = Path(line_stripped.strip('"')).as_posix()
+                    
+                    # The first appearance of the file in the log means it is its latest commit
+                    if file_name_norm in search_paths_set:
+                        orig_path = path_mapping[file_name_norm]
+                        if len(current_commit_parts) == 4:                            
+                            commit_oid, author, date_str, full_message = current_commit_parts
+                            single_line_message = " ".join(full_message.splitlines())
+                            commit_date = datetime.fromisoformat(date_str)
+                            result_map[orig_path] = CommitInfo(
+                                relative_path=orig_path, 
+                                oid=commit_oid, 
+                                author=author, 
+                                date=commit_date, 
+                                message=single_line_message
+                            )
+                            # Remove to ignore any older historical commits for this file
+                            search_paths_set.remove(file_name_norm)
+
+        # =========================================================================
+        # STEP 3: Handle files hidden inside .gitignore
+        # =========================================================================
+        # Files left in search_paths_set are clean but have no log history -> ignored
+        for remaining_file_str in search_paths_set:
+            orig_path = path_mapping[remaining_file_str]
+            result_map[orig_path] = CommitInfo.uncommitted(orig_path, "It seems the file is in .gitignore list")
+
+        return list(result_map.values())
+
+    def get_batch_commits_info(
+        self, 
+        oids: list[str]
+    ) -> list[CommitInfo]:
+        """
+        Batch queries commit metadata by their OIDs (hashes) using a single or chunked subprocess call.
+        
+        Args:
+            oids: A list of git commit hashes to inspect.
+            
+        Returns:
+            A list of CommitInfo objects corresponding to the input OIDs order.
+        """
+        # Validation of input parameters to prevent hidden bugs and crashes
+        if not self.git_cmd_path or not self.git_cmd_path.exists():
+            raise ValueError(f"Invalid Git executable path: '{self.git_cmd_path}'")
+        if not self.repo_root_dir or not self.repo_root_dir.is_dir():
+            raise ValueError(f"Invalid repository root directory: '{self.repo_root_dir}'")
+        if not oids:
+            return []
+
+        # Deduplicate OIDs to optimize the Git process payload
+        unique_oids = list(set(oids))
+        result_map: dict[str, CommitInfo] = {}
+
+        # Define maximum character limit for safe cross-platform CLI execution
+        MAX_CMD_LEN = 7000
+        
+        # Base command structure using --no-patch to avoid pulling heavy diff bodies into memory
+        base_cmd = [
+            str(self.git_cmd_path), "show", 
+            "--no-patch", 
+            "--format=COMMIT:%H|%an|%aI|%s"
+        ]
+        
+        # Dynamically distribute OIDs into chunks based on total CLI arguments length
+        chunks = self._build_oid_chunks(base_cmd, unique_oids, MAX_CMD_LEN)
+
+        # Execute the process for each safe chunk
+        for chunk_args in chunks:
+            cmd = base_cmd + chunk_args
+
+            completed_process = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding='utf-8-sig',
+                cwd=str(self.repo_root_dir)
+            )        
+            if completed_process.returncode != 0:
+                raise CommandError(f"Unable to execute git show for a dynamic chunk. Error: {completed_process.stderr.strip()}")
+                
+            log_output = completed_process.stdout.strip()
+            if not log_output:
+                continue
+                
+            # Parse structured output line by line
+            for line in log_output.splitlines():
+                line = line.strip()
+                if line.startswith("COMMIT:"):
+                    parts = line[7:].split('|', 3)
+                    if len(parts) == 4:
+                        oid = parts
+                        try:
+                            parsed_date = datetime.fromisoformat(parts)
+                        except (ValueError, IndexError):
+                            parsed_date = None
+
+                        result_map[oid] = CommitInfo(
+                            relative_path=None,  # Not bound to a specific file during global OID lookup
+                            oid=oid,
+                            author=parts,
+                            date=parsed_date,
+                            message=parts
+                        )
+
+        # Reconstruct the final list mapping back to the user's original request order and duplicates
+        final_results = []
+        for original_oid in oids:
+            if original_oid in result_map:
+                final_results.append(result_map[original_oid])
+            else:
+                # Fallback for invalid or missing commit OIDs
+                final_results.append(
+                    CommitInfo(
+                        relative_path=None,
+                        oid=original_oid,
+                        author=None,
+                        date=None,
+                        message="Commit OID not found in this repository"
+                    )
+                )
+
+        return final_results
+
+    def get_batch_files_commit_history_2(
+        self, 
+        relative_file_paths: list[Path]
+    ) -> list[CommitInfo]:
+        """
+        Batch queries the latest commit history or local modification status for a list of file paths.
+        
+        Args:
+            relative_file_paths: A list of repository-relative Path objects to check.
+            
+        Returns:
+            A list of CommitInfo objects representing the current status or last commit of each file.
+        """
+        # Validate inputs to avoid silent failures or dangerous subprocess invocations
+        self._validate_git_state(relative_file_paths)
+        if not relative_file_paths:
+            return []
+
+        result_map: dict[Path, CommitInfo] = {}
+        
+        # Standardize paths to POSIX format for bulletproof cross-platform string matching
+        search_paths_set = {p.as_posix() for p in relative_file_paths}
+        path_mapping = {p.as_posix(): p for p in relative_file_paths}
+
+        # =========================================================================
+        # STEP 1: Check local modifications & untracked files via Git Status
+        # =========================================================================
+        self._process_local_git_status(search_paths_set, path_mapping, result_map)
+
+        # EARLY RETURN: If every single file has uncommitted changes, we can stop here
+        if not search_paths_set:
+            return list(result_map.values())
+
+        # =========================================================================
+        # STEP 2 & 3: Build dynamic chunks and fetch commit history via Git Log
+        # =========================================================================
+        clean_files_list = list(search_paths_set)
+        MAX_CMD_LEN = 7000
+        
+        base_cmd = [
+            str(self.git_cmd_path), "log", 
+            "--format=COMMIT:%H|%an|%aI|%s",  # %s ensures single-line commit messages
+            "--name-only", 
+            "--"
+        ]
+        
+        chunks = self._build_file_chunks(base_cmd, clean_files_list, path_mapping, MAX_CMD_LEN)
+        self._parse_batch_git_logs(chunks, base_cmd, search_paths_set, path_mapping, result_map)
+
+        # =========================================================================
+        # STEP 4: Handle pristine tracked files that lack commit logs
+        # =========================================================================
+        self._apply_fallback_for_missing_history(search_paths_set, path_mapping, result_map)
+
+        return list(result_map.values())
+
+    # =========================================================================
+    # PROTECTED HELPER METHODS (Step-by-step extraction)
+    # =========================================================================
+
+    def _validate_git_state(self, relative_file_paths: list[Path]) -> None:
+        """Validates the readiness of the Git executable and target repository path."""
+        if not self.git_cmd_path or not self.git_cmd_path.exists():
+            raise ValueError(f"Invalid Git executable path: '{self.git_cmd_path}'")
+            
+        if not self.repo_root_dir or not self.repo_root_dir.is_dir():
+            raise ValueError(f"Invalid repository root directory: '{self.repo_root_dir}'")
+
+    def _process_local_git_status(
+        self, 
+        search_paths_set: set[str], 
+        path_mapping: dict[str, Path], 
+        result_map: dict[Path, CommitInfo]
+    ) -> None:
+        """Queries 'git status' to populate uncommitted file states and updates the search pool."""
+        completed_status_process = subprocess.run(
+            [str(self.git_cmd_path), "status", "--porcelain"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8-sig',
+            cwd=str(self.repo_root_dir)
+        )
+        if completed_status_process.returncode != 0:
+            raise CommandError(f"Unable to fetch batch git status: {completed_status_process.stderr.strip()}")
+
+        if not completed_status_process.stdout:
+            return
+
+        for line in completed_status_process.stdout.splitlines():
+            if len(line) < 4:
+                continue
+            
+            status_code = line[:2]
+            git_file_path_str = Path(line[3:].strip('"')).as_posix()
+            
+            if git_file_path_str in search_paths_set:
+                orig_path = path_mapping[git_file_path_str]
+                
+                if "??" in status_code:
+                    result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is untracked by Git")
+                elif "M" in status_code or "R" in status_code:
+                    result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is modified")
+                elif "A" in status_code:
+                    result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is added")
+                elif "D" in status_code:
+                    result_map[orig_path] = CommitInfo.uncommitted(orig_path, "File is deleted")
+                else:
+                    raise CommandError(f"Got unknown git status '{status_code}' for file '{orig_path}'")
+                
+                search_paths_set.remove(git_file_path_str)
+
+    def _build_file_chunks(
+        self, 
+        base_cmd: list[str], 
+        files_list: list[str], 
+        path_mapping: dict[str, Path], 
+        max_len: int
+    ) -> list[list[str]]:
+        """Groups file paths into sub-lists matching the maximum command-line string length limits."""
+        base_cmd_len = sum(len(arg) + 1 for arg in base_cmd)
+        current_chunk = []
+        current_len = base_cmd_len
+        chunks = []
+        
+        for file_str in files_list:
+            os_specific_path = str(path_mapping[file_str])
+            arg_len = len(os_specific_path) + 1 
+
+            if base_cmd_len + arg_len > max_len:
+                raise ValueError(
+                    f"The file path is too long to be processed via CLI! "
+                    f"Command length ({base_cmd_len + arg_len} chars) exceeds the limit of {max_len} chars. "
+                    f"Path: '{os_specific_path}'"
+                )
+            
+            if current_len + arg_len > max_len:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = [os_specific_path]
+                current_len = base_cmd_len + arg_len
+            else:
+                current_chunk.append(os_specific_path)
+                current_len += arg_len
+        
+        if current_chunk:
+            chunks.append(current_chunk)
+            
+        return chunks
+
+    def _parse_batch_git_logs(
+        self, 
+        chunks: list[list[str]], 
+        base_cmd: list[str], 
+        search_paths_set: set[str], 
+        path_mapping: dict[str, Path], 
+        result_map: dict[Path, CommitInfo]
+    ) -> None:
+        """Executes chunked 'git log' commands and extracts the top-most historical commit for each target file."""
+        for chunk_args in chunks:
+            cmd = base_cmd + chunk_args
+
+            completed_log_process = subprocess.run(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8-sig',
+                cwd=str(self.repo_root_dir)
+            )        
+            if completed_log_process.returncode != 0:
+                raise CommandError(f"Unable to get batch git log for a chunk: {completed_log_process.stderr.strip()}")
+                
+            log_output = completed_log_process.stdout.strip()
+            if not log_output:
+                continue
+                
+            current_commit = None
+            for line in log_output.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                
+                if line.startswith("COMMIT:"):
+                    parts = line[7:].split('|', 3)
+                    if len(parts) == 4:
+                        try:
+                            parsed_date = datetime.fromisoformat(parts)
+                        except (ValueError, IndexError):
+                            parsed_date = None
+
+                        current_commit = {
+                            "oid": parts,
+                            "author": parts,
+                            "date": parsed_date,
+                            "message": parts
+                        }
+                elif current_commit:
+                    file_posix_path = Path(line).as_posix()
+                    if file_posix_path in search_paths_set:
+                        orig_path = path_mapping[file_posix_path]
+                        
+                        # Only record the first occurrence (the latest commit in git chronological output)
+                        if orig_path not in result_map:
+                            result_map[orig_path] = CommitInfo(
+                                relative_path=orig_path,
+                                oid=current_commit["oid"],
+                                author=current_commit["author"],
+                                date=current_commit["date"],
+                                message=current_commit["message"]
+                            )
+
+    def _apply_fallback_for_missing_history(
+        self, 
+        search_paths_set: set[str], 
+        path_mapping: dict[str, Path], 
+        result_map: dict[Path, CommitInfo]
+    ) -> None:
+        """Applies a default descriptive state to clean files that returned no log history."""
+        for file_posix in search_paths_set:
+            orig_path = path_mapping[file_posix]
+            if orig_path not in result_map:
+                result_map[orig_path] = CommitInfo(
+                    relative_path=orig_path,
+                    oid=None,
+                    author=None,
+                    date=None,
+                    message="No commit history found in this branch"
+                )
+
+    @staticmethod
+    def _build_oid_chunks(base_cmd: list[str], oids: list[str], max_len: int) -> list[list[str]]:
+        """
+        Internal protected helper to dynamically group OID tokens into character-limited argument lists.
+        """
+        base_cmd_len = sum(len(arg) + 1 for arg in base_cmd)
+        current_chunk = []
+        current_len = base_cmd_len
+        chunks = []
+
+        for oid in oids:
+            arg_len = len(oid) + 1
+            
+            # Guard against a single massive argument token exceeding the OS limit
+            if base_cmd_len + arg_len > max_len:
+                raise ValueError(f"The OID token length exceeds safe CLI limits: '{oid}'")
+
+            if current_len + arg_len > max_len:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = [oid]
+                current_len = base_cmd_len + arg_len
+            else:
+                current_chunk.append(oid)
+                current_len += arg_len
+
+        if current_chunk:
+            chunks.append(current_chunk)
+            
+        return chunks
+
 
 class ExternalTool:
     def make_variables_dict_from_config_and_script_path(self, script_path):
