@@ -82,10 +82,14 @@ SETUP_TESTS_FILE_NAME = "_setup.sql"
 RECENT_CHANGES_WINDOW_MINUTES = 30
 RECENT_CHANGES_LIMIT = 1000
 
+UNKNOWN_SHA_LABEL = "UNKNOWN"
+UNKNOWN_AUTHOR_LABEL = "Unknown"
+UNKNOWN_MESSAGE_LABEL = "Commit or object state is unknown"
 UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
 UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
 UNCOMMITTED_DATE_LABEL = "-------"
 UNCOMMITTED_MESSAGE_LABEL = "Uncommitted changes"
+
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -212,21 +216,21 @@ class CommitInfo(NamedTuple):
             oid=oid,
             author=None,
             date=None,
-            message=message or "Commit or object state is unknown"
+            message=message or UNCOMMITTED_MESSAGE_LABEL
         )
 
     def __repr__(self) -> str:
         date_label = self.date.strftime("%Y-%m-%d") if self.date is not None else UNCOMMITTED_DATE_LABEL
         oid_label = self.oid[:8] if self.oid else UNCOMMITTED_SHA_LABEL
         message_label = self.message if self.message else UNCOMMITTED_MESSAGE_LABEL
-        author_label = self.author if self.author else getpass.getuser()
+        author_label = self.author if self.author else UNKNOWN_AUTHOR_LABEL
         return f"[{oid_label}] {date_label} - {message_label}\n  Author: {author_label}"
     
     def sort_key(self) -> tuple[datetime, str, str]:
         if self.date is not None:
-            sort_date = self.date
+            sort_date = self.date.replace(tzinfo=None)
         else:
-            sort_date = datetime.min.replace(tzinfo=datetime.now().astimezone().tzinfo) if datetime.now().astimezone().tzinfo else datetime.min
+            sort_date = datetime.min
             
         sort_author = self.author if self.author else ""
         sort_oid = self.oid if self.oid else ""        
@@ -359,7 +363,6 @@ class GitChecker:
         if not log_output:
             # Fallback if the file OID exists locally (e.g., in index) but has never been committed
             return CommitInfo.unknown(
-                oid=clean_oid,
                 message="Content hash (OID) is completely untracked or modified locally"
             )
 
@@ -1520,51 +1523,34 @@ class VerifyCommand (BaseCommand):
             "message": message
         }
     
-    def display_verification_changes_by_commits(self, git_cmd_path, git_root_path, files_sorted):
-        assert git_cmd_path is not None
-        assert git_root_path is not None
+    def display_verification_changes_by_commits(self, files_sorted):
+        assert self.git is not None
         assert isinstance(files_sorted, collections.abc.Iterable)
 
-        resolved_repo_root = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)        
         for file_path in files_sorted:
-            abs_path = pathlib.Path(file_path).resolve()            
-            try:
-                rel_path = abs_path.relative_to(resolved_repo_root)
-            except ValueError:
-                rel_path = abs_path                
-            commit_info = self.get_file_commit_history(git_cmd_path, resolved_repo_root, rel_path)            
-            if commit_info:
-                msg_clean = " ".join(line.strip() for line in commit_info["message"].splitlines() if line.strip())
-                commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_clean)
-            else:
-                commit_key = ("----------", "Local Changes", "UNCOMMITTED", "File has modifications not yet committed to Git")
-            
-            with open(abs_path, 'rb') as f:
-                script_bytes = f.read()
-            current_oid = get_git_blob_sha1_for_bytes(script_bytes)[:8]
+            commit_info = self.git.get_latest_commit(file_path)
+            script_info = get_script_info(self.scripts_dir, file_path)            
+            commits_group[commit_info].append(script_info)
 
-            commits_group[commit_key].append((rel_path, current_oid))
-        
         sorted_commits = sorted(
-            commits_group.items(), 
-            key=lambda x: x[0], 
+            commits_group.items(),
+            key=lambda i: i[0].sort_key(), 
             reverse=True
         )
 
-        for (date, author, sha, message), files in sorted_commits:
-            print(f"[{sha}] {date} - {message}")
-            print(f"  Author: {author}")
-            for f, oid in files:
-                print(f"    [{f.as_posix()} (OID: {oid})]")                
+        for commit, scripts in sorted_commits:
+            print(f"{commit!r}")
+            for s in scripts:
+                print(f"    {s!r}")                
 
-    def display_verification_changes(self, scripts_dir, git_cmd_path, git_root_path, scripts_sorted):
-        if git_root_path is None:
+    def display_verification_changes(self, scripts_dir, scripts_sorted):
+        if self.git is None:
             script_infos = [get_script_info(scripts_dir, s) for s in scripts_sorted] 
             for i in script_infos:
                 print(f"  {i!r}")
         else:
-            self.display_verification_changes_by_commits(git_cmd_path, git_root_path, scripts_sorted)
+            self.display_verification_changes_by_commits(scripts_sorted)
 
     def get_oid_commit_history(self, git_cmd_path, repo_root_dir, target_oid):
         assert git_cmd_path is not None
@@ -1654,55 +1640,43 @@ class VerifyCommand (BaseCommand):
         return rows
 
 
-    def display_recent_changes_grouped_by_git_commits(self, git_cmd_path, git_root_path, rows):
-        assert git_cmd_path is not None
-        assert git_root_path is not None
+    def display_recent_changes_grouped_by_git_commits(self, rows):
+        assert self.git is not None
         assert rows is not None
 
-        resolved_git_root_path = pathlib.Path(git_root_path).resolve()
         commits_group = collections.defaultdict(list)
 
         for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
             clean_oid = git_blob_sha1.strip()
-            commit_info = self.get_oid_commit_history(git_cmd_path, resolved_git_root_path, clean_oid)
-            if not commit_info:
-                raise CommandError(f"Unable to find commit history for git sha1 {clean_oid}")            
-            msg_clean = " ".join(line.strip() for line in commit_info["message"].splitlines() if line.strip())
-            commit_key = (commit_info["date"], commit_info["author"], commit_info["sha"], msg_clean)                
-            commits_group[commit_key].append({
-                "path": relative_path,
-                "type": script_type,
-                "version": version_id,
-                "oid": clean_oid[:8],
-                "applied_at": applied_at.strftime("%Y-%m-%d %H:%M:%S")
-            })
+            commit_info = self.git.get_commit_by_file_oid(clean_oid)
+            script_info = ScriptInfo(script_path=relative_path, relative_path=relative_path, oid=clean_oid, text="")
+            commits_group[commit_info].append(script_info)
         
         sorted_commits = sorted(
             commits_group.items(), 
-            key=lambda x: x[0], 
+            key=lambda i: i[0].sort_key(),
             reverse=True
         )
-        for (date, author, sha, message), scripts in sorted_commits:
-            print(f"[{sha}] {date} - {message}")
-            print(f"  Author: {author}")
+        for commit, scripts in sorted_commits:
+            print(f"{commit!r}")
             for s in scripts:
-                print(f"     [{s['applied_at']:<19} | {s['version']:<6} | {s['path']} (OID: {s['oid']})]")
+                print(f"    {s!r}")
 
-    def display_recent_changes(self, git_cmd_path, git_root_path, limit=10, window_minutes=30):
+    def display_recent_changes(self, limit=10, window_minutes=30):
         
         rows = self.get_recent_changes_from_db(limit, window_minutes)
         if not rows:
             return
         print(f"The list of recent changes were applied to the target schema:")
 
-        if git_root_path is None:
+        if self.git is None:
             for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
                 date_str = applied_at.strftime("%Y-%m-%d %H:%M:%S")
                 clean_oid = git_blob_sha1.strip()[:8]
                 clean_path = str(relative_path).replace('\\', '/')                
                 print(f"  [{date_str} | {script_type:<10} | {version_id:<6} | {clean_path} (OID: {clean_oid})]")
         else:
-            self.display_recent_changes_grouped_by_git_commits(git_cmd_path, git_root_path, rows)
+            self.display_recent_changes_grouped_by_git_commits(rows)
 
 
 
@@ -1750,7 +1724,7 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
-    def verify_baseline_scripts(self, scripts_dir, git_cmd_path, git_root_path, script_builder):
+    def verify_baseline_scripts(self, scripts_dir, script_builder):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
@@ -1767,7 +1741,7 @@ class VerifyCommand (BaseCommand):
 
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH)
         print(f"The baseline scripts to install: ")
-        self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
+        self.display_verification_changes(scripts_dir, scripts_sorted)
 
         if script_builder is not None:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
@@ -1802,7 +1776,7 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
-    def verify_versioned_scripts(self, scripts_dir, git_cmd_path, git_root_path, script_builder):
+    def verify_versioned_scripts(self, scripts_dir, script_builder):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
@@ -1839,7 +1813,7 @@ class VerifyCommand (BaseCommand):
             if len(scripts_sorted) == 0:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
-            self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_sorted)
+            self.display_verification_changes(scripts_dir, scripts_sorted)
             if script_builder is not None:
                 version_id = script_version_dir.name
                 self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, script_builder)   
@@ -1863,7 +1837,7 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(formatted_sql_text)
                 script_builder.write_body(f"COMMIT;\n")
 
-    def verify_repeatable_scripts(self, scripts_dir, git_cmd_path, git_root_path, script_builder):
+    def verify_repeatable_scripts(self, scripts_dir, script_builder):
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
@@ -1895,7 +1869,7 @@ class VerifyCommand (BaseCommand):
             return
         print(f"The repeatable scripts to (re)install: ")
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
-        self.display_verification_changes(scripts_dir, git_cmd_path, git_root_path, scripts_to_repeat)
+        self.display_verification_changes(scripts_dir, scripts_to_repeat)
         if script_builder is not None:
             scripts_to_repeat_dict = {}
             for script_path in scripts_to_repeat:
@@ -1913,12 +1887,10 @@ class VerifyCommand (BaseCommand):
         self.check_if_stored_environment_id_matches_to_scripts_dir() 
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
-        git_root_path = None
-        git_cmd_path = None
+
+        self.git = None
         if not self.args.skip_git_checks:
-            git_cmd_path = self.try_get_git_cmd_path(self.config)
-            if git_cmd_path is not None:
-                git_root_path = self.try_get_git_repo_root(git_cmd_path, self.scripts_dir)
+            self.git = GitChecker.try_get(self.config, self.scripts_dir)
 
         script_builder = None
         script_path = self.args.build_update_script
@@ -1929,9 +1901,9 @@ class VerifyCommand (BaseCommand):
             if script_builder is not None:
                 search_path = self.get_search_path_for_scripts()
                 self.write_search_path(search_path, script_builder)
-            self.verify_baseline_scripts(self.scripts_dir, git_cmd_path, git_root_path, script_builder)
-            self.verify_versioned_scripts(self.scripts_dir, git_cmd_path, git_root_path, script_builder)
-            self.verify_repeatable_scripts(self.scripts_dir, git_cmd_path, git_root_path, script_builder)
+            self.verify_baseline_scripts(self.scripts_dir, script_builder)
+            self.verify_versioned_scripts(self.scripts_dir, script_builder)
+            self.verify_repeatable_scripts(self.scripts_dir, script_builder)
             # finalize writing update script
             if script_builder is not None:
                 written = script_builder.get_written_body_bytes()
@@ -1946,7 +1918,7 @@ class VerifyCommand (BaseCommand):
                 script_builder.cleanup()
             raise
         if not self.args.skip_display_recent_changes:
-            self.display_recent_changes(git_cmd_path, git_root_path, RECENT_CHANGES_LIMIT, RECENT_CHANGES_WINDOW_MINUTES)
+            self.display_recent_changes(RECENT_CHANGES_LIMIT, RECENT_CHANGES_WINDOW_MINUTES)
 
 class InitCommand (BaseCommand):
     """Creates version control tables in an empty database schema."""
