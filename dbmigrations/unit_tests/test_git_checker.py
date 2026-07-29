@@ -199,7 +199,7 @@ def test_get_commit_by_file_oid_untracked_or_missing_hash():
     if the log command output is completely empty (object is not tracked in history).
     """
     checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
-    target_blob_oid = "000000000000000000000000"
+    target_blob_oid = None
 
     # Empty log output means Git could not find this object hash in any commit
     with patch.object(checker, "_run_git", return_value=""):

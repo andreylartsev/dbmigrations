@@ -84,7 +84,7 @@ RECENT_CHANGES_LIMIT = 1000
 
 UNKNOWN_SHA_LABEL = "UNKNOWN"
 UNKNOWN_AUTHOR_LABEL = "Unknown"
-UNKNOWN_MESSAGE_LABEL = "Commit or object state is unknown"
+UNKNOWN_MESSAGE_LABEL = "Content hash (OID) is completely untracked or modified locally"
 UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
 UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
 UNCOMMITTED_DATE_LABEL = "-------"
@@ -211,12 +211,12 @@ class CommitInfo(NamedTuple):
         )
 
     @classmethod
-    def unknown(cls, oid: str | None = None, message: str | None = None) -> Self:
+    def unknown(cls, message: str | None = None) -> Self:
         return cls(
-            oid=oid,
+            oid=None,
             author=None,
             date=None,
-            message=message or UNCOMMITTED_MESSAGE_LABEL
+            message=message or UNKNOWN_MESSAGE_LABEL
         )
 
     def __repr__(self) -> str:
@@ -340,9 +340,7 @@ class GitChecker:
         # =========================================================================
         # STEP 3: Fallback if the file has no commit history in the branch
         # =========================================================================
-        return CommitInfo.unknown(
-            message="No commit history found in this branch"
-        )
+        return CommitInfo.unknown("No commit history found in this branch")
 
     def get_commit_by_file_oid(self, file_oid: str) -> CommitInfo:
         """
@@ -362,9 +360,7 @@ class GitChecker:
         
         if not log_output:
             # Fallback if the file OID exists locally (e.g., in index) but has never been committed
-            return CommitInfo.unknown(
-                message="Content hash (OID) is completely untracked or modified locally"
-            )
+            return CommitInfo.unknown("Content hash (OID) is completely untracked or modified locally")
 
         parts = log_output.strip().split("|", 3)
         if len(parts) != 4:
