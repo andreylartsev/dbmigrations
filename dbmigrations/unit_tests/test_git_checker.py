@@ -138,7 +138,6 @@ def test_get_latest_commit_file_is_untracked():
         mock_run.assert_called_once_with(["status", "--porcelain", "-z", "--", "new_script.py"])
         
         # Verify the returned CommitInfo object state
-        assert result.relative_path == target_file
         assert result.oid is None
         assert "untracked" in result.message
 
@@ -165,7 +164,6 @@ def test_get_latest_commit_file_is_clean_returns_log_data():
     with patch.object(checker, "_run_git", side_effect=side_effect):
         result = checker.get_latest_commit(target_file)
 
-        assert result.relative_path == target_file
         assert result.oid == "a1b2c3d4e5f6"
         assert result.author == "John Doe"
         assert result.date == datetime.fromtimestamp(1711800000)
@@ -193,7 +191,6 @@ def test_get_commit_by_file_oid_happy_path():
         assert result.author == "Jane Smith"
         assert result.date == datetime.fromtimestamp(1711900000)
         assert result.message == "Add core migration logic"
-        assert result.relative_path is None # Search by hash doesn't bind a specific file path
 
 
 def test_get_commit_by_file_oid_untracked_or_missing_hash():

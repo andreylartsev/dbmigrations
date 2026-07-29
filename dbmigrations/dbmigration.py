@@ -192,39 +192,42 @@ def get_script_info(scripts_dir, script_path, decode_and_store_text = False, enc
     return result
 
 class CommitInfo(NamedTuple):
-    relative_path : Path | None
     oid : str | None
     author : str | None    
     date : datetime | None
     message : str | None
 
     @classmethod
-    def uncommitted(cls, relative_path, message : str|None = None) -> Self:
+    def uncommitted(cls, message : str | None = None) -> Self:
         return cls(
-            relative_path=relative_path,
             oid=None,
             author=getpass.getuser(),
             date=datetime.now(),
             message=message or UNCOMMITTED_MESSAGE_LABEL
         )
+
     @classmethod
-    def unknown(cls, oid: str | None = None, relative_path: Path | None = None, message: str | None = None) -> Self:
+    def unknown(cls, oid: str | None = None, message: str | None = None) -> Self:
         return cls(
-            relative_path=relative_path,
             oid=oid,
             author=None,
             date=None,
             message=message or "Commit or object state is unknown"
         )
+
     def __repr__(self) -> str:
-        oid_label = self.oid[:8] if self.oid else UNCOMMITTED_SHA_LABEL
         date_label = self.date.strftime("%Y-%m-%d") if self.date is not None else UNCOMMITTED_DATE_LABEL
+        oid_label = self.oid[:8] if self.oid else UNCOMMITTED_SHA_LABEL
         message_label = self.message if self.message else UNCOMMITTED_MESSAGE_LABEL
         author_label = self.author if self.author else getpass.getuser()
         return f"[{oid_label}] {date_label} - {message_label}\n  Author: {author_label}"
     
     def sort_key(self) -> tuple[datetime, str, str]:
-        sort_date = self.date if self.date else datetime.min
+        if self.date is not None:
+            sort_date = self.date
+        else:
+            sort_date = datetime.min.replace(tzinfo=datetime.now().astimezone().tzinfo) if datetime.now().astimezone().tzinfo else datetime.min
+            
         sort_author = self.author if self.author else ""
         sort_oid = self.oid if self.oid else ""        
         return (sort_date, sort_author, sort_oid)
@@ -308,9 +311,9 @@ class GitChecker:
             if len(entry) >= 4:
                 status_code = entry[:2]
                 if "??" in status_code:
-                    return CommitInfo.uncommitted(relative_file_path, "File is untracked by Git")
+                    return CommitInfo.uncommitted("File is untracked by Git")
                 else:
-                    return CommitInfo.uncommitted(relative_file_path, f"File is modified ({status_code.strip()})")
+                    return CommitInfo.uncommitted(f"File is modified ({status_code.strip()})")
 
         # =========================================================================
         # STEP 2: Fetch the latest commit for a clean file via Git Log
@@ -324,7 +327,6 @@ class GitChecker:
             if len(parts) == 4:
                 oid, author, timestamp_str, message = parts
                 return CommitInfo(
-                    relative_path=relative_file_path,
                     oid=oid,
                     author=author,
                     date=datetime.fromtimestamp(int(timestamp_str)),
@@ -335,7 +337,6 @@ class GitChecker:
         # STEP 3: Fallback if the file has no commit history in the branch
         # =========================================================================
         return CommitInfo.unknown(
-            relative_path=relative_file_path, 
             message="No commit history found in this branch"
         )
 
@@ -369,7 +370,6 @@ class GitChecker:
         oid, author, timestamp_str, message = parts
         
         return CommitInfo(
-            relative_path=None, # Path is not explicitly bound when searching strictly by object hash
             oid=oid,
             author=author,
             date=datetime.fromtimestamp(int(timestamp_str)),
