@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
-import git
+import subprocess
 
-# Импортируйте ваши классы (замените your_module на имя вашего файла)
+# Replace 'dbmigration' with your actual module name
 from dbmigration import GitChecker, CommandError, GIT_CMD_CONFIG_ATTRIBUTE
 
 # =========================================================================
@@ -25,7 +25,7 @@ def test_git_cmd_path_missing_in_system_shows_warning(capsys):
         
         # Capture stdout/stderr to verify the user-friendly warning
         captured = capsys.readouterr()
-        assert "Warning: Git executable was not found in your system's PATH" in captured.out
+        assert "Warning: Git executable was not found in system PATH" in captured.out
 
 
 def test_git_cmd_path_invalid_in_toml_raises_command_error():
@@ -49,16 +49,17 @@ def test_git_repo_not_found_shows_warning(capsys, tmp_path):
     is valid but it is not located inside any Git repository structure.
     """
     tmp_path.mkdir(parents=True, exist_ok=True)
+    mock_git_cmd = Path("git")
 
-    with patch.object(GitChecker, "_try_get_git_repo", return_value=None) as mock_method:        
-        with patch.object(GitChecker, "_try_get_git_cmd_path", return_value=Path("git")), \
-             patch("git.refresh"):
-             
-            result = GitChecker.try_get({}, tmp_path)
+    # Simulate subprocess.run raising CalledProcessError when git rev-parse fails
+    with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "git")):
+        result = GitChecker._try_get_git_repo_root(mock_git_cmd, tmp_path)
 
-            assert result is None
+        assert result is None
 
-            captured = capsys.readouterr()
+        captured = capsys.readouterr()
+        assert "Warning: A valid Git repository root was not found" in captured.out
+
 
 def test_git_repo_invalid_directory_path_raises_command_error():
     """
@@ -66,9 +67,10 @@ def test_git_repo_invalid_directory_path_raises_command_error():
     path is not a folder or doesn't exist at all.
     """
     fake_path = Path("C:/totally/fake/and/missing/dir")
+    mock_git_cmd = Path("git")
     
     with pytest.raises(CommandError) as exc_info:
-        GitChecker._try_get_git_repo(fake_path)
+        GitChecker._try_get_git_repo_root(mock_git_cmd, fake_path)
         
     assert "is invalid or not a directory!" in str(exc_info.value)
 
@@ -98,18 +100,15 @@ def test_try_get_initializes_successfully_on_happy_path(tmp_path):
     """
     toml_config = {}
     mock_path = Path("/usr/bin/git")
-    mock_repo = MagicMock(spec=git.Repo)
+    mock_repo_root = Path("/projects/my_project")
     
     # Stub both internal routines to simulate a pristine working state
     with patch.object(GitChecker, "_try_get_git_cmd_path", return_value=mock_path), \
-         patch.object(GitChecker, "_try_get_git_repo", return_value=mock_repo), \
-         patch("git.refresh") as mock_refresh:
+         patch.object(GitChecker, "_try_get_git_repo_root", return_value=mock_repo_root):
          
         checker = GitChecker.try_get(toml_config, tmp_path)
         
-        # Verify that GitPython state was refreshed with the correct string route
-        mock_refresh.assert_called_once_with(path=str(mock_path))
-        
-        # Verify the wrapper object state
+        # Verify the wrapper object state and dependencies
         assert isinstance(checker, GitChecker)
-        assert checker.repo == mock_repo
+        assert checker.git_cmd == mock_path
+        assert checker.repo_root == mock_repo_root

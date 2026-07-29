@@ -18,13 +18,12 @@ import tomllib
 import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import NamedTuple, Self
+from typing import NamedTuple, Self, Any
 
 #
 # prerequire packages listed in requirements.txt
 # 
 import psycopg
-import git
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
@@ -219,7 +218,7 @@ class CommitInfo(NamedTuple):
         )
     def __repr__(self) -> str:
         oid_label = self.oid[:8] if self.oid else UNCOMMITTED_SHA_LABEL
-        date_label = self.date.strftime("%Y-%m-%d") if self.date else UNCOMMITTED_DATE_LABEL
+        date_label = self.date.strftime("%Y-%m-%d") if self.date is not None else UNCOMMITTED_DATE_LABEL
         message_label = self.message if self.message else UNCOMMITTED_MESSAGE_LABEL
         author_label = self.author if self.author else getpass.getuser()
         return f"[{oid_label}] {date_label} - {message_label}\n  Author: {author_label}"
@@ -229,147 +228,136 @@ class CommitInfo(NamedTuple):
         sort_author = self.author if self.author else ""
         sort_oid = self.oid if self.oid else ""        
         return (sort_date, sort_author, sort_oid)
- 
+
 class GitChecker:
 
-    def __init__(self, repo: git.Repo):
-        self.repo = repo
+    def __init__(self, git_cmd: Path, repo_root: Path):
+        self.git_cmd = git_cmd
+        self.repo_root = repo_root
 
     @classmethod
-    def try_get(cls, toml_config: dict, scripts_dir: Path) -> Self | None:
-        git_cmd_path = cls._try_get_git_cmd_path(toml_config)
-        if git_cmd_path is None:
+    def try_get(cls, toml_config: dict[str, Any], scripts_dir: Path) -> Self | None:
+        # 1. Look up the git executable path
+        git_cmd = cls._try_get_git_cmd_path(toml_config)
+        if git_cmd is None:
             return None
-            
-        git.refresh(path=str(git_cmd_path))                        
 
-        repo = cls._try_get_git_repo(scripts_dir)
-        if repo is None:
+        # 2. Locate the root directory of the Git repository
+        repo_root = cls._try_get_git_repo_root(git_cmd, scripts_dir)
+        if repo_root is None:
             return None
                     
-        return cls(repo)
+        return cls(git_cmd, repo_root)
     
-    @staticmethod
-    def _try_get_git_cmd_path(toml_config: dict) -> Path | None:
-        # Case A: User explicitly provided a path in the configuration
+    @classmethod
+    def _try_get_git_cmd_path(cls, toml_config: dict[str, Any]) -> Path | None:
         if GIT_CMD_CONFIG_ATTRIBUTE in toml_config:
             cmd_path_str = toml_config[GIT_CMD_CONFIG_ATTRIBUTE]
             cmd_path = Path(cmd_path_str)
             if not cmd_path.exists():
                 raise CommandError(
-                    f"The git cmd specified in {GIT_CMD_CONFIG_ATTRIBUTE} of TOML config does not exist! "
-                    "Comment it out if you are not sure where it is in the system"
+                    f"The git cmd specified in {GIT_CMD_CONFIG_ATTRIBUTE} of TOML config does not exist!"
                 )
             return cmd_path        
-        # Case B: No path in config -> look up in the system environments
+        
         cmd_path_str = shutil.which("git")
         if cmd_path_str is None:
-            print("Warning: Git executable was not found in your system's PATH environments. Git features are disabled.")
+            print("Warning: Git executable was not found in system PATH. Git features are disabled.")
             return None
             
         return Path(cmd_path_str)
         
-    @staticmethod
-    def _try_get_git_repo(scripts_dir: Path) -> git.Repo | None:
+    @classmethod
+    def _try_get_git_repo_root(cls, git_cmd: Path, scripts_dir: Path) -> Path | None:
         resolved_dir = Path(scripts_dir).resolve()
         if not resolved_dir.is_dir():
             raise CommandError(f"The specified path '{scripts_dir}' is invalid or not a directory!")        
         
         try:
-            return git.Repo(str(resolved_dir), search_parent_directories=True)
-        except (git.exc.InvalidGitRepositoryError, git.exc.NoSuchPathError):
-            print(f"Warning: A valid Git repository root was not found for path '{scripts_dir}'. Git features are disabled.")
+            # Find the .git root directory using the rev-parse command
+            res = subprocess.run(
+                [str(git_cmd), "-C", str(resolved_dir), "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, check=True
+            )
+            return Path(res.stdout.strip())
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            print(f"Warning: A valid Git repository root was not found for '{scripts_dir}'. Git features are disabled.")
             return None
 
+    def _run_git(self, args: list[str]) -> str:
+        """Helper method to safely execute Git commands."""
+        cmd = [str(self.git_cmd), "-C", str(self.repo_root)] + args
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore")
+        if res.returncode != 0:
+            return ""
+        return res.stdout
 
-    def get_batch_files_commit_history(self, relative_file_paths: list[Path]) -> list[CommitInfo]:
-
-        if not relative_file_paths:
-            return []
-
-        result_map: dict[Path, CommitInfo] = {}
-        search_paths = set(relative_file_paths)
-
-        # =========================================================================
-        # STEP 1: Process uncommitted changes via Git API Status
-        # =========================================================================
-        for untracked_file in self.repo.untracked_files:
-            untracked_path = Path(untracked_file)
-            if untracked_path in search_paths:
-                result_map[untracked_path] = CommitInfo.uncommitted(untracked_path, "File is untracked by Git")
-                search_paths.remove(untracked_path)
-
-        for diff_item in self.repo.index.diff(None) + self.repo.index.diff('HEAD'):
-            # diff_item.b_path or a_path gives the repo-relative path string
-            changed_path = Path(diff_item.b_path or diff_item.a_path)
-            
-            if changed_path in search_paths:
-                status_desc = f"File is modified ({diff_item.change_type})"
-                result_map[changed_path] = CommitInfo.uncommitted(changed_path, status_desc)
-                search_paths.remove(changed_path)
-
-        if not search_paths:
-            return list(result_map.values())
+    def get_file_commit_history(self, relative_file_path: Path) -> CommitInfo:
+        """Fetches the status or the latest commit information for a single specific file."""
+        posix_path = relative_file_path.as_posix()
 
         # =========================================================================
-        # STEP 2 & 3: Fetch latest commit for clean files via Git API Log
+        # STEP 1: Check for uncommitted changes in the specific file
         # =========================================================================
-        for file_path in list(search_paths):
-            try:
-                commits = list(self.repo.iter_commits(paths=file_path.as_posix(), max_count=1))
-                
-                if commits:
-                    last_commit = commits[0]
-                    # Convert commit timestamp to datetime object
-                    commit_date = datetime.fromtimestamp(last_commit.committed_date)
-                    
-                    result_map[file_path] = CommitInfo(
-                        relative_path=file_path,
-                        oid=last_commit.hexsha,
-                        author=last_commit.author.name,
-                        date=commit_date,
-                        message=last_commit.summary
-                    )
-                    search_paths.remove(file_path)
-            except Exception:
-                # Safeguard against unexpected Git API glitches for a single file
-                continue
+        # The --porcelain flag guarantees a stable, machine-readable output format.
+        # Passing the specific path optimizes the lookup on large repositories.
+        status_output = self._run_git(["status", "--porcelain", "-z", "--", posix_path])
+        if status_output:
+            # Split by \x00 due to the -z flag (protects against spaces in file paths)
+            entry = status_output.split("\x00")[0]
+            if len(entry) >= 4:
+                status_code = entry[:2]
+                if "??" in status_code:
+                    return CommitInfo.uncommitted(relative_file_path, "File is untracked by Git")
+                else:
+                    return CommitInfo.uncommitted(relative_file_path, f"File is modified ({status_code.strip()})")
 
         # =========================================================================
-        # STEP 4: Fallback for pristine files that somehow have no commit logs
+        # STEP 2: Fetch the latest commit for a clean file via Git Log
         # =========================================================================
-        for remaining_path in search_paths:
-            result_map[remaining_path] = CommitInfo.unknown(
-                relative_path=remaining_path, 
-                message="No commit history found in this branch"
-            )
-
-        return list(result_map.values())
-
-    def get_batch_commits_info(self, oids: list[str]) -> list[CommitInfo]:
-        result_results = []
+        # Output format: SHA | AUTHOR | TIMESTAMP | COMMIT_SUBJECT
+        log_format = "--format=%H|%an|%ct|%s"
+        log_output = self._run_git(["log", "-1", log_format, "--", posix_path])
         
-        for oid in oids:
-            try:
-                commit_obj = self.repo.commit(oid)
-                commit_date = datetime.fromtimestamp(commit_obj.committed_date)
-                
-                result_results.append(
-                    CommitInfo(
-                        relative_path=None,
-                        oid=commit_obj.hexsha,
-                        author=commit_obj.author.name,
-                        date=commit_date,
-                        message=commit_obj.summary
-                    )
+        if log_output:
+            parts = log_output.strip().split("|", 3)
+            if len(parts) == 4:
+                oid, author, timestamp_str, message = parts
+                return CommitInfo(
+                    relative_path=relative_file_path,
+                    oid=oid,
+                    author=author,
+                    date=datetime.fromtimestamp(int(timestamp_str)),
+                    message=message
                 )
-            except (git.BadName, Exception):
-                # Fallback if the OID does not exist in the repository
-                result_results.append(
-                    CommitInfo.unknown(oid=oid, message="Commit OID not found in this repository")
+
+        # =========================================================================
+        # STEP 3: Fallback if the file has no commit history in the branch
+        # =========================================================================
+        return CommitInfo.unknown(
+            relative_path=relative_file_path, 
+            message="No commit history found in this branch"
+        )
+
+    def get_commit_info(self, oid: str) -> CommitInfo:
+        """Fetches metadata for a single specific commit using its OID (SHA)."""
+        log_format = "--format=%H|%an|%ct|%s"
+        # --no-patch disables diff generation, making the execution lightning fast
+        show_output = self._run_git(["show", "--no-patch", log_format, oid])
+        
+        if show_output:
+            parts = show_output.strip().split("|", 3)
+            if len(parts) == 4:
+                res_oid, author, timestamp_str, message = parts
+                return CommitInfo(
+                    relative_path=None,
+                    oid=res_oid,
+                    author=author,
+                    date=datetime.fromtimestamp(int(timestamp_str)),
+                    message=message
                 )
-                
-        return result_results
+        
+        return CommitInfo.unknown(oid=oid, message="Commit OID not found in this repository")
 
 class ExternalTool:
     def make_variables_dict_from_config_and_script_path(self, script_path):
