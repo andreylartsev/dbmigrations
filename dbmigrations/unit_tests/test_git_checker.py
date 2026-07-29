@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 import subprocess
+from datetime import datetime
 
 # Replace 'dbmigration' with your actual module name
 from dbmigration import GitChecker, CommandError, GIT_CMD_CONFIG_ATTRIBUTE
@@ -112,3 +113,115 @@ def test_try_get_initializes_successfully_on_happy_path(tmp_path):
         assert isinstance(checker, GitChecker)
         assert checker.git_cmd == mock_path
         assert checker.repo_root == mock_repo_root
+
+# =========================================================================
+# TESTS FOR LOGIC METHODS (get_latest_commit & get_commit_by_file_oid)
+# =========================================================================
+
+def test_get_latest_commit_file_is_untracked():
+    """
+    Ensures get_latest_commit detects an untracked file via 'git status' output
+    and returns a properly flagged uncommitted CommitInfo object.
+    """
+    # Create checker with dummy paths
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+    target_file = Path("new_script.py")
+
+    # Simulate 'git status --porcelain -z' output for an untracked file
+    # The output format for untracked is '?? filename\x00'
+    mock_status_output = "?? new_script.py\x00"
+
+    with patch.object(checker, "_run_git", return_value=mock_status_output) as mock_run:
+        result = checker.get_latest_commit(target_file)
+
+        # Verify right Git command arguments were passed
+        mock_run.assert_called_once_with(["status", "--porcelain", "-z", "--", "new_script.py"])
+        
+        # Verify the returned CommitInfo object state
+        assert result.relative_path == target_file
+        assert result.oid is None
+        assert "untracked" in result.message
+
+
+def test_get_latest_commit_file_is_clean_returns_log_data():
+    """
+    Ensures get_latest_commit parses 'git log' stdout properly when the file
+    is clean and returns a CommitInfo object filled with real commit metadata.
+    """
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+    target_file = Path("existing_script.py")
+
+    # Mock responses: empty status (clean file) and a structured log line
+    # Format: SHA|AUTHOR|TIMESTAMP|SUBJECT
+    mock_log_output = "a1b2c3d4e5f6|John Doe|1711800000|Fix minor database connection leak"
+
+    def side_effect(args):
+        if "status" in args:
+            return "" # No uncommitted changes
+        if "log" in args:
+            return mock_log_output
+        return ""
+
+    with patch.object(checker, "_run_git", side_effect=side_effect):
+        result = checker.get_latest_commit(target_file)
+
+        assert result.relative_path == target_file
+        assert result.oid == "a1b2c3d4e5f6"
+        assert result.author == "John Doe"
+        assert result.date == datetime.fromtimestamp(1711800000)
+        assert result.message == "Fix minor database connection leak"
+
+
+def test_get_commit_by_file_oid_happy_path():
+    """
+    Verifies get_commit_by_file_oid successfully finds a commit by blob OID
+    and maps the structured git log response into a CommitInfo instance.
+    """
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+    target_blob_oid = "7f8e9d1c"
+
+    # Simulated output from 'git log -1 --find-object=...'
+    mock_log_output = "f1e2d3c4b5a6|Jane Smith|1711900000|Add core migration logic"
+
+    with patch.object(checker, "_run_git", return_value=mock_log_output) as mock_run:
+        result = checker.get_commit_by_file_oid(target_blob_oid)
+
+        # Ensure --find-object argument was correctly formatted and passed
+        mock_run.assert_called_once_with(["log", "-1", f"--find-object={target_blob_oid}", "--format=%H|%an|%ct|%s"])
+
+        assert result.oid == "f1e2d3c4b5a6"
+        assert result.author == "Jane Smith"
+        assert result.date == datetime.fromtimestamp(1711900000)
+        assert result.message == "Add core migration logic"
+        assert result.relative_path is None # Search by hash doesn't bind a specific file path
+
+
+def test_get_commit_by_file_oid_untracked_or_missing_hash():
+    """
+    Checks that get_commit_by_file_oid returns an 'unknown' state CommitInfo
+    if the log command output is completely empty (object is not tracked in history).
+    """
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+    target_blob_oid = "000000000000000000000000"
+
+    # Empty log output means Git could not find this object hash in any commit
+    with patch.object(checker, "_run_git", return_value=""):
+        result = checker.get_commit_by_file_oid(target_blob_oid)
+
+        assert result.oid == target_blob_oid
+        assert result.author is None
+        assert result.date is None
+        assert "untracked or modified locally" in result.message
+
+
+def test_get_commit_by_file_oid_empty_argument_raises_value_error():
+    """
+    Ensures that passing an empty string or whitespace to get_commit_by_file_oid
+    immediately raises a ValueError before executing any Git processes.
+    """
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+
+    with pytest.raises(ValueError) as exc_info:
+        checker.get_commit_by_file_oid("   ")
+
+    assert "must not be empty" in str(exc_info.value)
