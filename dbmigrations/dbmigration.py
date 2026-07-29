@@ -170,8 +170,8 @@ def get_char():
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return char
 
-class ScriptInfo(NamedTuple):
-    script_path : pathlib.Path
+class ScriptFsInfo(NamedTuple):
+    script_path : Path
     relative_path : str
     oid : str
     text : str
@@ -179,21 +179,33 @@ class ScriptInfo(NamedTuple):
     def __repr__(self) -> str:
         short_oid = self.oid[:8]
         return f"[{self.relative_path} (OID: {short_oid})]"
-    
 
-def get_script_info(scripts_dir, script_path, decode_and_store_text = False, encoding="utf-8-sig", encoding_errors="ignore"):
-    relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-    with open(script_path, 'rb') as f:
-        script_bytes = f.read()
-    git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-    text = ""
-    if decode_and_store_text:
-        text = script_bytes.decode(encoding, encoding_errors)
-    result = ScriptInfo(script_path=script_path, 
-                      relative_path=relative_script_path,
-                      oid=git_blob_sha1,
-                      text=text)
-    return result
+    @classmethod
+    def get_info(cls, scripts_dir, script_path, decode_and_store_text = False, encoding="utf-8-sig", encoding_errors="ignore") -> Self:
+        relative_script_path = get_script_path_for_log(scripts_dir, script_path)
+        with open(script_path, 'rb') as f:
+            script_bytes = f.read()
+        git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
+        text = ""
+        if decode_and_store_text:
+            text = script_bytes.decode(encoding, encoding_errors)
+        result = cls(script_path=script_path, 
+                    relative_path=relative_script_path,
+                    oid=git_blob_sha1,
+                    text=text)
+        return result
+
+
+class ScriptDbInfo(NamedTuple):
+    applied_at : datetime
+    script_type : str
+    version_id : str
+    relative_path : str
+    git_blob_sha1 : str
+    def __repr__(self) -> str:
+        date_str = self.applied_at.strftime("%Y-%m-%d %H:%M:%S")
+        clean_oid = self.git_blob_sha1.strip()[:8]
+        return f"  [{date_str} | {self.script_type:<10} | {self.version_id:<6} | {self.relative_path} (OID: {clean_oid})]"
 
 class CommitInfo(NamedTuple):
     oid : str | None
@@ -1007,7 +1019,7 @@ class UpdateCommand (BaseCommand):
 
     def run_baseline_scripts_with_external_tool(self, version, scripts_dir, scripts, tool):
         print(f"Running baseline scripts with external tool '{tool.exec_path}'")        
-        script_infos = [get_script_info(scripts_dir, s) for s in scripts]
+        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]
         for i in script_infos:
             print(f"Running script: {i!r}...")
             tool.run(i.script_path)
@@ -1025,7 +1037,7 @@ class UpdateCommand (BaseCommand):
         print(f"Committed.")
 
     def run_baseline_scripts_each_in_own_tran(self, version, scripts_dir, scripts):        
-        script_infos = [get_script_info(scripts_dir, s) for s in scripts]
+        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]
         with self.dbconn.cursor() as cur:
             for i in script_infos:
                 print(f"Running script: {i!r}...")
@@ -1048,7 +1060,7 @@ class UpdateCommand (BaseCommand):
             print(f"Committed.")
 
     def rerun_versioned_scripts(self, version, scripts_dir, scripts):
-        script_infos = [get_script_info(scripts_dir, s) for s in scripts]        
+        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]        
         with self.dbconn.cursor() as cur:
             print(f"Reapply version {version}...")
             cur.execute("BEGIN")
@@ -1072,7 +1084,7 @@ class UpdateCommand (BaseCommand):
             print(f"Committed.")
 
     def run_versioned_scripts_in_tran(self, version, scripts_dir, scripts):
-        script_infos = [get_script_info(scripts_dir, s) for s in scripts]    
+        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]    
         with self.dbconn.cursor() as cur:
             print(f"Apply version {version}...")
             cur.execute("BEGIN")
@@ -1202,7 +1214,7 @@ class UpdateCommand (BaseCommand):
             return
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         script_infos = [
-            get_script_info(scripts_dir, s, decode_and_store_text=True, 
+            ScriptFsInfo.get_info(scripts_dir, s, decode_and_store_text=True, 
                             encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) 
                             for s in scripts_to_repeat]
         print(f"Found {len(script_infos)} scripts to re-run")
@@ -1526,7 +1538,7 @@ class VerifyCommand (BaseCommand):
         commits_group = collections.defaultdict(list)        
         for file_path in files_sorted:
             commit_info = self.git.get_latest_commit(file_path)
-            script_info = get_script_info(self.scripts_dir, file_path)            
+            script_info = ScriptFsInfo.get_info(self.scripts_dir, file_path)            
             commits_group[commit_info].append(script_info)
 
         sorted_commits = sorted(
@@ -1542,7 +1554,7 @@ class VerifyCommand (BaseCommand):
 
     def display_verification_changes(self, scripts_dir, scripts_sorted):
         if self.git is None:
-            script_infos = [get_script_info(scripts_dir, s) for s in scripts_sorted] 
+            script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts_sorted] 
             for i in script_infos:
                 print(f"  {i!r}")
         else:
@@ -1635,6 +1647,13 @@ class VerifyCommand (BaseCommand):
         rows = cursor.fetchall()
         return rows
 
+    @staticmethod
+    def _print_row(row):
+        applied_at, script_type, version_id, relative_path, git_blob_sha1 = row
+        date_str = applied_at.strftime("%Y-%m-%d %H:%M:%S")
+        clean_oid = git_blob_sha1.strip()[:8]
+        clean_path = str(relative_path).replace('\\', '/')                
+        print(f"  [{date_str} | {script_type:<10} | {version_id:<6} | {clean_path} (OID: {clean_oid})]")
 
     def display_recent_changes_grouped_by_git_commits(self, rows):
         assert self.git is not None
@@ -1643,9 +1662,14 @@ class VerifyCommand (BaseCommand):
         commits_group = collections.defaultdict(list)
 
         for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
+            script_info = ScriptDbInfo(
+                applied_at=applied_at, 
+                script_type=script_type, 
+                version_id=version_id, 
+                relative_path=relative_path, 
+                git_blob_sha1=git_blob_sha1)
             clean_oid = git_blob_sha1.strip()
             commit_info = self.git.get_commit_by_file_oid(clean_oid)
-            script_info = ScriptInfo(script_path=relative_path, relative_path=relative_path, oid=clean_oid, text="")
             commits_group[commit_info].append(script_info)
         
         sorted_commits = sorted(
@@ -1656,7 +1680,7 @@ class VerifyCommand (BaseCommand):
         for commit, scripts in sorted_commits:
             print(f"{commit!r}")
             for s in scripts:
-                print(f"    {s!r}")
+                print(f"  {s!r}")
 
     def display_recent_changes(self, limit=10, window_minutes=30):
         
@@ -1667,10 +1691,13 @@ class VerifyCommand (BaseCommand):
 
         if self.git is None:
             for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
-                date_str = applied_at.strftime("%Y-%m-%d %H:%M:%S")
-                clean_oid = git_blob_sha1.strip()[:8]
-                clean_path = str(relative_path).replace('\\', '/')                
-                print(f"  [{date_str} | {script_type:<10} | {version_id:<6} | {clean_path} (OID: {clean_oid})]")
+                script_info = ScriptDbInfo(
+                    applied_at=applied_at, 
+                    script_type=script_type, 
+                    version_id=version_id, 
+                    relative_path=relative_path, 
+                    git_blob_sha1=git_blob_sha1)
+                print(f"  {script_info!r}")
         else:
             self.display_recent_changes_grouped_by_git_commits(rows)
 
