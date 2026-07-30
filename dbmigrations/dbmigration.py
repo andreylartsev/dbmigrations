@@ -18,7 +18,8 @@ import tomllib
 import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import NamedTuple, Self, Any
+from types import TracebackType
+from typing import NamedTuple, Self, Any, TextIO, Iterable, Type
 
 #
 # prerequire packages listed in requirements.txt
@@ -1263,16 +1264,20 @@ class UpdateCommand (BaseCommand):
             print(f"Updated.")
 
 class UpdateScriptBuilder:
+    target_script_path: Path
+    temp_script_path: Path
+    written_body_bytes: int
+    temp_file: TextIO | None
 
-    def __init__(self, script_path: pathlib.Path | str):
-        self.target_script_path = pathlib.Path(script_path)
-        self.temp_script_path = pathlib.Path(script_path).with_suffix(".temp")
+    def __init__(self, script_path: Path | str) -> None:
+        self.target_script_path = Path(script_path)
+        self.temp_script_path = Path(script_path).with_suffix(".temp")
         self.written_body_bytes = 0
         self.temp_file = None
     
-    def check(self):
+    def check(self) -> None:
         assert self.target_script_path is not None, "self.target_script_path must be initialized"
-        assert isinstance(self.target_script_path, pathlib.Path), "self.target_script_path must be a pathlib.Path"
+        assert isinstance(self.target_script_path, Path), "self.target_script_path must be a pathlib.Path"
 
         if not self.target_script_path.parent.exists():
             raise CommandError(
@@ -1299,16 +1304,21 @@ class UpdateScriptBuilder:
                 f"Unable to write to temporary target script file '{self.temp_script_path}'"
             )
 
-    def get_written_body_bytes(self):
+    def get_written_body_bytes(self) -> int:
         return self.written_body_bytes
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         assert self.temp_script_path is not None, "self.temp_script_path must be initialized"
-        assert isinstance(self.temp_script_path, pathlib.Path), "self.temp_script_path must be a pathlib.Path"
+        assert isinstance(self.temp_script_path, Path), "self.temp_script_path must be a pathlib.Path"
         self.temp_file = self.temp_script_path.open("a", encoding="utf-8")
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, 
+        exc_type: Type[BaseException] | None, 
+        exc_val: BaseException | None, 
+        exc_tb: TracebackType | None
+    ) -> bool:
         if self.temp_file and not self.temp_file.closed:
             self.temp_file.close()        
         if exc_type is not None:
@@ -1322,12 +1332,12 @@ class UpdateScriptBuilder:
                 pass 
         return False 
 
-    def write_header(self, s: str):
+    def write_header(self, s: str) -> None:
         assert self.temp_file is not None, "The temporary file is not initialized yet. Ensure you are inside the 'with' context."
         assert not self.temp_file.closed, "The temporary file is not opened. Ensure you are inside the 'with' context."
         self.temp_file.write(s)
 
-    def write_body(self, s: str):
+    def write_body(self, s: str) -> None:
         assert self.temp_file is not None, "The temporary file is not initialized yet. Ensure you are inside the 'with' context."
         assert not self.temp_file.closed, "The temporary file is not opened. Ensure you are inside the 'with' context."
 
@@ -1335,7 +1345,7 @@ class UpdateScriptBuilder:
         if written > 0:
             self.written_body_bytes += written
 
-    def write_body_lines(self, lines):
+    def write_body_lines(self, lines: Iterable[str]) -> None:
         assert self.temp_file is not None, "The temporary file is not initialized yet. Ensure you are inside the 'with' context."
         assert not self.temp_file.closed, "The temporary file is not opened. Ensure you are inside the 'with' context."
         for s in lines:
@@ -1343,7 +1353,7 @@ class UpdateScriptBuilder:
             if written > 0:
                 self.written_body_bytes += written
     
-    def cleanup(self):
+    def cleanup(self) -> None:
         if self.temp_file and not self.temp_file.closed:
             self.temp_file.close()
 
@@ -1365,9 +1375,9 @@ class UpdateScriptBuilder:
         else:
             print(f"Warning: The target script path is not initialized")
 
-    def finalize(self):
-        assert isinstance(self.temp_script_path, pathlib.Path)
-        assert isinstance(self.target_script_path, pathlib.Path)
+    def finalize(self) -> None:
+        assert isinstance(self.temp_script_path, Path)
+        assert isinstance(self.target_script_path, Path)
 
         if self.temp_file and not self.temp_file.closed:
             self.temp_file.close()
