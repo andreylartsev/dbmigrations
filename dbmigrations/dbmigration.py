@@ -1507,14 +1507,6 @@ class VerifyCommand (BaseCommand):
         rows = cursor.fetchall()
         return rows
 
-    @staticmethod
-    def _print_row(row):
-        applied_at, script_type, version_id, relative_path, git_blob_sha1 = row
-        date_str = applied_at.strftime("%Y-%m-%d %H:%M:%S")
-        clean_oid = git_blob_sha1.strip()[:8]
-        clean_path = str(relative_path).replace('\\', '/')                
-        print(f"  [{date_str} | {script_type:<10} | {version_id:<6} | {clean_path} (OID: {clean_oid})]")
-
     def display_recent_changes_grouped_by_git_commits(self, rows):
         assert self.git is not None
         assert rows is not None
