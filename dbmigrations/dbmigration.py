@@ -218,19 +218,54 @@ class ScriptFsInfo(NamedTuple):
         return f"[{self.relative_path} (OID: {short_oid})]"
 
     @classmethod
-    def get_info(cls, scripts_dir, script_path, decode_and_store_text = False, encoding="utf-8-sig", encoding_errors="ignore") -> Self:
+    def get_info(
+        cls, 
+        scripts_dir: str | Path, 
+        script_path: str | Path
+    ) -> Self:
+        """
+        Factory method for potentially large files. 
+        Calculates Git SHA-1 efficiently in chunks without loading text into memory.
+        """
         relative_script_path = get_script_path_for_log(scripts_dir, script_path)
+        git_blob_sha1 = get_git_blob_sha1_for_file_path(script_path)
+        
+        result = cls(
+            script_path=script_path, 
+            relative_path=relative_script_path,
+            oid=git_blob_sha1,
+            text=""
+        )
+        return result 
+
+    @classmethod
+    def get_info_with_text(
+        cls, 
+        scripts_dir: str | Path, 
+        script_path: str | Path, 
+        encoding: str = "utf-8-sig", 
+        encoding_errors: str = "ignore"
+    ) -> Self:
+        """
+        Factory method for small/medium files where full text content is needed.
+        Loads file bytes to calculate SHA-1 and decodes them into the 'text' field.
+        """
+        relative_script_path = get_script_path_for_log(scripts_dir, script_path)
+        
         with open(script_path, 'rb') as f:
             script_bytes = f.read()
+            
         git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-        text = ""
-        if decode_and_store_text:
-            text = script_bytes.decode(encoding, encoding_errors)
-        result = cls(script_path=script_path, 
-                    relative_path=relative_script_path,
-                    oid=git_blob_sha1,
-                    text=text)
+        text = script_bytes.decode(encoding, encoding_errors)
+        
+        result = cls(
+            script_path=script_path, 
+            relative_path=relative_script_path,
+            oid=git_blob_sha1,
+            text=text
+        )
         return result
+
 
 
 class ScriptDbInfo(NamedTuple):
@@ -1251,7 +1286,7 @@ class UpdateCommand (BaseCommand):
             return
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         script_infos = [
-            ScriptFsInfo.get_info(scripts_dir, s, decode_and_store_text=True, 
+            ScriptFsInfo.get_info_with_text(scripts_dir, s, 
                             encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) 
                             for s in scripts_to_repeat]
         print(f"Found {len(script_infos)} scripts to re-run")
