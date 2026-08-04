@@ -174,24 +174,30 @@ def resolve_relative_script_path(start_path: Path, depth_within_base_dir: int, p
 def log_server_notices(diag):
     print(f"Server: {diag.severity} - {diag.message_primary}")
 
-def get_char():
+def get_char() -> str:
+    result = ""    
     if sys.platform == "win32":
-        import msvcrt
-        char = msvcrt.getche().decode("utf-8", errors="ignore")
-        print()
-        return char
+        import msvcrt        
+        char_bytes = msvcrt.getch()        
+        # Handle special/function keys (arrows, F1-F12) which emit a prefix byte
+        if char_bytes in (b"\x00", b"\xe0"):
+            msvcrt.getch()  # Consume the second trailing byte of the special key
+            result = ""
+        else:
+            result = char_bytes.decode("utf-8", "ignore")
+            print(result, flush=True)            
     else:
         import termios
-        import tty
+        import tty        
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setcbreak(fd)
-            char = sys.stdin.read(1)
-            print(char) 
+            result = sys.stdin.read(1)
+            print(result, flush=True)
         finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return char
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)            
+    return result 
 
 class ScriptFsInfo(NamedTuple):
     script_path : Path
