@@ -105,14 +105,14 @@ def get_git_blob_sha1_for_bytes(script_bytes):
     sha1.update(content)
     return sha1.hexdigest()
 
-def get_script_path_for_log(scripts_dir, script_path):
-    dir = pathlib.Path(scripts_dir).parent.resolve()
-    file = pathlib.Path(script_path).resolve()
-    if file.is_relative_to(dir):
-        result = file.relative_to(dir)
+def get_script_path_for_log(scripts_dir: str|Path, script_path: str|Path) -> str:
+    base_dir = Path(scripts_dir).parent.resolve()
+    target_file = Path(script_path).resolve()
+    if target_file.is_relative_to(base_dir):
+        result = target_file.relative_to(base_dir).as_posix()
     else:
-        result = script_path
-    return result.as_posix()
+        result = target_file.as_posix()
+    return result
 
 def read_as_trimmed_string(file_path):
     with open(file_path, 'rb') as f:
