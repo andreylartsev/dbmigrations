@@ -114,14 +114,14 @@ def get_script_path_for_log(scripts_dir: str|Path, script_path: str|Path) -> str
         result = target_file.as_posix()
     return result
 
-def read_as_trimmed_string(file_path):
+def read_as_trimmed_string(file_path : str|Path) -> str:
     with open(file_path, 'rb') as f:
         for binary_line in f:
             decoded_str = binary_line.decode("utf-8-sig", "ignore")
             trimmed_str = decoded_str.strip()
             if trimmed_str:
                 return trimmed_str
-    raise CommandError(f"The file '{file_path}' must not be empty")
+    raise CommandError(f"The file '{file_path}' contains no valid text data")
 
 def resolve_relative_script_path(start_path, depth_within_base_dir, path_str):
     if not path_str.startswith("@"):
