@@ -95,8 +95,6 @@ UNCOMMITTED_MESSAGE_LABEL = "Uncommitted changes"
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
-    def __init__(self, message):
-        super().__init__(message)
 
 def get_git_blob_sha1_for_bytes(script_bytes : bytes) -> str:
     content = script_bytes.replace(b'\r\n', b'\n')
@@ -147,7 +145,7 @@ def read_as_trimmed_string(file_path : str|Path) -> str:
                 return trimmed_str
     raise CommandError(f"The file '{file_path}' contains no valid text data")
 
-def resolve_relative_script_path(start_path, depth_within_base_dir, path_str):
+def resolve_relative_script_path(start_path: Path, depth_within_base_dir: int, path_str : str) -> Path:
     if not path_str.startswith("@"):
         raise CommandError(f"The relative environment path must start with @ symbol, but '{path_str}' was found")
     start = path_str.find("@") + 1
@@ -166,7 +164,7 @@ def resolve_relative_script_path(start_path, depth_within_base_dir, path_str):
     # add a referencing env name
     result = result.joinpath(env_name)
     # walk forward
-    last_parts = start_path.parts[-depth_within_base_dir:]
+    last_parts = start_path.parts[-depth_within_base_dir:] if depth_within_base_dir > 0 else ()
     for part in last_parts:
         result = result.joinpath(part)
     # add extra path specified after env name
