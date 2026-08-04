@@ -107,34 +107,22 @@ def get_git_blob_sha1_for_bytes(script_bytes : bytes) -> str:
     return result
 
 def get_git_blob_sha1_for_file_path(file_path: str | Path) -> str:
-    """
-    Calculates Git SHA-1 using an efficient single-disk-read stream approach.
-    Mimics Git's internal memory-efficient handling of CRLF conversions.
-    Optimized for large files (GB+) by using a 1MB chunk size.
-    """
     path = Path(file_path)
-    # 1MB chunk size reduces Python loop iterations for gigabyte-scale files
     chunk_size = 1048576  
-    
-    # Inner generator that yields cleaned chunks from memory without cloning the disk data
+
     def bytes_stream():
         if path.stat().st_size == 0:
             return                
         with open(path, "rb") as f:
-            # Memory-map the file for fast OS-level caching
             with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                 while chunk := mm.read(chunk_size):
-                    # Strip out Carriage Return (\r) on the fly
                     yield chunk.replace(b"\r", b"")
 
-    # Step 1: Fast in-memory evaluation of the final size (no double disk read)
     total_bytes = sum(len(chunk) for chunk in bytes_stream())
-    
-    # Step 2: Initialize hash with the official Git header
+
     header = f"blob {total_bytes}\x00".encode("utf-8")
     sha1 = hashlib.sha1(header)
     
-    # Step 3: Stream the chunks straight into the SHA-1 engine
     for chunk in bytes_stream():
         sha1.update(chunk)
         
