@@ -503,7 +503,7 @@ class ExternalTool:
             result[variable_key] = value
         result["${file}"] = script_path
         result["${schema_name}"] = self.schema_name
-        return result  # 🔴 Breakpoint here to check substitution variables
+        return result
 
     def match_variables_to_args(self, variables: Dict[str, Any], args: List[str]) -> List[str]:
         """Maps argument placeholders to their actual python-internal unicode string values."""
