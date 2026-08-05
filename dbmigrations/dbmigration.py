@@ -17,10 +17,11 @@ import subprocess
 import sys
 import tomllib
 import traceback
+import locale
 from abc import ABC, abstractmethod
 from datetime import datetime
 from types import TracebackType
-from typing import NamedTuple, Self, Any, TextIO, Iterable, Type
+from typing import NamedTuple, Self, Any, TextIO, Iterable, Type, List, Dict
 
 #
 # prerequire packages listed in requirements.txt
@@ -453,30 +454,20 @@ class GitChecker:
 
 
 class ExternalTool:
-    def make_variables_dict_from_config_and_script_path(self, script_path):
-        result = {}
-        for key, value in self.dbconn_config.items():
-            variable_key = "${" + key.strip() + "}"  
-            result[variable_key] = value
-        result["${file}"] = script_path
-        result["${schema_name}"] = self.schema_name
-        return result
-
-    def match_variables_to_args(self, variables, args):
-        result = []
-        for arg in args:
-            variable_key = arg.strip() 
-            if variable_key in variables:
-                value_str = str(variables[variable_key])
-                result.append(value_str)
-            else:
-                result.append(arg)
-        return result
-
-    def __init__(self, tool_name, schema_name, dbconn_config, toml_config):
+    def __init__(
+        self, 
+        tool_name: str, 
+        schema_name: str, 
+        dbconn_config: Dict[str, Any], 
+        toml_config: Dict[str, Any]
+    ) -> None:
+        """Initializes the external tool configuration and caches system encoding."""
         self.tool_name = tool_name
         self.schema_name = schema_name
         self.dbconn_config = dbconn_config
+        
+        # Detect and cache system encoding once to save CPU cycles on multiple runs
+        self.system_encoding = locale.getpreferredencoding(False)
 
         if TOOLS_CONFIG_GROUP not in toml_config:
             raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
@@ -504,30 +495,56 @@ class ExternalTool:
             raise CommandError(f"There is no attribute '{TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
         self.success_result_code = tool_config[TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE]
 
-    def run(self, script_path):
+    def make_variables_dict_from_config_and_script_path(self, script_path: str) -> Dict[str, Any]:
+        """Creates a token lookup dictionary for variable substitution."""
+        result = {}
+        for key, value in self.dbconn_config.items():
+            variable_key = "${" + key.strip() + "}"  
+            result[variable_key] = value
+        result["${file}"] = script_path
+        result["${schema_name}"] = self.schema_name
+        return result  # 🔴 Breakpoint here to check substitution variables
+
+    def match_variables_to_args(self, variables: Dict[str, Any], args: List[str]) -> List[str]:
+        """Maps argument placeholders to their actual python-internal unicode string values."""
+        result = []
+        for arg in args:
+            variable_key = arg.strip() 
+            if variable_key in variables:
+                value_str = str(variables[variable_key])
+                result.append(value_str)
+            else:
+                result.append(arg)
+        return result 
+    
+    def run(self, script_path: str) -> int:
+        """Executes the tool in a safe context, streaming its output using system-native encoding."""
         tool_absolute_path = self.exec_path.absolute()
         tool_args = self.args
         variables = self.make_variables_dict_from_config_and_script_path(script_path)
         tool_args_with_matched_variables = self.match_variables_to_args(variables, tool_args)
         command_line = [str(tool_absolute_path), *tool_args_with_matched_variables]
-        process = subprocess.Popen(
+        
+        with subprocess.Popen(
             args=command_line, 
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT, 
             text=True,
-            encoding='utf-8-sig')
-        # Read and print output line by line as it happens
-        for line in iter(process.stdout.readline, ''):
-            print(line, end='') 
+            encoding=self.system_encoding,
+            errors='replace'
+        ) as process:
+            
+            if process.stdout:
+                for line in iter(process.stdout.readline, ''):
+                    print(line, end='') 
 
-        remaining_stdout, _ = process.communicate()
-        if remaining_stdout:
-            print(remaining_stdout, end='')
-
-        result_code = process.returncode 
+            result_code = process.wait() 
 
         if result_code != self.success_result_code:
             raise CommandError(f"The tool '{self.tool_name}' returned unsuccessful result code {result_code}!")
+            
+        return result_code 
+
 
 class OwnMigration(ABC):    
     @abstractmethod
