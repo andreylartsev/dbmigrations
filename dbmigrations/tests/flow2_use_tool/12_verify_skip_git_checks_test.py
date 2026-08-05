@@ -9,10 +9,6 @@ def test_dbmigration_verify_skip_git_checks_success(cfg):
     # Construct the path to the specific samples folder
     target_sample_path = cfg.SCRIPTS_PATH
     
-    # Generate a completely unique filename using UUID v4 to avoid any file handle conflicts on Windows
-    unique_filename = f"verify_test_{uuid.uuid4().hex}.sql"
-    output_sql_file = cfg.TESTS_DIR.joinpath(unique_filename)
-    
     # Construct the CLI command including the new script generation flag
     command = [
         cfg.PYTHON_EXE,
@@ -24,40 +20,34 @@ def test_dbmigration_verify_skip_git_checks_success(cfg):
         "--skip-git-checks"
     ]
     
-    try:
-        # Run the database migration script in verification mode
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            encoding="utf-8-sig"  # Handles Windows console BOM character matching properly
-        )
-        
-        # Print outputs with a fallback to "EMPTY" if stdout/stderr are empty or contain only whitespaces
-        print("\n=== STDOUT ===")
-        print(result.stdout.strip() or "EMPTY")
-        print("=== STDERR ===")
-        print(result.stderr.strip() or "EMPTY")
-        
-        # 1. Verify the process exit code status (0 means success)
-        assert result.returncode == 0, f"Script execution failed with error: {result.stdout or result.stderr}"
-        
-        # 2. Verify dynamic database connection string format output log via regex match
-        db_conn_pattern = r"Opened db connection: '\S+@\S+:\d+/\S+'"
-        assert re.search(db_conn_pattern, result.stdout) is not None, \
-            f"Database connection log string was not found or has an invalid format: {result.stdout}"
+    # Run the database migration script in verification mode
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8-sig"  # Handles Windows console BOM character matching properly
+    )
     
-        # 3. Verify target schema connection log statements
-        assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
-        assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
-        assert "Closed db connection." in result.stdout
-        
-        # 4. Verify baseline and versioned block summary messages
-        assert "The baseline scripts to install:" in result.stdout
-        assert "00_esbdb_schema.sql" in result.stdout
-        assert "01_esbdb_data.sql" in result.stdout
-           
-    finally:
-        # CRITICAL: Clean up the generated file after assertions complete or if an assertion fails
-        if output_sql_file.exists():
-            output_sql_file.unlink()
+    # Print outputs with a fallback to "EMPTY" if stdout/stderr are empty or contain only whitespaces
+    print("\n=== STDOUT ===")
+    print(result.stdout.strip() or "EMPTY")
+    print("=== STDERR ===")
+    print(result.stderr.strip() or "EMPTY")
+    
+    # 1. Verify the process exit code status (0 means success)
+    assert result.returncode == 0, f"Script execution failed with error: {result.stdout or result.stderr}"
+    
+    # 2. Verify dynamic database connection string format output log via regex match
+    db_conn_pattern = r"Opened db connection: '\S+@\S+:\d+/\S+'"
+    assert re.search(db_conn_pattern, result.stdout) is not None, \
+        f"Database connection log string was not found or has an invalid format: {result.stdout}"
+
+    # 3. Verify target schema connection log statements
+    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+    assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
+    assert "Closed db connection." in result.stdout
+    
+    # 4. Verify baseline and versioned block summary messages
+    assert "The baseline scripts to install:" in result.stdout
+    assert "00_esbdb_schema.sql" in result.stdout
+    assert "01_esbdb_data.sql" in result.stdout
