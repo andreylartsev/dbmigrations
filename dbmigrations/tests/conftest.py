@@ -3,7 +3,6 @@ import tomllib
 from pathlib import Path
 from typing import NamedTuple, Any, Dict
 import pytest
-import psycopg  
 
 DEFAULT_TARGET_SCHEMA_NAME = "test3"
 
@@ -19,6 +18,7 @@ class TestConfig(NamedTuple):
     DBMIGRATION_PY_PATH: Path
     TESTS_DIR: Path
     SAMPLES_PATH: Path
+    SCRIPTS_PATH: Path | None
     DBCONN_CONFIG: Dict[str, Any]  # Ready to be used as psycopg.connect(**config.DBCONN_CONFIG)
     RUN_TESTS_BY: Any
     NO_PASSWORD: bool
@@ -95,6 +95,7 @@ def load_config_parameters(target_schema) -> TestConfig:
         DBMIGRATION_PY_PATH=dbmigration_py_path,
         TESTS_DIR=tests_dir,
         SAMPLES_PATH=samples_path,
+        SCRIPTS_PATH=None,
         DBCONN_CONFIG=dbconn_config,
         RUN_TESTS_BY=run_tests_by,
         NO_PASSWORD=no_password
@@ -108,21 +109,3 @@ def cfg(request) -> TestConfig:
     schema_from_cli = request.config.getoption("--schema")
     return load_config_parameters(target_schema=schema_from_cli)
  
-
-# 4. Session Setup Fixture
-@pytest.fixture(scope="session", autouse=True)
-def setup_database_session(cfg: TestConfig):
-    """Recreates the target database schema exactly ONCE before the entire test suite starts."""
-    
-    with psycopg.connect(**cfg.DBCONN_CONFIG) as conn:
-        conn.autocommit = True  
-        with conn.cursor() as cur:
-            cur.execute(
-                psycopg.sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE;").format(psycopg.sql.Identifier(cfg.TARGET_SCHEMA))
-            )
-            cur.execute(
-                psycopg.sql.SQL("CREATE SCHEMA {};").format(psycopg.sql.Identifier(cfg.TARGET_SCHEMA))
-            )
-            
-    print(f"\n[SESSION SETUP] Target schema '{cfg.TARGET_SCHEMA}' has been successfully recreated via psycopg.")
-    yield
