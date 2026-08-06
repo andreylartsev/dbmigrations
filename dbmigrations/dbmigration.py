@@ -825,14 +825,12 @@ class BaseCommand:
              raise CommandError(f"The attribute self.args.schema_name must not be None")
          return psycopg.sql.Identifier(self.args.schema_name)
 
-    def check_if_schema_exists(self):
+    def check_if_schema_exists(self) -> bool:
         sql = """
             SELECT EXISTS (
                 SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = %s)"""
         value = self.dbconn_get_single_value(sql, (self.args.schema_name,))
-        if value is None:
-            raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
-        return value
+        return value is True
     
     def get_scripts_path_environment_id(self):
         environment_id = None
