@@ -869,14 +869,14 @@ class BaseCommand:
                 
         return environment_id
 
-
-    def get_stored_environment_id(self):
+    def get_stored_environment_id(self) -> str:
         sql = """
                 SELECT id FROM {schema_name_identity}.dbmigration_environment_id ORDER BY created_at ASC LIMIT 1"""        
         formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name()) 
         value = self.dbconn_get_single_value(formatted_sql, [])
         if value is None:
-            raise CommandError(f"Unable to get stored environment id from the database schema")
+            schema_name = self.args.schema_name if hasattr(self.args, "schema_name") else "Unknown" 
+            raise CommandError(f"Unable to get stored environment ID from the database schema '{schema_name}'")
         return value
     
     def get_search_path_for_scripts(self):
