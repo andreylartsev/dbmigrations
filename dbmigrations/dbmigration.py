@@ -818,12 +818,13 @@ class BaseCommand:
         
         return f"{info.user}@{host}{port}/{info.dbname}"
 
-    def get_schema_name(self):
-         if self.args is None:
-             raise CommandError(f"The attribute self.args must not be None")
-         if self.args.schema_name is None:
-             raise CommandError(f"The attribute self.args.schema_name must not be None")
-         return psycopg.sql.Identifier(self.args.schema_name)
+    def get_schema_name(self) -> psycopg.sql.Identifier:
+         if not self.args:
+             raise CommandError(f"The attribute self.args must be present")
+         schema_name = self.args.schema_name
+         if not schema_name:
+             raise CommandError(f"The attribute self.args.schema_name must be present")
+         return psycopg.sql.Identifier(schema_name)
 
     def check_if_schema_exists(self) -> bool:
         sql = """
