@@ -21,7 +21,7 @@ import locale
 from abc import ABC, abstractmethod
 from datetime import datetime
 from types import TracebackType
-from typing import NamedTuple, Self, Any, TextIO, Iterable, Type, List, Dict
+from typing import NamedTuple, Self, Any, TextIO, Iterable, Type, List, Dict, Sequence, Mapping
 
 #
 # prerequire packages listed in requirements.txt
@@ -558,7 +558,7 @@ class OwnMigration(ABC):
         pass
 
 class MigrationCheckForOlderVersionControlTables (OwnMigration):
-    def get_sql_to_check_if_need_migration(self):
+    def get_sql_to_check_if_need_migration(self) -> str:
         sql = """
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.tables 
@@ -569,12 +569,12 @@ class MigrationCheckForOlderVersionControlTables (OwnMigration):
             ) AS conditions_met;     
         """
         return sql
-    def get_migration_ddl(self):
+    def get_migration_ddl(self) -> str:
         raise CommandError(f"This version of dbmigration tools is incompatible with this schema.\n" 
                             "Please use the previous version available by tag 0.9.x or upgrade the current schema by deleting dbmigration_version and dbmigration_repeatable tables and running the update subcommand with --force-run-cleanup flag: \n" 
                             "i.e. dbmigration.py update <schema_name> <scripts_folder> --force-run-cleanup")
                            
-    def get_migration_desc(self):
+    def get_migration_desc(self) -> str:
         desc = "Check for older version control tables"
         return desc
 
@@ -582,7 +582,7 @@ class BaseCommand:
 
     all_own_migrations: list[OwnMigration]
 
-    def apply_all_own_migrations(self):
+    def apply_all_own_migrations(self) -> int:
         applied_count = 0
         for m in self.all_own_migrations:
             if not isinstance(m, OwnMigration):
@@ -600,7 +600,7 @@ class BaseCommand:
                 applied_count += 1
         return applied_count
 
-    def check_if_all_own_migrations_are_applied(self):
+    def check_if_all_own_migrations_are_applied(self) -> None:
         for m in self.all_own_migrations:
             if not isinstance(m, OwnMigration):
                 raise CommandError(f"Not a 'Migration' object found within the migrations collection")
@@ -786,28 +786,37 @@ class BaseCommand:
         result_query = psycopg.sql.SQL(sql).format(**params)
         return result_query
 
-    def dbconn_get_single_value(self, sql, params):
+    def dbconn_get_single_value(
+            self, 
+            sql : str | psycopg.sql.Composed, 
+            params : Sequence[Any] | Mapping[str, Any]) -> Any | None:
         with self.dbconn.cursor() as cur:
             cur.execute(sql, params)
-            row = cur.fetchone()
-            return row[0] if row is not None else None
+            try:
+                row = cur.fetchone()
+            except psycopg.ProgrammingError: # thrown in case of DDL or anonymous PL/pgSQL block
+                return None
+            return next(iter(row), None) if row is not None else None
         
-    def dbconn_exec_with_no_result_in_tran(self, sql, params):
-        with self.dbconn.cursor() as cur:
-            cur.execute("BEGIN")
-            cur.execute(sql, params)
-            cur.execute("COMMIT")
+    def dbconn_exec_with_no_result_in_tran(
+        self, 
+        sql: str | psycopg.sql.Composed, 
+        params: Sequence[Any] | Mapping[str, Any]
+    ) -> None:
+        with self.dbconn:
+            with self.dbconn.cursor() as cur:
+                cur.execute(sql, params)
 
-    def dbconn_attr_as_utf_8(self, attr):
-        if attr is None:
-            return "None"
-        else:
-            return attr.decode('utf-8')
+    def dbconn_get_connection_string(self, dbconn: psycopg.Connection[Any]) -> str:
+        info = dbconn.info
+        
+        host_val = getattr(info, "host", None)
+        host = host_val if host_val else "[local_socket]"
 
-    def dbconn_get_connection_string(self, dbconn):
-        info = dbconn.pgconn
-        result = f"{self.dbconn_attr_as_utf_8(info.user)}@{self.dbconn_attr_as_utf_8(info.host)}:{self.dbconn_attr_as_utf_8(info.port)}/{self.dbconn_attr_as_utf_8(info.db)}"
-        return result
+        port_val = getattr(info, "port", None)        
+        port = f":{port_val}" if port_val else ""
+        
+        return f"{info.user}@{host}{port}/{info.dbname}"
 
     def get_schema_name(self):
          if self.args is None:
