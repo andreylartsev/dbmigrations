@@ -875,8 +875,7 @@ class BaseCommand:
         formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name()) 
         value = self.dbconn_get_single_value(formatted_sql, [])
         if value is None:
-            schema_name = self.args.schema_name if hasattr(self.args, "schema_name") else "Unknown" 
-            raise CommandError(f"Unable to get stored environment ID from the database schema '{schema_name}'")
+            raise CommandError(f"Unable to get stored environment ID from the database schema")
         return value
     
     def get_search_path_for_scripts(self):
