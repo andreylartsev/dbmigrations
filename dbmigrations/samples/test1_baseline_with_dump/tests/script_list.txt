@@ -1,0 +1,4 @@
+assure_that_table_t1_is_ok.sql
+assure_that_table_t2_is_ok.sql
+assure_that_view_latest_t1_is_ok.sql
+is_true_that_view_latest_t1_returns_max_value.sql
