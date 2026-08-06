@@ -104,7 +104,7 @@ def load_config_parameters(target_schema) -> TestConfig:
 
 # 3. Pytest Fixture providing the NamedTuple to tests
 @pytest.fixture(scope="session")
-def cfg(request) -> TestConfig:
+def session_cfg(request) -> TestConfig:
     """Provides a session-wide named tuple instance containing all settings."""
     schema_from_cli = request.config.getoption("--schema")
     return load_config_parameters(target_schema=schema_from_cli)

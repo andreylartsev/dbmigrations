@@ -3,11 +3,11 @@ import psycopg
 from typing import NamedTuple
 
 @pytest.fixture(scope="package")
-def cfg(cfg) -> NamedTuple:
+def cfg(session_cfg) -> NamedTuple:
     """Provides a package-wide named tuple instance containing all settings."""
-    result = cfg._replace(
+    result = session_cfg._replace(
         TARGET_SCHEMA="esbdb",
-        SCRIPTS_PATH=cfg.SAMPLES_PATH.joinpath("test1_baseline_with_dump")
+        SCRIPTS_PATH=session_cfg.SAMPLES_PATH.joinpath("test1_baseline_with_dump")
     )
     return result
 
