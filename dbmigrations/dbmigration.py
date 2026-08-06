@@ -775,12 +775,16 @@ class BaseCommand:
                 sorted_files.insert(0, cleanup_file_path)
         return sorted_files
 
-    def format_sql(self, sql, **params):
+    def format_sql_text(self, sql : str, **params) -> str:
         if self.dbconn is None:
             raise CommandError(f"DB connection is not initialized yet")
-        formatted_sql = psycopg.sql.SQL(sql).format(**params)
-        formatted_text = formatted_sql.as_string(self.dbconn)
-        return formatted_text        
+        composed_query = psycopg.sql.SQL(sql).format(**params)
+        result_str = composed_query.as_string(self.dbconn)
+        return result_str        
+
+    def format_sql(self, sql: str, **params) -> psycopg.sql.Composed:
+        result_query = psycopg.sql.SQL(sql).format(**params)
+        return result_query
 
     def dbconn_get_single_value(self, sql, params):
         with self.dbconn.cursor() as cur:
@@ -1646,19 +1650,19 @@ class VerifyCommand (BaseCommand):
     def write_search_path(self, search_path, builder):
         assert builder is not None
         with builder:
-            formatted_sql_text = self.format_sql("SELECT pg_catalog.set_config('search_path', {search_path}, false);\n", search_path=search_path)
+            formatted_sql_text = self.format_sql_text("SELECT pg_catalog.set_config('search_path', {search_path}, false);\n", search_path=search_path)
             builder.write_header(formatted_sql_text)
 
     def write_baseline_scripts(self, version, scripts_dir, scripts, script_builder):
         assert script_builder is not None
         with script_builder:
-            formatted_sql_text = self.format_sql("-- Baseline scripts for version {version_id}\n", version_id=version)
+            formatted_sql_text = self.format_sql_text("-- Baseline scripts for version {version_id}\n", version_id=version)
             script_builder.write_body(formatted_sql_text)
             for script_path in scripts:
                 relative_script_path = get_script_path_for_log(scripts_dir, script_path)
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
-                formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))                    
+                formatted_sql_text = self.format_sql_text("--{script_path}\n", script_path=str(relative_script_path))                    
                 script_builder.write_body(formatted_sql_text)
                 script_builder.write_body(f"BEGIN;\n")
                 script_builder.write_body_lines(lines)
@@ -1666,7 +1670,7 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(f"COMMIT;\n")
 
             script_builder.write_body(f"BEGIN;\n")
-            formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", 
+            formatted_sql_text = self.format_sql_text("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", 
                                                  schema_name=self.get_schema_name(), version_id=version)
             script_builder.write_body(formatted_sql_text)
             for script_path in scripts:
@@ -1674,7 +1678,7 @@ class VerifyCommand (BaseCommand):
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
                 git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                formatted_sql_text = self.format_sql_text("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
                                                     schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                 script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"COMMIT;\n")
@@ -1707,27 +1711,27 @@ class VerifyCommand (BaseCommand):
     def write_versioned_scripts(self, version, scripts_dir, scripts, script_builder):
         assert script_builder is not None
         with script_builder:
-            formatted_sql_text = self.format_sql("-- Versioned scripts for version {version_id}\n", version_id=version)
+            formatted_sql_text = self.format_sql_text("-- Versioned scripts for version {version_id}\n", version_id=version)
             script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"BEGIN;\n")
             for script_path in scripts:
                 relative_script_path = get_script_path_for_log(scripts_dir, script_path)
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
-                formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
+                formatted_sql_text = self.format_sql_text("--{script_path}\n", script_path=str(relative_script_path))
                 script_builder.write_body(formatted_sql_text)
                 script_builder.write_body_lines(lines)
                 script_builder.write_body(f"\n")
-            formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, FALSE);\n", 
-                                                 schema_name=self.get_schema_name(), version_id=version)
+            formatted_sql_text = self.format_sql_text("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, FALSE);\n", 
+                                                    schema_name=self.get_schema_name(), version_id=version)
             script_builder.write_body(formatted_sql_text)
             for script_path in scripts:
                 relative_script_path = get_script_path_for_log(scripts_dir, script_path)
                 with open(script_path, 'rb') as f:
                     script_bytes = f.read()
                 git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
+                formatted_sql_text = self.format_sql_text("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                                                        schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
                 script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
@@ -1776,18 +1780,18 @@ class VerifyCommand (BaseCommand):
     def write_repeatable_scripts(self, target_version, scripts_dict, scripts_dir, script_builder):
         assert script_builder is not None
         with script_builder:
-            formatted_sql_text = self.format_sql("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
+            formatted_sql_text = self.format_sql_text("-- Repeatable scripts for version {version_id}\n", version_id=target_version)
             script_builder.write_body(formatted_sql_text)
             for git_blob_sha1, script_path in scripts_dict.items():
                 relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-                formatted_sql_text = self.format_sql("--{script_path}\n", script_path=str(relative_script_path))
+                formatted_sql_text = self.format_sql_text("--{script_path}\n", script_path=str(relative_script_path))
                 script_builder.write_body(formatted_sql_text)
                 script_builder.write_body(f"BEGIN;\n")
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                 script_builder.write_body_lines(lines)
                 script_builder.write_body(f"\n")
-                formatted_sql_text = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
+                formatted_sql_text = self.format_sql_text("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
                                                         schema_name=self.get_schema_name(), git_blob_sha1=git_blob_sha1, version_id=target_version, relative_path=str(relative_script_path))
                 script_builder.write_body(formatted_sql_text)
                 script_builder.write_body(f"COMMIT;\n")
