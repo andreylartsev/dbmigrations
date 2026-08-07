@@ -613,22 +613,26 @@ class BaseCommand:
                 desc = m.get_migration_desc()
                 raise CommandError(f"Run 'update' subcommand to update version control tables within the schema. The following migration need to be applied: {desc}")
 
-    def get_default_dbenv(self, toml_config):
+    def get_default_dbenv(self, toml_config : dict[str, Any]) -> str:
         if DEFAULT_DBENV_CONFIG_ATTRIBUTE not in toml_config:
-            raise CommandError(f"There is no '{DEFAULT_DBENV_CONFIG_ATTRIBUTE}' within the configuration file '{TOML_CONFIG_FILE}'.")
+            raise CommandError(f"Missing required key '{DEFAULT_DBENV_CONFIG_ATTRIBUTE}' in configuration file '{TOML_CONFIG_FILE}'.")
         default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
-        return default_dbenv
+        return str(default_dbenv)
 
-    def get_dbenv_config(self, toml_config, dbenv_param):
+    def get_dbenv_config(
+            self, 
+            toml_config : dict[str, Any], 
+            dbenv_param : str
+    ) -> tuple[dict[str, Any], str | None, bool]:
         if DBENVS_CONFIG_GROUP not in toml_config:
-            raise CommandError(f"There is no configuration group'{DBENVS_CONFIG_GROUP}' within the configuration file '{TOML_CONFIG_FILE}'.")
+            raise CommandError(f"Missing required configuration group'{DBENVS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
         dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
         if dbenv_param not in dbenvs_config:
-            raise CommandError(f"There is no configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' within the configuration file '{TOML_CONFIG_FILE}'.")
-        config = copy.deepcopy(dbenvs_config[dbenv_param])
-        run_tests_by = config.pop(RUN_TESTS_BY_ATTRIBUTE, None)
-        no_password = config.pop(NO_PASSWORD_ATTRIBUTE, False)
-        return config, run_tests_by, no_password
+            raise CommandError(f"Missing configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' in configuration file '{TOML_CONFIG_FILE}'.")
+        config_copy = copy.deepcopy(dbenvs_config[dbenv_param])
+        run_tests_by = config_copy.pop(RUN_TESTS_BY_ATTRIBUTE, None)
+        no_password = config_copy.pop(NO_PASSWORD_ATTRIBUTE, False)
+        return config_copy, run_tests_by, no_password
 
     def try_get_external_tool_name(self, dir):
         start_path = pathlib.Path(dir) 
@@ -1036,7 +1040,7 @@ class BaseCommand:
             "dbmigration_repeatable_scripts",
     ]
 
-    def check_if_all_version_control_tables_exist(self):
+    def check_if_all_version_control_tables_exist(self) -> None:
         schema_name = self.get_schema_name_arg()    
         for table_name in self._required_version_control_tables:
             if not self.check_if_table_exists(table_name):
@@ -1052,8 +1056,7 @@ class BaseCommand:
                     f"The schema '{schema_name}' already contains the version control table '{table_name}'"
                 )
 
-    def __init__(self, config, subparsers, command_name, command_help):
-
+    def __init__(self, config, subparsers, command_name, command_help) -> None:
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
         self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
@@ -1076,6 +1079,7 @@ class BaseCommand:
         self.parser.add_argument("--user", type=str, default=None, help="user name")
         self.parser.add_argument("-n","--no-password",  action="store_true", default=self.no_password, help="dont ask user password")
         self.parser.set_defaults(call=self) 
+
     def __enter__(self):
         if self.args.dbenv is not None:
             self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(self.config, self.args.dbenv)  
