@@ -936,33 +936,25 @@ class BaseCommand:
             raise CommandError(f"Unable to get latest installed version")
         return value
 
-    def check_if_repeatable_script_installed(self, git_blob_sha1, version, relative_path):
+    def check_if_repeatable_script_installed(self, git_blob_sha1: str, version: str, relative_path: str) -> bool:
         sql = """
             SELECT EXISTS (
-                SELECT 1 
-                FROM {schema_name}.dbmigration_repeatable_scripts newer
-                WHERE newer.relative_path = {relative_path}
-                AND newer.version_id = {version_id}
-                AND newer.git_blob_sha1 = {git_blob_sha1}
-                AND newer.created_at = (
-                    SELECT current_rec.created_at 
-                    FROM {schema_name}.dbmigration_repeatable_scripts current_rec
-                    WHERE current_rec.relative_path = {relative_path}
-                        AND current_rec.version_id = {version_id}
-                    ORDER BY current_rec.created_at DESC
+                SELECT 1 FROM (
+                    SELECT git_blob_sha1 
+                    FROM {schema_name}.dbmigration_repeatable_scripts
+                    WHERE relative_path = %s 
+                      AND version_id = %s
+                    ORDER BY created_at DESC
                     LIMIT 1
-                )
-            )
-        """        
-        formatted_sql = self.format_sql(sql, 
-                                        schema_name=self.get_schema_name(), 
-                                        version_id=version, 
-                                        relative_path=relative_path, 
-                                        git_blob_sha1=git_blob_sha1)
-        value = self.dbconn_get_single_value(formatted_sql, [])
-        if value is None:
-            raise CommandError(f"Unable to check if repeatable script was installed")
-        return value
+                ) latest
+                WHERE latest.git_blob_sha1 = %s
+            );
+        """                
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())        
+        params = (relative_path, version, git_blob_sha1)        
+        value = self.dbconn_get_single_value(formatted_sql, params)
+        return value is True
+
 
     def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self, scripts_dir):
         print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
