@@ -580,11 +580,13 @@ class MigrationCheckForOlderVersionControlTables (OwnMigration):
 
 class BaseCommand:
 
-    all_own_migrations: list[OwnMigration]
+    _all_own_migrations: list[OwnMigration] = [
+       MigrationCheckForOlderVersionControlTables() 
+    ]
 
     def apply_all_own_migrations(self) -> int:
         applied_count = 0
-        for m in self.all_own_migrations:
+        for m in self._all_own_migrations:
             if not isinstance(m, OwnMigration):
                 raise CommandError(f"Not a 'Migration' object found within the migrations collection")
             sql = m.get_sql_to_check_if_need_migration()
@@ -601,7 +603,7 @@ class BaseCommand:
         return applied_count
 
     def check_if_all_own_migrations_are_applied(self) -> None:
-        for m in self.all_own_migrations:
+        for m in self._all_own_migrations:
             if not isinstance(m, OwnMigration):
                 raise CommandError(f"Not a 'Migration' object found within the migrations collection")
             sql = m.get_sql_to_check_if_need_migration()
@@ -1051,10 +1053,6 @@ class BaseCommand:
                 )
 
     def __init__(self, config, subparsers, command_name, command_help):
-
-        self.all_own_migrations = [
-            MigrationCheckForOlderVersionControlTables()
-        ]
 
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
