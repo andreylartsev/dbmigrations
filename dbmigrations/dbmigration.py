@@ -1075,10 +1075,10 @@ class BaseCommand:
         self.default_dbenv = self.get_default_dbenv(config)
         self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
         self.use_run_tests_by_user = False
-        try:        
-            self.options = config[OPTIONS_CONFIG_GROUP]
-        except:
-            raise CommandError(f"Configuration file {TOML_CONFIG_FILE} does not contain configuration group '{OPTIONS_CONFIG_GROUP}'")  
+
+        if OPTIONS_CONFIG_GROUP not in self.config:
+            raise CommandError(f"Missing configuration group '{OPTIONS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")  
+        self.options = config[OPTIONS_CONFIG_GROUP]
     
         self.file_read_encoding =  self.options.get("file_read_encoding", OPTIONS_DEFAULT_FILE_READ_ENCODING)
         self.file_read_encoding_errors =  self.options.get("file_read_encoding_errors", OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS)
@@ -1109,17 +1109,21 @@ class BaseCommand:
         
         if self.args.dbname is not None:
             self.dbconn_settings["dbname"]=self.args.dbname
+            
         if not self.args.no_password and not self.no_password:
             password = None
             if self.use_run_tests_by_user:
-                password = os.getenv(DBCONN_TESTER_PASSWORD_ENVVAR_NAME)
-                if password is None:
-                    password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
-                    if password is None:
-                        raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
+                password = os.getenv(
+                    DBCONN_TESTER_PASSWORD_ENVVAR_NAME,
+                    os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME))
+            else:
+                password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
+            if password is None:
+                raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
             self.dbconn_settings["password"]=password
         else:
-            self.dbconn_settings.pop("password", None)
+            self.dbconn_settings["password"]=None
+
         try:
             self.dbconn = psycopg.connect(**self.dbconn_settings)
         except psycopg.Error as pg_error:
