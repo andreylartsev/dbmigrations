@@ -657,7 +657,7 @@ class BaseCommand:
             dbenv_param : str
     ) -> tuple[dict[str, Any], str | None, bool]:
         if DBENVS_CONFIG_GROUP not in toml_config:
-            raise CommandError(f"Missing required configuration group'{DBENVS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
+            raise CommandError(f"Missing required configuration group '{DBENVS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
         dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
         if dbenv_param not in dbenvs_config:
             raise CommandError(f"Missing configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' in configuration file '{TOML_CONFIG_FILE}'.")
