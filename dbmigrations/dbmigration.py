@@ -1070,7 +1070,13 @@ class BaseCommand:
                     f"The schema '{schema_name}' already contains the version control table '{table_name}'"
                 )
 
-    def __init__(self, config, subparsers, command_name, command_help) -> None:
+    def __init__(
+            self, 
+            config: dict[str, Any], 
+            subparsers: Any, 
+            command_name: str, 
+            command_help: str
+    ) -> None:
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
         self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
@@ -1091,7 +1097,7 @@ class BaseCommand:
         self.parser.add_argument("--port", type=int, default=None, help="db server port")
         self.parser.add_argument("--dbname", type=str, default=None, help="database name")
         self.parser.add_argument("--user", type=str, default=None, help="user name")
-        self.parser.add_argument("-n","--no-password",  action="store_true", default=self.no_password, help="dont ask user password")
+        self.parser.add_argument("-n","--no-password",  action="store_true", default=False, help="don't ask user password")
         self.parser.set_defaults(call=self) 
 
     def __enter__(self):
