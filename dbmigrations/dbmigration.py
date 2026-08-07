@@ -459,28 +459,22 @@ class ExternalTool:
         tool_name: str, 
         schema_name: str, 
         dbconn_config: Dict[str, Any], 
-        toml_config: Dict[str, Any]
+        tool_config: Dict[str, Any]
     ) -> None:
         """Initializes the external tool configuration and caches system encoding."""
         self.tool_name = tool_name
         self.schema_name = schema_name
         self.dbconn_config = dbconn_config
+        self.tool_config = tool_config
         
         # Detect and cache system encoding once to save CPU cycles on multiple runs
         self.system_encoding = locale.getpreferredencoding(False)
 
-        if TOOLS_CONFIG_GROUP not in toml_config:
-            raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
-        tools_config = toml_config[TOOLS_CONFIG_GROUP]
-        
-        if tool_name not in tools_config:
-            raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
-        tool_config = tools_config[tool_name]
-
+        # Read tool config
         if TOOL_EXEC_ATTRIBUTE not in tool_config:
-            raise CommandError(f"There is no attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+            raise CommandError(f"Missing required attribute '{TOOL_EXEC_ATTRIBUTE}' in tool configuration '{tool_name}'.")
         exec_attribute = tool_config[TOOL_EXEC_ATTRIBUTE]
-        exec_path = pathlib.Path(exec_attribute)
+        exec_path = Path(exec_attribute)
         if not exec_path.exists():
             raise CommandError(f"The path '{exec_path}' specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' does not exists.")
         if not exec_path.is_file():
@@ -494,6 +488,44 @@ class ExternalTool:
         if TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE not in tool_config:
             raise CommandError(f"There is no attribute '{TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
         self.success_result_code = tool_config[TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE]
+
+    @classmethod
+    def try_get(
+        cls, 
+        dir : Path, 
+        schema_name : str, 
+        dbconn_config : dict[str, Any], 
+        toml_config : dict[str, Any]
+    ) -> Self | None:
+        if TOOLS_CONFIG_GROUP not in toml_config:
+            raise CommandError(f"Missing configuration group '{TOOLS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
+        tools_config = toml_config[TOOLS_CONFIG_GROUP]        
+
+        tool_name = ExternalTool._try_get_tool_name(dir)
+        if tool_name is None:
+            return None
+        
+        if tool_name not in tools_config:
+            raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
+        tool_config = tools_config[tool_name]
+        
+        result = cls(
+            tool_name, schema_name, dbconn_config, tool_config
+        )
+        return result        
+
+    @classmethod
+    def _try_get_tool_name(cls, dir : Path) -> str|None:
+        start_path = Path(dir) 
+        if not start_path.exists():
+            raise CommandError(f"The folder '{dir}' does not exists")
+        if not start_path.is_dir():
+            raise CommandError(f"The path '{dir}' is not a directory")        
+        use_tool_file_name = start_path.joinpath(USE_TOOL_NAME_FILE_NAME)
+        if not use_tool_file_name.exists():
+            return None
+        tool_name = read_as_trimmed_string(use_tool_file_name)
+        return tool_name        
 
     def make_variables_dict_from_config_and_script_path(self, script_path: str) -> Dict[str, Any]:
         """Creates a token lookup dictionary for variable substitution."""
@@ -633,24 +665,6 @@ class BaseCommand:
         run_tests_by = config_copy.pop(RUN_TESTS_BY_ATTRIBUTE, None)
         no_password = config_copy.pop(NO_PASSWORD_ATTRIBUTE, False)
         return config_copy, run_tests_by, no_password
-
-    def try_get_external_tool_name(self, dir):
-        start_path = pathlib.Path(dir) 
-        if not start_path.exists():
-            raise CommandError(f"The folder '{dir}' does not exists")
-        if not start_path.is_dir():
-            raise CommandError(f"The path '{dir}' is not a directory")        
-        use_tool_file_name = start_path.joinpath(USE_TOOL_NAME_FILE_NAME)
-        if not use_tool_file_name.exists():
-            return None
-        tool_name = read_as_trimmed_string(use_tool_file_name)
-        if TOOLS_CONFIG_GROUP not in self.config:
-            raise CommandError(f"There is no configuration group '{TOOLS_CONFIG_GROUP}' in the configuration file '{TOML_CONFIG_FILE}'.")
-        tools_config = self.config[TOOLS_CONFIG_GROUP]        
-        if tool_name not in tools_config:
-            raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
-        return tool_name
-
 
     def get_script_dependencies(self, base_dir, depth_within_base_dir, script_path):
         if not script_path.exists():
@@ -1249,12 +1263,13 @@ class UpdateCommand (BaseCommand):
         print(f"Apply baseline scripts...")
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
         
-        external_tool_name = self.try_get_external_tool_name(baseline_version_subdir);
-        if external_tool_name is not None:
-            tool = ExternalTool(external_tool_name, self.args.schema_name, self.dbconn_settings, self.config)
-            self.run_baseline_scripts_with_external_tool(baseline_version, scripts_dir, scripts_sorted, tool)
+        external_tool = ExternalTool.try_get(
+            baseline_version_subdir, self.get_schema_name_arg(), self.dbconn_settings, self.config)
+        if external_tool:
+            self.run_baseline_scripts_with_external_tool(baseline_version, scripts_dir, scripts_sorted, external_tool)
         else:
             self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_dir, scripts_sorted)
+
         print(f"The baseline scripts were applied.")       
 
     def reapply_the_latest_version(self, scripts_dir):
