@@ -818,11 +818,9 @@ class BaseCommand:
         return f"{info.user}@{host}{port}/{info.dbname}"
     
     def get_schema_name_arg(self) -> str:
-        if not self.args:
-            raise CommandError(f"The attribute self.args must be present")
         schema_name = self.args.schema_name
         if not schema_name:
-            raise CommandError(f"The attribute self.args.schema_name must be present")
+            raise CommandError(f"The attribute self.args.schema_name must not be empty")
         return schema_name
 
     def get_schema_name(self) -> psycopg.sql.Identifier:
@@ -838,8 +836,6 @@ class BaseCommand:
         return value is True
 
     def get_scripts_path_arg(self) -> Path:
-        if not hasattr(self.args, 'scripts_path'):
-            raise CommandError("The argument 'scripts_path' is undefined")
         if not self.args.scripts_path:
             raise CommandError("The path specified by 'scripts_path' must not be an empty string")
             
@@ -926,11 +922,16 @@ class BaseCommand:
         value = self.dbconn_get_single_value(formatted_sql, [])
         return value is True
     
-    def get_latest_version_installed(self):
+    def get_latest_version_installed(self) -> str:
+        schema_id = self.get_schema_name()
         sql = """
-            SELECT MAX(version_id) FROM {schema_name}.dbmigration_versions"""
-        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
+            SELECT MAX(version_id) FROM {schema_identity}.dbmigration_versions"""
+        formatted_sql = self.format_sql(sql, schema_identity=schema_id)
         value = self.dbconn_get_single_value(formatted_sql, [])
+        return value
+
+    def check_if_any_latest_version_installed(self) -> str:
+        value = self.get_latest_version_installed()
         if value is None:
             raise CommandError(f"Unable to get latest installed version")
         return value
@@ -1254,7 +1255,7 @@ class UpdateCommand (BaseCommand):
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
             return
-        latest_installed_version = self.get_latest_version_installed()
+        latest_installed_version = self.check_if_any_latest_version_installed()
         print(f"The latest installed version is {latest_installed_version}.")
         version_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir() and item.name == latest_installed_version]
         if len(version_subdirs) != 1:
@@ -1277,7 +1278,7 @@ class UpdateCommand (BaseCommand):
             raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
         if not self.check_if_version_table_include_baseline_version():
             raise CommandError(f"The baseline version must be installed before running versioned scripts")
-        latest_installed_version = self.get_latest_version_installed()
+        latest_installed_version = self.check_if_any_latest_version_installed()
         print(f"The latest installed version is {latest_installed_version}.")       
         newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
         if len(newer_version_subdirs) == 0:
@@ -1305,9 +1306,9 @@ class UpdateCommand (BaseCommand):
         if not target_version_file_path.exists():
             raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
-        latest_installed_version = self.get_latest_version_installed() 
+        latest_installed_version = self.check_if_any_latest_version_installed() 
         if latest_installed_version != target_version:
-            raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version {latest_installed_version}.")                  
+            raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version '{latest_installed_version}'.")                  
         print(f"Target version matches the latest installed version '{target_version}'")
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
         scripts_to_repeat = [] 
@@ -1771,10 +1772,10 @@ class VerifyCommand (BaseCommand):
             raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
         latest_installed_version = None 
         newer_version_subdirs = []
-        try:
-            latest_installed_version = self.get_latest_version_installed()
+        latest_installed_version = self.get_latest_version_installed()
+        if latest_installed_version is not None:
             newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
-        except CommandError:
+        else:
             newer_version_subdirs = versioned_subdirs
 
         if len(newer_version_subdirs) == 0:
@@ -1831,12 +1832,9 @@ class VerifyCommand (BaseCommand):
         if not target_version_file_path.exists():
             raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
-        latest_installed_version = None 
-        try:
-            latest_installed_version = self.get_latest_version_installed()
-        except CommandError:
-            print(f"No versions were installed in the database schema.")
-
+        latest_installed_version = self.get_latest_version_installed()
+        if latest_installed_version is None:
+           print(f"No versions were installed in the database schema.") 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
@@ -2129,7 +2127,7 @@ class RunTestsCommand (BaseCommand):
             if not target_version_file_path.exists():
                 raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in unit tests scripts subdirectory '{unit_tests_dir}'.")
             target_version = read_as_trimmed_string(target_version_file_path)
-            latest_installed_version = self.get_latest_version_installed() 
+            latest_installed_version = self.check_if_any_latest_version_installed() 
             if latest_installed_version != target_version:
                 raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
             print(f"Target version matches the latest installed version '{target_version}'")
