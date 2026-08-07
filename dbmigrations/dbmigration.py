@@ -956,46 +956,53 @@ class BaseCommand:
         return value is True
 
 
-    def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self, scripts_dir):
+    def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self, scripts_dir : Path) -> None:
         print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
         
         latest_version_in_baseline = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
-            baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
-            if len(baseline_subdirs) == 1:
-                baseline_version_subdir = baseline_subdirs[0]
-                latest_version_in_baseline = baseline_version_subdir.name
+            baseline_subdirs = [item.name for item in baseline_dir.iterdir() if item.is_dir()]
+            baseline_subdirs_len = len(baseline_subdirs)
+            if baseline_subdirs_len != 1:
+                raise CommandError(
+                    f"The baseline directory must include exactly one subdirectory with version scripts, "
+                    f"but {baseline_subdirs_len} present."
+                )
+            latest_version_in_baseline = baseline_subdirs[0]
 
         latest_version_in_versioned = None
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if versioned_dir.exists():
             latest_version_in_versioned = max((item.name for item in versioned_dir.iterdir() if item.is_dir()), default=None)
 
-        latest_version_in_scripts = None
-        if latest_version_in_versioned is None:
-            latest_version_in_scripts = latest_version_in_baseline
-        elif latest_version_in_baseline is None:
-            latest_version_in_scripts = latest_version_in_versioned
-        elif latest_version_in_versioned > latest_version_in_baseline:
-            latest_version_in_scripts = latest_version_in_versioned
-        else:
-            raise CommandError(f"The latest version of the subdirectory with the versions'{latest_version_in_versioned}' must be greater than the version of the baseline scripts '{latest_version_in_scripts}'.")
+        if latest_version_in_versioned and latest_version_in_baseline and latest_version_in_versioned <= latest_version_in_baseline:
+            raise CommandError(
+                f"The latest version of the subdirectory with the versions '{latest_version_in_versioned}' "
+                f"must be greater than the version of the baseline scripts '{latest_version_in_baseline}'."
+            )
+    
+        latest_version_in_scripts = max(
+            filter(None, [latest_version_in_versioned, latest_version_in_baseline]), default=None)
 
         if latest_version_in_scripts is None:
-            print(f"No either baseline or versioned script updates were found in scripts dir: '{scripts_dir}'")
-            return        
+            print(f"Neither baseline nor versioned script updates were found in scripts dir: '{scripts_dir}'")
+            return
+                
         target_version_in_repeatable = None
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if repeatable_dir.exists():
             target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
             if target_version_file_path.exists():
                 target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
+
         if target_version_in_repeatable is None:
             print(f"No repeatable scripts were found in scripts dir: '{scripts_dir}'")
             return 
+
         if latest_version_in_scripts != target_version_in_repeatable:
             raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not match the latest version in versioned scripts '{latest_version_in_scripts}'")
+
         print(f"Completed.")
 
     def do_initial_cross_checks(self):
