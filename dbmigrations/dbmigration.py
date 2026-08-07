@@ -808,8 +808,7 @@ class BaseCommand:
                 cur.execute(sql, params)
 
     def dbconn_get_connection_string(self, dbconn: psycopg.Connection[Any]) -> str:
-        info = dbconn.info
-        
+        info = dbconn.info                
         host_val = getattr(info, "host", None)
         host = host_val if host_val else "[local_socket]"
 
@@ -817,23 +816,28 @@ class BaseCommand:
         port = f":{port_val}" if port_val else ""
         
         return f"{info.user}@{host}{port}/{info.dbname}"
+    
+    def get_schema_name_arg(self) -> str:
+        if not self.args:
+            raise CommandError(f"The attribute self.args must be present")
+        schema_name = self.args.schema_name
+        if not schema_name:
+            raise CommandError(f"The attribute self.args.schema_name must be present")
+        return schema_name
 
     def get_schema_name(self) -> psycopg.sql.Identifier:
-         if not self.args:
-             raise CommandError(f"The attribute self.args must be present")
-         schema_name = self.args.schema_name
-         if not schema_name:
-             raise CommandError(f"The attribute self.args.schema_name must be present")
-         return psycopg.sql.Identifier(schema_name)
+        schema_name = self.get_schema_name_arg()        
+        return psycopg.sql.Identifier(schema_name)
 
     def check_if_schema_exists(self) -> bool:
+        schema_name = self.get_schema_name_arg()
         sql = """
             SELECT EXISTS (
                 SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = %s)"""
-        value = self.dbconn_get_single_value(sql, (self.args.schema_name,))
+        value = self.dbconn_get_single_value(sql, (schema_name,))
         return value is True
-    
-    def get_scripts_path_environment_id(self) -> str:
+
+    def get_scripts_path_arg(self) -> Path:
         if not hasattr(self.args, 'scripts_path'):
             raise CommandError("The argument 'scripts_path' is undefined")
         if not self.args.scripts_path:
@@ -844,6 +848,10 @@ class BaseCommand:
             raise CommandError("The path specified by 'scripts_path' argument does not exist")
         if not scripts_path.is_dir():
             raise CommandError("The path specified by 'scripts_path' argument is not a valid directory")        
+        return scripts_path
+    
+    def get_scripts_path_environment_id(self) -> str:            
+        scripts_path = self.get_scripts_path_arg()
             
         target_environment_id_file_name = scripts_path.joinpath(TARGET_ENVIRONMENT_ID_FILE_NAME)
         
@@ -870,25 +878,24 @@ class BaseCommand:
         return environment_id
 
     def get_stored_environment_id(self) -> str:
+        schema_id = self.get_schema_name()
         sql = """
                 SELECT id FROM {schema_name_identity}.dbmigration_environment_id ORDER BY created_at ASC LIMIT 1"""        
-        formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name()) 
+        formatted_sql = self.format_sql(sql, schema_name_identity=schema_id) 
         value = self.dbconn_get_single_value(formatted_sql, [])
-        if value is None:
-            raise CommandError(f"Unable to get stored environment ID from the database schema")
         return value
     
-    def get_search_path_for_scripts(self):
-        scripts_dir = pathlib.Path(self.args.scripts_path)
-        set_search_path_file = scripts_dir.joinpath(SEARCH_PATH_FILE_NAME)
+    def get_search_path_for_scripts(self) -> str:            
+        scripts_path = self.get_scripts_path_arg()   
+        set_search_path_file = scripts_path.joinpath(SEARCH_PATH_FILE_NAME)
         if not set_search_path_file.exists():
             return self.args.schema_name
         if not set_search_path_file.is_file():
-            raise CommandError(f"The search path file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{self.args.scripts_path}' is not a file")
+            raise CommandError(f"The search path file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{scripts_path}' is not a file")
         trimmed_str = read_as_trimmed_string(set_search_path_file)
         return trimmed_str
     
-    def set_session_search_path(self, search_path):
+    def set_session_search_path(self, search_path : str) -> None:
         print(f"Set session search path to '{search_path}'.")
         sql = f"""
             SELECT pg_catalog.set_config('search_path', %s, false)"""
@@ -896,25 +903,28 @@ class BaseCommand:
         if result != search_path:
             raise CommandError(f"Unexpected value '{result}' returned on attempt to set the search path")
 
-    def check_if_table_exists(self, table_name):
+    def check_if_table_exists(self, table_name : str) -> bool:
+        schema_name = self.get_schema_name_arg()
         sql = """
             SELECT EXISTS (
-                SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = %s)"""
-        value = self.dbconn_get_single_value(sql, (self.args.schema_name, table_name))
-        if value is None:
-            raise CommandError(f"Unable to check whether table {table_name} exists in target schema")
-        return value
-    def check_if_version_table_include_baseline_version(self):
+                SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = %s
+            );
+        """
+        value = self.dbconn_get_single_value(sql, (schema_name, table_name))
+        return value is True
+    
+    def check_if_version_table_include_baseline_version(self) -> bool:
+        schema_id = self.get_schema_name()
         sql = """
             SELECT EXISTS (
                 SELECT 1
                 FROM {schema_name}.dbmigration_versions
-                WHERE is_baseline IS TRUE)"""
-        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
+                WHERE is_baseline IS TRUE
+            );
+        """
+        formatted_sql = self.format_sql(sql, schema_name=schema_id)
         value = self.dbconn_get_single_value(formatted_sql, [])
-        if value is None:
-            raise CommandError(f"Unable to check whether the baseline scripts were applied in the target schema")
-        return value
+        return value is True
     
     def get_latest_version_installed(self):
         sql = """
