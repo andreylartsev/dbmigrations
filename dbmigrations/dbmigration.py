@@ -885,9 +885,12 @@ class BaseCommand:
         scripts_path = self.get_scripts_path_arg()   
         set_search_path_file = scripts_path.joinpath(SEARCH_PATH_FILE_NAME)
         if not set_search_path_file.exists():
-            return self.args.schema_name
+            return self.get_schema_name_arg()
         if not set_search_path_file.is_file():
-            raise CommandError(f"The search path file '{SEARCH_PATH_FILE_NAME}' within scripts directory '{scripts_path}' is not a file")
+            raise CommandError(
+                f"The search path file '{SEARCH_PATH_FILE_NAME}' "
+                f"within scripts directory '{scripts_path}' is not a valid file"
+            )
         trimmed_str = read_as_trimmed_string(set_search_path_file)
         return trimmed_str
     
@@ -1005,10 +1008,8 @@ class BaseCommand:
 
         print(f"Completed.")
 
-    def do_initial_cross_checks(self):
-        self.scripts_dir = pathlib.Path(self.args.scripts_path).resolve()        
-        if not self.scripts_dir.exists():
-            raise CommandError(f"The scripts repository path '{self.args.scripts_path}' does not exists")       
+    def do_initial_cross_checks(self) -> None:
+        self.scripts_dir = self.get_scripts_path_arg().resolve()        
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
         search_path = self.get_search_path_for_scripts()
