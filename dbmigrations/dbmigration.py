@@ -1018,32 +1018,37 @@ class BaseCommand:
         else:
             print(f"Use the default users search path")     
 
-    def check_if_stored_environment_id_matches_to_scripts_dir(self):
+    def check_if_stored_environment_id_matches_to_scripts_dir(self) -> None:
         stored_environment_id = self.get_stored_environment_id()
         scripts_environment_id = self.get_scripts_path_environment_id()
         if stored_environment_id != scripts_environment_id:
-            raise CommandError(f"The stored environment ID '{stored_environment_id}' in the target schema does not match the scripts directory '{self.scripts_dir}'")
+            scripts_path = self.get_scripts_path_arg()
+            raise CommandError(f"The stored environment ID '{stored_environment_id}' in the target schema does not match the scripts directory '{scripts_path}'")
         print(f"Target schema environment ID matches the scripts directory ID: {stored_environment_id}")
 
-    def check_if_all_version_control_tables_exists(self):
-        if not self.check_if_table_exists("dbmigration_environment_id"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_environment_id'")
-        if not self.check_if_table_exists("dbmigration_versions"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_versions'")
-        if not self.check_if_table_exists("dbmigration_version_scripts"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include version control table 'dbmigration_version_scripts'")
-        if not self.check_if_table_exists("dbmigration_repeatable_scripts"):
-            raise CommandError(f"The schema '{self.args.schema_name}' does not include repeatable scripts control table 'dbmigration_repeatable_scripts'")
-    
-    def check_if_all_version_control_tables_does_not_exists(self):
-        if self.check_if_table_exists("dbmigration_environment_id"):
-            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_environment_id'")
-        if self.check_if_table_exists("dbmigration_versions"):
-            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_versions'")
-        if self.check_if_table_exists("dbmigration_version_scripts"):
-            raise CommandError(f"The schema '{self.args.schema_name}' already include version control table 'dbmigration_version_scripts'")
-        if self.check_if_table_exists("dbmigration_repeatable_scripts"):
-            raise CommandError(f"The schema '{self.args.schema_name}' already include repeatable scripts control table 'dbmigration_repeatable_scripts'")
+
+    _required_version_control_tables = [
+            "dbmigration_environment_id",
+            "dbmigration_versions",
+            "dbmigration_version_scripts",
+            "dbmigration_repeatable_scripts",
+    ]
+
+    def check_if_all_version_control_tables_exist(self):
+        schema_name = self.get_schema_name_arg()    
+        for table_name in self._required_version_control_tables:
+            if not self.check_if_table_exists(table_name):
+                raise CommandError(
+                    f"The schema '{schema_name}' is missing the version control table '{table_name}'"
+                )
+            
+    def check_if_all_version_control_tables_do_not_exist(self) -> None:
+        schema_name = self.get_schema_name_arg()    
+        for table_name in self._required_version_control_tables:
+            if self.check_if_table_exists(table_name):
+                raise CommandError(
+                    f"The schema '{schema_name}' already contains the version control table '{table_name}'"
+                )
 
     def __init__(self, config, subparsers, command_name, command_help):
 
@@ -1359,14 +1364,14 @@ class UpdateCommand (BaseCommand):
         
         if self.args.force_reapply_latest_version:
             print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
-            self.check_if_all_version_control_tables_exists()
+            self.check_if_all_version_control_tables_exist()
             self.check_if_stored_environment_id_matches_to_scripts_dir() 
             self.reapply_the_latest_version(self.scripts_dir)
             self.apply_repeatable_scripts(self.scripts_dir, force_reapply=True)
             print(f"Reapplied.")
         else:
             print(f"Performing updates from scripts repository: '{self.scripts_dir}'")
-            self.check_if_all_version_control_tables_exists() 
+            self.check_if_all_version_control_tables_exist() 
             self.check_if_stored_environment_id_matches_to_scripts_dir() 
             self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
             self.apply_baseline_scripts(self.scripts_dir)
@@ -1866,7 +1871,7 @@ class VerifyCommand (BaseCommand):
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()        
         self.check_if_all_own_migrations_are_applied()
-        self.check_if_all_version_control_tables_exists();
+        self.check_if_all_version_control_tables_exist();
         self.check_if_stored_environment_id_matches_to_scripts_dir() 
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
 
@@ -1995,7 +2000,7 @@ class InitCommand (BaseCommand):
         if not self.check_if_schema_is_empty():
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
-            self.check_if_all_version_control_tables_does_not_exists()
+            self.check_if_all_version_control_tables_does_not_exist()
             print(f"WARNING: Schema is not empty!")
 
         environment_id = self.get_scripts_path_environment_id()
@@ -2144,7 +2149,7 @@ class RunTestsCommand (BaseCommand):
         self.do_initial_cross_checks()
         if not self.args.skip_env_checks:
             self.check_if_all_own_migrations_are_applied()
-            self.check_if_all_version_control_tables_exists() 
+            self.check_if_all_version_control_tables_exist() 
             self.check_if_stored_environment_id_matches_to_scripts_dir()    
         print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
         self.run_unit_test_scripts(self.scripts_dir)
