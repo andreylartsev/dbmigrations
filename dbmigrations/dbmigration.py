@@ -807,9 +807,10 @@ class BaseCommand(ABC):
         return result_query
 
     def dbconn_get_single_value(
-            self, 
-            sql : str | psycopg.sql.Composed, 
-            params : Sequence[Any] | Mapping[str, Any]) -> Any | None:
+        self, 
+        sql : str | psycopg.sql.Composed, 
+        params : Sequence[Any] | Mapping[str, Any]
+    ) -> Any | None:
         with self.dbconn.cursor() as cur:
             cur.execute(sql, params)
             try:
@@ -1640,16 +1641,17 @@ class UpdateScriptBuilder:
 class VerifyCommand (BaseCommand):
     """Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."""
     
-    def make_dbconn_session_readonly(self):
+    def make_dbconn_session_readonly(self) -> None:
         sql = """
             SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"""
         with self.dbconn.cursor() as cur:
             cur.execute(sql)
 
-    def get_baseline_version_installed(self):
+    def get_baseline_version_installed(self) -> None:
         sql = """
                 SELECT version_id FROM {schema_name}.dbmigration_versions WHERE is_baseline IS TRUE ORDER BY version_id DESC LIMIT 1"""
-        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
+        schema_id = self.get_schema_name()
+        formatted_sql = self.format_sql(sql, schema_name=schema_id)
         value = self.dbconn_get_single_value(formatted_sql, [])
         return value
 
