@@ -15,7 +15,7 @@ dbname = "test1"
 user = "postgres"
 run_tests_by = "postgres"  
 connect_timeout = 10
-no_password = false
+no_password = true
 # sslmode = "prefer"
 
 [dbenvs.local_windows_test_2]
