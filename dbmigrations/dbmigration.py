@@ -1500,14 +1500,14 @@ class UpdateCommand (BaseCommand):
             print(f"Performing reapply latest version from scripts repository: '{scripts_dir}'")
             self.reapply_the_latest_version()
             self.apply_repeatable_scripts(force_reapply=True)
-            print(f"Reapplied.")
+            print("Reapplied.")
         else:
             print(f"Performing updates from scripts repository: '{scripts_dir}'")
             self.check_if_max_version_of_versioned_scripts_matches_repeatable_target()
             self.apply_baseline_scripts()
             self.apply_versioned_scripts()
             self.apply_repeatable_scripts(force_reapply=self.args.force_reapply_all_repeatable)
-            print(f"Updated.")
+            print("Updated.")
 
 class UpdateScriptBuilder:
     target_script_path: Path
