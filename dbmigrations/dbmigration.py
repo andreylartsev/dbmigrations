@@ -497,13 +497,13 @@ class ExternalTool:
         dbconn_config : dict[str, Any], 
         toml_config : dict[str, Any]
     ) -> Self | None:
-        if TOOLS_CONFIG_GROUP not in toml_config:
-            raise CommandError(f"Missing configuration group '{TOOLS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
-        tools_config = toml_config[TOOLS_CONFIG_GROUP]        
-
         tool_name = ExternalTool._try_get_tool_name(dir)
         if tool_name is None:
             return None
+
+        if TOOLS_CONFIG_GROUP not in toml_config:
+            raise CommandError(f"Missing configuration group '{TOOLS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
+        tools_config = toml_config[TOOLS_CONFIG_GROUP]        
         
         if tool_name not in tools_config:
             raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
@@ -1309,51 +1309,63 @@ class UpdateCommand (BaseCommand):
             help="source scripts repository path"
         )
 
-    def apply_baseline_scripts(self, scripts_dir):
+    def apply_baseline_scripts(self, scripts_dir: Path) -> None:
+
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory.")
             return
         if self.check_if_version_table_include_baseline_version():
-            print(f"The target schema already has the baseline version installed. Baseline scripts will be skipped.")
+            print("The target schema already has the baseline version installed. Baseline scripts will be skipped.")
             return
         baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
-        if len(baseline_subdirs) != 1:
-            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with the baseline scripts but {len(baseline_subdirs)} was found")
+        baseline_subdirs_len = len(baseline_subdirs)
+        if baseline_subdirs_len != 1:
+            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with the baseline scripts but {baseline_subdirs_len} was found")
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
         print(f"The baseline version to install {baseline_version}.")       
-        print(f"Apply baseline scripts...")
-        scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
+        print("Apply baseline scripts...")
+        scripts_sorted = self.get_sorted_scripts_from_dir(
+            baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
         
         external_tool = ExternalTool.try_get(
             baseline_version_subdir, self.get_schema_name_arg(), self.dbconn_settings, self.config)
         if external_tool:
-            self.run_baseline_scripts_with_external_tool(baseline_version, scripts_dir, scripts_sorted, external_tool)
+            self.run_baseline_scripts_with_external_tool(
+                baseline_version, scripts_dir, scripts_sorted, external_tool)
         else:
-            self.run_baseline_scripts_each_in_own_tran(baseline_version, scripts_dir, scripts_sorted)
+            self.run_baseline_scripts_each_in_own_tran(
+                baseline_version, scripts_dir, scripts_sorted)
 
-        print(f"The baseline scripts were applied.")       
+        print("The baseline scripts were applied.")       
 
-    def reapply_the_latest_version(self, scripts_dir):
+    def reapply_the_latest_version(self, scripts_dir: Path) -> None:
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
             return
-        latest_installed_version = self.check_if_any_latest_version_installed()
-        print(f"The latest installed version is {latest_installed_version}.")
-        version_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir() and item.name == latest_installed_version]
-        if len(version_subdirs) != 1:
-            raise CommandError(f"There is no subdirectory with scripts that matched to the latest installed version '{latest_installed_version}'")
-        latest_version_dir = version_subdirs[0]
-        scripts_sorted = self.get_sorted_scripts_from_dir(latest_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=True)
-        if len(scripts_sorted) == 0:
+        
+        latest_installed = self.check_if_any_latest_version_installed()
+        print(f"The latest installed version is {latest_installed}.")
+
+        latest_version_dir = versioned_dir.joinpath(latest_installed)
+        if not latest_version_dir.is_dir():
+            raise CommandError(
+                f"There is no subdirectory with scripts that matched to the "
+                f"latest installed version '{latest_installed}'"
+            )
+        
+        scripts_sorted = self.get_sorted_scripts_from_dir(
+            latest_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=True)
+        if not scripts_sorted:
             filters_str = ",".join(self.file_glob_filters)
             raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
-        self.rerun_versioned_scripts(latest_installed_version, scripts_dir, scripts_sorted)       
+        
+        self.rerun_versioned_scripts(latest_installed, scripts_dir, scripts_sorted)
 
 
-    def apply_versioned_scripts(self, scripts_dir):
+    def apply_versioned_scripts(self, scripts_dir: Path) -> None:
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
