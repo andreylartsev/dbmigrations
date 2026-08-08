@@ -2124,7 +2124,7 @@ class InitCommand (BaseCommand):
         if not self.check_if_schema_is_empty():
             if not self.args.force_init:
                 raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
-            self.check_if_all_version_control_tables_does_not_exist()
+            self.check_if_all_version_control_tables_do_not_exist()
             print(f"WARNING: Schema is not empty!")
 
         environment_id = self.get_scripts_path_environment_id()
