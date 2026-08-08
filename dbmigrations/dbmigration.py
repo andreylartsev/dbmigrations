@@ -1280,14 +1280,34 @@ class UpdateCommand (BaseCommand):
         print(f"Committed.")
 
 
-    def __init__(self, config, subparsers): 
+    def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
         super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
-        self.parser.add_argument("--force-reapply-latest-version",  action="store_true", default=False, help="clean up the latest version within the database and reapply the included *.sql scripts.")
-        self.parser.add_argument("--force-reapply-all-repeatable",  action="store_true", default=False, help="reapply all repeatable scripts, regardless of changes.")
-        self.parser.add_argument("--force-run-cleanup",  action="store_true", default=False, help="run the cleanup script before executing version-specific scripts.")
-        self.parser.add_argument("--skip-confirmation",  action="store_true", default=False, help="skip confirmation before executing updates.")
-        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
-
+        
+        self.parser.add_argument(
+            "--force-reapply-latest-version",  
+            action="store_true", 
+            help="clean up the latest version within the database and reapply the included *.sql scripts."
+        )
+        self.parser.add_argument(
+            "--force-reapply-all-repeatable",  
+            action="store_true", 
+            help="reapply all repeatable scripts, regardless of changes."
+        )
+        self.parser.add_argument(
+            "--force-run-cleanup",  
+            action="store_true", 
+            help="run the cleanup script before executing version-specific scripts."
+        )
+        self.parser.add_argument(
+            "--skip-confirmation",  
+            action="store_true", 
+            help="skip confirmation before executing updates."
+        )
+        self.parser.add_argument(
+            "scripts_path", 
+            type=str, 
+            help="source scripts repository path"
+        )
 
     def apply_baseline_scripts(self, scripts_dir):
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
