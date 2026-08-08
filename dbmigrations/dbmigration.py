@@ -865,6 +865,9 @@ class BaseCommand(ABC):
         if not scripts_path.is_dir():
             raise CommandError(f"The path specified by 'scripts_path' argument is not a valid directory: {str(scripts_path)}")        
         return scripts_path
+
+    def get_resolved_scripts_dir(self) -> Path:
+        return self.get_scripts_path_arg().resolve()
     
     def get_scripts_path_environment_id(self) -> str:            
         scripts_path = self.get_scripts_path_arg()
@@ -979,9 +982,9 @@ class BaseCommand(ABC):
         return value is True
 
 
-    def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self, scripts_dir : Path) -> None:
-        print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts in: {scripts_dir}")
-        
+    def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self) -> None:
+        scripts_dir = self.get_resolved_scripts_dir()
+        print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts...")
         latest_version_in_baseline = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
@@ -1029,7 +1032,6 @@ class BaseCommand(ABC):
         print(f"Completed.")
 
     def do_initial_cross_checks(self) -> None:
-        self.scripts_dir = self.get_scripts_path_arg().resolve()        
         if not self.check_if_schema_exists():
             raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
         search_path = self.get_search_path_for_scripts()
@@ -1309,8 +1311,8 @@ class UpdateCommand (BaseCommand):
             help="source scripts repository path"
         )
 
-    def apply_baseline_scripts(self, scripts_dir: Path) -> None:
-
+    def apply_baseline_scripts(self) -> None:
+        scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory.")
@@ -1340,7 +1342,8 @@ class UpdateCommand (BaseCommand):
 
         print("The baseline scripts were applied.")       
 
-    def reapply_the_latest_version(self, scripts_dir: Path) -> None:
+    def reapply_the_latest_version(self) -> None:
+        scripts_dir = self.get_resolved_scripts_dir()
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
@@ -1364,7 +1367,8 @@ class UpdateCommand (BaseCommand):
         
         self.rerun_versioned_scripts(latest_installed, scripts_dir, scripts_sorted)
 
-    def apply_versioned_scripts(self, scripts_dir: Path) -> None:
+    def apply_versioned_scripts(self) -> None:
+        scripts_dir = self.get_resolved_scripts_dir()
         force_run_cleanup = self.args.force_run_cleanup
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
@@ -1405,7 +1409,8 @@ class UpdateCommand (BaseCommand):
 
         print("The versioned scripts were applied.")
 
-    def apply_repeatable_scripts(self, scripts_dir: Path, force_reapply: bool = False) -> None:        
+    def apply_repeatable_scripts(self, force_reapply: bool = False) -> None:        
+        scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
@@ -1472,7 +1477,7 @@ class UpdateCommand (BaseCommand):
 
         print("The repeatable scripts were applied.")
 
-    def run(self):
+    def run(self) -> None:
         if not self.args.skip_confirmation:
             print("You are going to run updates. Would you like to continue? [y/N]: ", end="", flush=True)
             answer = get_char().lower()
@@ -1485,22 +1490,22 @@ class UpdateCommand (BaseCommand):
         if applied_count > 0:
             print(f"The version control tables were updated. Please rerun the tool to update the schema using your scripts.")
             return
-        
+
+        self.check_if_all_version_control_tables_exist()
+        self.check_if_stored_environment_id_matches_to_scripts_dir() 
+
+        scripts_dir = self.get_scripts_path_arg()        
         if self.args.force_reapply_latest_version:
-            print(f"Performing reapply latest version from scripts repository: '{self.scripts_dir}'")
-            self.check_if_all_version_control_tables_exist()
-            self.check_if_stored_environment_id_matches_to_scripts_dir() 
-            self.reapply_the_latest_version(self.scripts_dir)
-            self.apply_repeatable_scripts(self.scripts_dir, force_reapply=True)
+            print(f"Performing reapply latest version from scripts repository: '{scripts_dir}'")
+            self.reapply_the_latest_version()
+            self.apply_repeatable_scripts(force_reapply=True)
             print(f"Reapplied.")
         else:
-            print(f"Performing updates from scripts repository: '{self.scripts_dir}'")
-            self.check_if_all_version_control_tables_exist() 
-            self.check_if_stored_environment_id_matches_to_scripts_dir() 
-            self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
-            self.apply_baseline_scripts(self.scripts_dir)
-            self.apply_versioned_scripts(self.scripts_dir)
-            self.apply_repeatable_scripts(self.scripts_dir, force_reapply=self.args.force_reapply_all_repeatable)
+            print(f"Performing updates from scripts repository: '{scripts_dir}'")
+            self.check_if_max_version_of_versioned_scripts_matches_repeatable_target()
+            self.apply_baseline_scripts()
+            self.apply_versioned_scripts()
+            self.apply_repeatable_scripts(force_reapply=self.args.force_reapply_all_repeatable)
             print(f"Updated.")
 
 class UpdateScriptBuilder:
@@ -1674,14 +1679,14 @@ class VerifyCommand (BaseCommand):
         except Exception as e:
             raise CommandError(f"The specified script file '{script_path}' is not accessible for write")
     
-    def display_verification_changes_by_commits(self, files_sorted):
+    def display_verification_changes_by_commits(self, scripts_dir: Path, files_sorted : list[Path]) -> None:
         assert self.git is not None
         assert isinstance(files_sorted, collections.abc.Iterable)
 
         commits_group = collections.defaultdict(list)        
         for file_path in files_sorted:
             commit_info = self.git.get_latest_commit(file_path)
-            script_info = ScriptFsInfo.get_info(self.scripts_dir, file_path)            
+            script_info = ScriptFsInfo.get_info(scripts_dir, file_path)            
             commits_group[commit_info].append(script_info)
 
         sorted_commits = sorted(
@@ -1695,13 +1700,13 @@ class VerifyCommand (BaseCommand):
             for s in scripts:
                 print(f"    {s!r}")                
 
-    def display_verification_changes(self, scripts_dir, scripts_sorted):
+    def display_verification_changes(self, scripts_dir: Path, scripts_sorted: list[Path]) -> None:
         if self.git is None:
             script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts_sorted] 
             for i in script_infos:
                 print(f"  {i!r}")
         else:
-            self.display_verification_changes_by_commits(scripts_sorted)
+            self.display_verification_changes_by_commits(scripts_dir, scripts_sorted)
 
     def get_recent_changes_from_db(self, limit=10, window_minutes=30):
         sql = """
@@ -1839,7 +1844,8 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
-    def verify_baseline_scripts(self, scripts_dir, script_builder):
+    def verify_baseline_scripts(self, script_builder: UpdateScriptBuilder) -> None:
+        scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
@@ -1891,7 +1897,8 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
-    def verify_versioned_scripts(self, scripts_dir, script_builder):
+    def verify_versioned_scripts(self, script_builder: UpdateScriptBuilder) -> None:
+        scripts_dir = self.get_resolved_scripts_dir()
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
@@ -1952,7 +1959,8 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(formatted_sql_text)
                 script_builder.write_body(f"COMMIT;\n")
 
-    def verify_repeatable_scripts(self, scripts_dir, script_builder):
+    def verify_repeatable_scripts(self, script_builder: UpdateScriptBuilder) -> None:
+        scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
@@ -1997,12 +2005,12 @@ class VerifyCommand (BaseCommand):
         self.check_if_all_own_migrations_are_applied()
         self.check_if_all_version_control_tables_exist();
         self.check_if_stored_environment_id_matches_to_scripts_dir() 
-        self.check_if_max_version_of_versioned_scripts_matches_repeatable_target(self.scripts_dir)
-
+        self.check_if_max_version_of_versioned_scripts_matches_repeatable_target()
 
         self.git = None
         if not self.args.skip_git_checks:
-            self.git = GitChecker.try_get(self.config, self.scripts_dir)
+            scripts_dir = self.get_resolved_scripts_dir()
+            self.git = GitChecker.try_get(self.config, scripts_dir)
 
         script_builder = None
         script_path = self.args.build_update_script
@@ -2013,9 +2021,9 @@ class VerifyCommand (BaseCommand):
             if script_builder is not None:
                 search_path = self.get_search_path_for_scripts()
                 self.write_search_path(search_path, script_builder)
-            self.verify_baseline_scripts(self.scripts_dir, script_builder)
-            self.verify_versioned_scripts(self.scripts_dir, script_builder)
-            self.verify_repeatable_scripts(self.scripts_dir, script_builder)
+            self.verify_baseline_scripts(script_builder)
+            self.verify_versioned_scripts(script_builder)
+            self.verify_repeatable_scripts(script_builder)
             # finalize writing update script
             if script_builder is not None:
                 written = script_builder.get_written_body_bytes()
@@ -2272,9 +2280,10 @@ class RunTestsCommand (BaseCommand):
         if not self.args.skip_env_checks:
             self.check_if_all_own_migrations_are_applied()
             self.check_if_all_version_control_tables_exist() 
-            self.check_if_stored_environment_id_matches_to_scripts_dir()    
-        print(f"Running unit tests for scripts repository: '{self.scripts_dir}'")
-        self.run_unit_test_scripts(self.scripts_dir)
+            self.check_if_stored_environment_id_matches_to_scripts_dir()
+        scripts_dir = self.get_resolved_scripts_dir()    
+        print(f"Running unit tests for scripts repository: '{scripts_dir}'")
+        self.run_unit_test_scripts(scripts_dir)
 
 def read_toml_config():
     script_dir = pathlib.Path(__file__).absolute().parent
