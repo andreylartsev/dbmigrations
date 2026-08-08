@@ -2135,8 +2135,6 @@ class InitCommand (BaseCommand):
 
 class TestFailed(Exception):
     """A unit test error."""
-    def __init__(self, message):
-        super().__init__(message)
 
 class RunTestsCommand (BaseCommand):
     """Runs db unit test scripts to the target database schema."""
