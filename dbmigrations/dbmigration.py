@@ -1223,7 +1223,12 @@ class UpdateCommand (BaseCommand):
                     cur.execute(script_sql, (version, i.relative_path, i.oid))
         print(f"Committed.")
 
-    def rerun_versioned_scripts(self, version, scripts_dir, scripts):
+    def rerun_versioned_scripts(
+        self, 
+        version: str, 
+        scripts_dir: Path, 
+        scripts: list[Path]
+    ) -> None: 
         print(f"Reapply version {version}...")
         script_infos = [
             ScriptFsInfo.get_info_with_text(
@@ -1249,25 +1254,30 @@ class UpdateCommand (BaseCommand):
                     cur.execute(formatted_sql, (version, i.relative_path, i.oid))        
         print(f"Committed.")
 
-    def run_versioned_scripts_in_tran(self, version, scripts_dir, scripts):
-        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]    
-        with self.dbconn.cursor() as cur:
-            print(f"Apply version {version}...")
-            cur.execute("BEGIN")
-            for i in script_infos:
-                print(f"Running script: {i!r}...")
-                with open(i.script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    script_text = f.read()
-                cur.execute(script_text)
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, FALSE)", 
-                                            schema_name=self.get_schema_name(), version_id=version)
-            cur.execute(formatted_sql, []) 
-            for i in script_infos:
-                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=i.relative_path,git_blob_sha1=i.oid)
-                cur.execute(formatted_sql, [])
-            cur.execute("COMMIT")       
-            print(f"Committed.")
+    def run_versioned_scripts_in_tran(
+        self, 
+        version: str, 
+        scripts_dir: Path, 
+        scripts: list[Path]
+    ) -> None:             
+        script_infos = [
+            ScriptFsInfo.get_info_with_text(
+                scripts_dir, s, self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) for s in scripts]        
+        print(f"Apply version {version}...")
+        schema_id=self.get_schema_name() 
+        with self.dbconn.transaction():
+            with self.dbconn.cursor() as cur:
+                for i in script_infos:
+                    print(f"Running script: {i!r}...")
+                    cur.execute(i.text)
+                formatted_sql = self.format_sql(
+                    "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, FALSE)", schema_name=schema_id)                                  
+                cur.execute(formatted_sql, (version,))
+                for i in script_infos:
+                    formatted_sql = self.format_sql(
+                        "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES (%s, %s, %s);\n", schema_name=schema_id)
+                    cur.execute(formatted_sql, (version, i.relative_path, i.oid))
+        print(f"Committed.")
 
 
     def __init__(self, config, subparsers): 
