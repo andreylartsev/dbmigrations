@@ -1188,60 +1188,66 @@ class UpdateCommand (BaseCommand):
             "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES (%s, %s, %s);", 
             schema_name=schema_id
         )
-        with self.dbconn:
+        with self.dbconn.transaction():
             with self.dbconn.cursor() as cur:
                 cur.execute(version_sql, (version,))                
                 for i in script_infos:
                     cur.execute(script_sql, (version, i.relative_path, i.oid))                    
         print("Committed.")
 
-
-    def run_baseline_scripts_each_in_own_tran(self, version, scripts_dir, scripts):        
-        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]
-        with self.dbconn.cursor() as cur:
-            for i in script_infos:
-                print(f"Running script: {i!r}...")
-                with open(i.script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    script_text = f.read()
-                cur.execute("BEGIN")
-                cur.execute(script_text)                                  
-                cur.execute("COMMIT")       
-                print(f"Committed.")
-            print(f"Setting the baseline version as '{version}'.")
-            cur.execute("BEGIN")
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE)", 
-                                            schema_name=self.get_schema_name(),version_id=version)                                  
-            cur.execute(formatted_sql, [])
-            for i in script_infos:
-                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=i.relative_path,git_blob_sha1=i.oid)
-                cur.execute(formatted_sql, [])
-            cur.execute("COMMIT")       
+    def run_baseline_scripts_each_in_own_tran(
+        self, 
+        version: str, 
+        scripts_dir: Path, 
+        scripts: list[Path]
+    ) -> None:        
+        script_infos = [ScriptFsInfo.get_info_with_text(scripts_dir, s) for s in scripts]
+        for i in script_infos:
+            print(f"Running script: {i!r}...")
+            with self.dbconn.transaction():
+                with self.dbconn.cursor() as cur:
+                    cur.execute(i.text)                                  
             print(f"Committed.")
+        print(f"Setting the baseline version as '{version}'.")
+        schema_id = self.get_schema_name()
+        version_sql = self.format_sql(
+            "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)",  
+            schema_name=schema_id)                                  
+        script_sql = self.format_sql(
+            "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES (%s, %s, %s);\n", 
+            schema_name=schema_id)
+        with self.dbconn.transaction():
+            with self.dbconn.cursor() as cur:
+                cur.execute(version_sql, (version,))
+                for i in script_infos:
+                    cur.execute(script_sql, (version, i.relative_path, i.oid))
+        print(f"Committed.")
 
     def rerun_versioned_scripts(self, version, scripts_dir, scripts):
-        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]        
-        with self.dbconn.cursor() as cur:
-            print(f"Reapply version {version}...")
-            cur.execute("BEGIN")
-            formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_version_scripts WHERE version_id=%s", schema_name=self.get_schema_name())
-            cur.execute(formatted_sql, (version,))    
-            formatted_sql = self.format_sql("DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=self.get_schema_name())
-            cur.execute(formatted_sql, (version,))    
-            for i in script_infos:
-                print(f"Running script: {i!r}...")
-                with open(i.script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    script_text = f.read()
-                cur.execute(script_text)                              
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, FALSE)", 
-                                            schema_name=self.get_schema_name(), version_id=version)                                  
-            cur.execute(formatted_sql, [])
-            for i in script_infos:
-                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=i.relative_path,git_blob_sha1=i.oid)
-                cur.execute(formatted_sql, [])        
-            cur.execute("COMMIT")       
-            print(f"Committed.")
+        print(f"Reapply version {version}...")
+        script_infos = [
+            ScriptFsInfo.get_info_with_text(
+                scripts_dir, s, self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) for s in scripts]
+        schema_id=self.get_schema_name()        
+        with self.dbconn.transaction():
+            with self.dbconn.cursor() as cur:
+                formatted_sql = self.format_sql(
+                    "DELETE FROM {schema_name}.dbmigration_version_scripts WHERE version_id=%s", schema_name=schema_id)
+                cur.execute(formatted_sql, (version,))    
+                formatted_sql = self.format_sql(
+                    "DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=schema_id)
+                cur.execute(formatted_sql, (version,))    
+                for i in script_infos:
+                    print(f"Running script: {i!r}...")
+                    cur.execute(i.text)                              
+                formatted_sql = self.format_sql(
+                    "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, FALSE)", schema_name=schema_id)                                  
+                cur.execute(formatted_sql, (version,))
+                for i in script_infos:
+                    formatted_sql = self.format_sql(
+                        "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES (%s, %s, %s);\n", schema_name=schema_id)
+                    cur.execute(formatted_sql, (version, i.relative_path, i.oid))        
+        print(f"Committed.")
 
     def run_versioned_scripts_in_tran(self, version, scripts_dir, scripts):
         script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]    
