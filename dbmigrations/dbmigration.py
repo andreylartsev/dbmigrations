@@ -1364,6 +1364,46 @@ class UpdateCommand (BaseCommand):
         
         self.rerun_versioned_scripts(latest_installed, scripts_dir, scripts_sorted)
 
+    def apply_versioned_scripts(self, scripts_dir: Path) -> None:
+        force_run_cleanup = self.args.force_run_cleanup
+        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
+        if not versioned_dir.exists():
+            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
+            return
+
+        if not self.check_if_version_table_include_baseline_version():
+            raise CommandError("The baseline version must be installed before running versioned scripts")
+
+        versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
+        if not versioned_subdirs:
+            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
+
+        latest_installed = self.check_if_any_latest_version_installed()
+        print(f"The latest installed version is {latest_installed}.")       
+
+        newer_version_subdirs = [item for item in versioned_subdirs if item.name > latest_installed]
+        if not newer_version_subdirs:
+            print("No newer versions found for installation.")       
+            return
+
+        print(f"Found {len(newer_version_subdirs)} new versions for installation.")       
+        print("Apply versioned scripts...")
+
+        sorted_subdirs = sorted(newer_version_subdirs)
+
+        for version_dir in sorted_subdirs:        
+            version_id = version_dir.name
+            scripts_sorted = self.get_sorted_scripts_from_dir(
+                version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=force_run_cleanup
+            )
+            
+            if not scripts_sorted:
+                filters_str = ",".join(self.file_glob_filters)
+                raise CommandError(f"The scripts subdirectory '{version_dir}' does not include any '{filters_str}' scripts")
+                
+            self.run_versioned_scripts_in_tran(version_id, scripts_dir, scripts_sorted)       
+
+        print("The versioned scripts were applied.")
 
     def apply_versioned_scripts(self, scripts_dir: Path) -> None:
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
