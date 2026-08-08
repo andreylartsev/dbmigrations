@@ -1405,52 +1405,67 @@ class UpdateCommand (BaseCommand):
 
         print("The versioned scripts were applied.")
 
-    def apply_repeatable_scripts(self, scripts_dir, force_reapply = False):        
+    def apply_repeatable_scripts(self, scripts_dir: Path, force_reapply: bool = False) -> None:        
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
-        print(f"Check repeatable scripts...")       
+
+        print("Check repeatable scripts...")
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
             raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
+
         target_version = read_as_trimmed_string(target_version_file_path)
+
         latest_installed_version = self.check_if_any_latest_version_installed() 
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version '{latest_installed_version}'.")                  
+
         print(f"Target version matches the latest installed version '{target_version}'")
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
-        scripts_to_repeat = [] 
-        for script_path in repeatable_scripts_sorted:
-            with open(script_path, 'rb') as f:
-                script_bytes = f.read()
-            git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-            relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-            if force_reapply:
-                scripts_to_repeat.append(script_path)
-            elif not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
-                scripts_to_repeat.append(script_path)
-        if len(scripts_to_repeat) == 0:
+
+        scripts_to_repeat = []
+        if force_reapply:
+            scripts_to_repeat = [*repeatable_scripts_sorted]
+        else:
+            script_infos = [
+                ScriptFsInfo.get_info(scripts_dir, s) for s in repeatable_scripts_sorted
+            ]
+            scripts_to_repeat = [
+                i.script_path
+                for i in script_infos
+                    if not self.check_if_repeatable_script_installed(i.oid, target_version, i.relative_path)
+            ]
+
+        if not scripts_to_repeat:
             print(f"No changed repeatable scripts found for (re)installation.")       
             return
-        scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
+        scripts_to_repeat = self.resolve_scripts_dependencies(
+            repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         script_infos = [
-            ScriptFsInfo.get_info_with_text(scripts_dir, s, 
-                            encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) 
-                            for s in scripts_to_repeat]
+            ScriptFsInfo.get_info_with_text(
+                scripts_dir, s, encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors
+            ) 
+            for s in scripts_to_repeat
+        ]
         print(f"Found {len(script_infos)} scripts to re-run")
-        print(f"Apply repeatable scripts...")       
-        with self.dbconn.cursor() as cur:
-            for i in script_infos:
-                print(f"Running script: {i!r}...")
-                cur.execute("BEGIN")
-                cur.execute(i.text)
-                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path})", 
-                                                schema_name=self.get_schema_name(), git_blob_sha1=i.oid, version_id=target_version, relative_path=i.relative_path)                                  
-                cur.execute(formatted_sql, [])     
-                cur.execute("COMMIT")
-                print(f"Committed.")
-        print(f"The repeatable scripts were applied.")       
+        print("Apply repeatable scripts...")
+
+        schema_id = self.get_schema_name()
+        repeatable_sql = self.format_sql(
+            "INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
+                schema_name=schema_id)                                  
+
+        for i in script_infos:
+            print(f"Running script: {i!r}...")
+            with self.dbconn.transaction():
+                with self.dbconn.cursor() as cur:
+                    cur.execute(i.text)
+                    cur.execute(repeatable_sql, (i.oid, target_version, i.relative_path))
+            print("Committed.")
+
+        print("The repeatable scripts were applied.")       
 
     def run(self):
         if not self.args.skip_confirmation:
