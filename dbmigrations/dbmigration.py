@@ -1405,34 +1405,6 @@ class UpdateCommand (BaseCommand):
 
         print("The versioned scripts were applied.")
 
-    def apply_versioned_scripts(self, scripts_dir: Path) -> None:
-        versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
-        if not versioned_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
-            return
-        versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
-        if len(versioned_subdirs) == 0:
-            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
-        if not self.check_if_version_table_include_baseline_version():
-            raise CommandError(f"The baseline version must be installed before running versioned scripts")
-        latest_installed_version = self.check_if_any_latest_version_installed()
-        print(f"The latest installed version is {latest_installed_version}.")       
-        newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
-        if len(newer_version_subdirs) == 0:
-            print(f"No newer versions found for installation.")       
-            return
-        newer_version_subdirs_sorted = sorted(newer_version_subdirs)
-        print(f"Found {len(newer_version_subdirs)} new versions for installation.")       
-        print(f"Apply versioned scripts...")
-        for script_version_dir in newer_version_subdirs_sorted:        
-            version_id = script_version_dir.name
-            scripts_sorted = self.get_sorted_scripts_from_dir(script_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
-            if len(scripts_sorted) == 0:
-                filters_str = ",".join(self.file_glob_filters)
-                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any '{filters_str}' scripts")
-            self.run_versioned_scripts_in_tran(version_id, scripts_dir, scripts_sorted)       
-        print(f"The versioned scripts were applied.")
-
     def apply_repeatable_scripts(self, scripts_dir, force_reapply = False):        
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
