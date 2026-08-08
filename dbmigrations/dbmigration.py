@@ -1483,7 +1483,7 @@ class UpdateCommand (BaseCommand):
             print("You are going to run updates. Would you like to continue? [y/N]: ", end="", flush=True)
             answer = get_char().lower()
             if answer != 'y':
-                raise CommandError("Cancelled by user");
+                raise CommandError("Cancelled by user")
         
         self.do_initial_cross_checks()        
         
