@@ -610,7 +610,7 @@ class MigrationCheckForOlderVersionControlTables (OwnMigration):
         desc = "Check for older version control tables"
         return desc
 
-class BaseCommand:
+class BaseCommand(ABC):
 
     _all_own_migrations: list[OwnMigration] = [
        MigrationCheckForOlderVersionControlTables() 
@@ -1153,7 +1153,8 @@ class BaseCommand:
             self.dbconn.close()
             print(f"Closed db connection.")
         return False # propagate the exception
-    
+
+    @abstractmethod
     def run(self):
         pass
     
