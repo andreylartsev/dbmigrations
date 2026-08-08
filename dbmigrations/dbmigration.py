@@ -861,9 +861,9 @@ class BaseCommand:
             
         scripts_path = Path(self.args.scripts_path)
         if not scripts_path.exists():
-            raise CommandError("The path specified by 'scripts_path' argument does not exist")
+            raise CommandError(f"The path specified by 'scripts_path' argument does not exist: {str(scripts_path)}")
         if not scripts_path.is_dir():
-            raise CommandError("The path specified by 'scripts_path' argument is not a valid directory")        
+            raise CommandError(f"The path specified by 'scripts_path' argument is not a valid directory: {str(scripts_path)}")        
         return scripts_path
     
     def get_scripts_path_environment_id(self) -> str:            
@@ -1100,7 +1100,7 @@ class BaseCommand:
         self.parser.add_argument("-n","--no-password",  action="store_true", default=False, help="don't ask user password")
         self.parser.set_defaults(call=self) 
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if self.args.dbenv is not None:
             self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(self.config, self.args.dbenv)  
         if self.args.host is not None:
@@ -1140,7 +1140,12 @@ class BaseCommand:
         self.dbconn.autocommit = True 
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
         if exc_type is not None:
             self.dbconn.rollback()
             print(f"Rolled back transaction.")
