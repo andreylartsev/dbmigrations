@@ -1166,24 +1166,35 @@ class BaseCommand(ABC):
 class UpdateCommand (BaseCommand):
     """Applies base, versioned, and repeatable scripts to the target database schema."""
 
-    def run_baseline_scripts_with_external_tool(self, version, scripts_dir, scripts, tool):
-        print(f"Running baseline scripts with external tool '{tool.exec_path}'")        
+    def run_baseline_scripts_with_external_tool(
+        self, 
+        version: str, 
+        scripts_dir: Path, 
+        scripts: list[Path], 
+        tool: ExternalTool
+    ) -> None:
+        print(f"Running baseline scripts with external tool '{tool.exec_path}'")                
         script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]
         for i in script_infos:
             print(f"Running script: {i!r}...")
-            tool.run(i.script_path)
-        print(f"Setting the baseline version '{version}'...")
-        with self.dbconn.cursor() as cur:
-            cur.execute("BEGIN")
-            formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE)", 
-                                            schema_name=self.get_schema_name(),version_id=version)                                  
-            cur.execute(formatted_sql, [])
-            for i in script_infos:
-                formatted_sql = self.format_sql("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=i.relative_path,git_blob_sha1=i.oid)
-                cur.execute(formatted_sql, [])
-            cur.execute("COMMIT")       
-        print(f"Committed.")
+            tool.run(i.script_path)            
+        print(f"Setting the baseline version '{version}'...")        
+        schema_id = self.get_schema_name()        
+        version_sql = self.format_sql(
+            "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE);", 
+            schema_name=schema_id
+        )                                  
+        script_sql = self.format_sql(
+            "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES (%s, %s, %s);", 
+            schema_name=schema_id
+        )
+        with self.dbconn:
+            with self.dbconn.cursor() as cur:
+                cur.execute(version_sql, (version,))                
+                for i in script_infos:
+                    cur.execute(script_sql, (version, i.relative_path, i.oid))                    
+        print("Committed.")
+
 
     def run_baseline_scripts_each_in_own_tran(self, version, scripts_dir, scripts):        
         script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]
