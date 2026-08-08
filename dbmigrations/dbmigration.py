@@ -1414,7 +1414,7 @@ class UpdateCommand (BaseCommand):
         print("Check repeatable scripts...")
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
-            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
+            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exist in repeatable scripts subdirectory '{repeatable_dir}'.")
 
         target_version = read_as_trimmed_string(target_version_file_path)
 
@@ -1435,27 +1435,32 @@ class UpdateCommand (BaseCommand):
             scripts_to_repeat = [
                 i.script_path
                 for i in script_infos
-                    if not self.check_if_repeatable_script_installed(i.oid, target_version, i.relative_path)
+                if not self.check_if_repeatable_script_installed(i.oid, target_version, i.relative_path)
             ]
 
         if not scripts_to_repeat:
-            print(f"No changed repeatable scripts found for (re)installation.")       
+            print("No changed repeatable scripts found for (re)installation.")       
             return
+
         scripts_to_repeat = self.resolve_scripts_dependencies(
-            repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
+            repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat
+        )
+        
         script_infos = [
             ScriptFsInfo.get_info_with_text(
                 scripts_dir, s, encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors
             ) 
             for s in scripts_to_repeat
         ]
+        
         print(f"Found {len(script_infos)} scripts to re-run")
         print("Apply repeatable scripts...")
 
         schema_id = self.get_schema_name()
         repeatable_sql = self.format_sql(
             "INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES (%s, %s, %s)", 
-                schema_name=schema_id)                                  
+            schema_name=schema_id
+        )                                  
 
         for i in script_infos:
             print(f"Running script: {i!r}...")
@@ -1465,7 +1470,7 @@ class UpdateCommand (BaseCommand):
                     cur.execute(repeatable_sql, (i.oid, target_version, i.relative_path))
             print("Committed.")
 
-        print("The repeatable scripts were applied.")       
+        print("The repeatable scripts were applied.")
 
     def run(self):
         if not self.args.skip_confirmation:
