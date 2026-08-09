@@ -1868,7 +1868,7 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
-    def verify_baseline_scripts(self, script_builder: UpdateScriptBuilder|None) -> None:
+    def verify_baseline_scripts(self, script_builder: UpdateScriptBuilder | None) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
@@ -1890,7 +1890,7 @@ class VerifyCommand (BaseCommand):
         print(f"The baseline scripts to install: ")
         self.display_required_changes(scripts_dir, scripts_sorted)
 
-        if script_builder is not None:
+        if script_builder:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
 
     def write_versioned_scripts(self, version : str, scripts_dir: Path, scripts: list[Path], script_builder: UpdateScriptBuilder) -> None:
