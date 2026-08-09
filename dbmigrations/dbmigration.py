@@ -1671,16 +1671,6 @@ class VerifyCommand (BaseCommand):
             if target_version != latest_installed_version:
                 raise CommandError(f"The target version '{target_version}' does not match the latest installed version '{latest_installed_version}'.")
     
-    def check_if_target_script_file_path_accessible_for_write(self, script_path):
-        path = pathlib.Path(script_path)
-        try:
-            path.touch(exist_ok=False)
-            path.unlink()
-        except FileExistsError as e:
-            raise CommandError(f"The specified script file '{script_path}' already exists")
-        except Exception as e:
-            raise CommandError(f"The specified script file '{script_path}' is not accessible for write")
-    
     def display_verification_changes_by_commits(self, scripts_dir: Path, files_sorted : list[Path]) -> None:
         assert self.git is not None
         assert isinstance(files_sorted, collections.abc.Iterable)
