@@ -1868,19 +1868,21 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
-    def verify_baseline_scripts(self, script_builder: UpdateScriptBuilder) -> None:
+    def verify_baseline_scripts(self, script_builder: UpdateScriptBuilder|None) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
             return
+        
         if self.check_if_version_table_include_baseline_version():
             installed_baseline_version = self.get_baseline_version_installed()
             print(f"The target schema has the baseline version installed: {installed_baseline_version}")
             return
         baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
-        if len(baseline_subdirs) != 1:
-            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with the baseline scripts but {len(baseline_subdirs)} was found")
+        if (baseline_subdirs_len := len(baseline_subdirs)) != 1:
+            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory "
+                               f"with the baseline scripts but {baseline_subdirs_len} was found")
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
 
@@ -1890,9 +1892,6 @@ class VerifyCommand (BaseCommand):
 
         if script_builder is not None:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
-        
-        # remember latest version in scripts for the further use in verify_repeatable()
-        self.latest_version_in_scripts = baseline_version
 
     def write_versioned_scripts(self, version : str, scripts_dir: Path, scripts: list[Path], script_builder: UpdateScriptBuilder) -> None:
         encoding = self.file_read_encoding 
