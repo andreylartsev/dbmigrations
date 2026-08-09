@@ -962,7 +962,7 @@ class BaseCommand(ABC):
         value = self.dbconn_get_single_value(formatted_sql, [])
         return value is True
     
-    def get_latest_version_installed(self) -> str:
+    def get_latest_version_installed(self) -> str|None:
         schema_id = self.get_schema_name()
         sql = """
             SELECT MAX(version_id) FROM {schema_identity}.dbmigration_versions"""
@@ -1893,6 +1893,9 @@ class VerifyCommand (BaseCommand):
         if script_builder:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
 
+        # remember latest version in scripts for the further use in verify_repeatable()
+        self.latest_version_in_scripts = baseline_version
+
     def write_versioned_scripts(self, version : str, scripts_dir: Path, scripts: list[Path], script_builder: UpdateScriptBuilder) -> None:
         encoding = self.file_read_encoding 
         errors = self.file_read_encoding_errors 
@@ -1921,48 +1924,50 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
-    def verify_versioned_scripts(self, script_builder: UpdateScriptBuilder) -> None:
+    def verify_versioned_scripts(self, script_builder: UpdateScriptBuilder | None) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
+
         if not versioned_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(f"The scripts path '{scripts_dir}' does not include the '{VERSIONED_DIR_NAME}' subdirectory.")
             return
+        
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
-        if len(versioned_subdirs) == 0:
-            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
-        latest_installed_version = None 
-        newer_version_subdirs = []
+        if not versioned_subdirs:
+            raise CommandError(
+                f"The versioned scripts path {versioned_dir} must contain at least one subdirectory, but none were found")
+
         latest_installed_version = self.get_latest_version_installed()
         if latest_installed_version is not None:
-            newer_version_subdirs = [x for x in versioned_subdirs if x.name > latest_installed_version]
+            newer_version_subdirs = [item for item in versioned_subdirs if item.name > latest_installed_version]
         else:
             newer_version_subdirs = versioned_subdirs
 
-        if len(newer_version_subdirs) == 0:
-            print(f"The latest version installed is {latest_installed_version}. No newer scripts were found for installation.")       
+        if not newer_version_subdirs:
+            print(f"The latest installed version is {latest_installed_version}. No newer scripts found for installation.")       
             return
+        
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
         
         # remember latest version in scripts for the further use in verify_repeatable()
         latest_version = newer_version_subdirs_sorted[-1].name
 
-        if self.latest_version_in_scripts is None:
-            self.latest_version_in_scripts = latest_version
-        elif latest_version > self.latest_version_in_scripts:
-            self.latest_version_in_scripts = latest_version
-        else:
-            raise CommandError(f"The latest version of the subdirectory with the versions'{latest_version}' must be greater than the version of the baseline scripts '{self.latest_version_in_scripts}'.")
+        if self.latest_version_in_scripts is not None and latest_version <= self.latest_version_in_scripts:
+            raise CommandError(
+                f"The latest script version '{latest_version}' must be greater than the baseline script version '{self.latest_version_in_scripts}'.")
 
+        self.latest_version_in_scripts = latest_version
+    
         print(f"The versioned scripts to install: ")    
-        for script_version_dir in newer_version_subdirs_sorted:    
-            scripts_sorted = self.get_sorted_scripts_from_dir(script_version_dir, VERSIONED_FILES_DEPTH)
-            if len(scripts_sorted) == 0:
+        for version_dir in newer_version_subdirs_sorted:    
+            scripts_sorted = self.get_sorted_scripts_from_dir(version_dir, VERSIONED_FILES_DEPTH)
+            if not scripts_sorted:
                 filters_str = ",".join(self.file_glob_filters)
-                raise CommandError(f"The scripts subdirectory '{script_version_dir}' does not include any {filters_str} scripts")
+                raise CommandError(f"The scripts subdirectory '{version_dir}' does not contain any '{filters_str}' scripts.")
             self.display_required_changes(scripts_dir, scripts_sorted)
-            if script_builder is not None:
-                version_id = script_version_dir.name
-                self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, script_builder)   
+            if script_builder:
+                version_id = version_dir.name
+                self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, script_builder)
 
     def write_repeatable_scripts(self, target_version: str, scripts_dict: dict[str,str], scripts_dir: Path, script_builder: UpdateScriptBuilder) -> None:
         with script_builder:
