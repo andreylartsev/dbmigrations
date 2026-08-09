@@ -15,28 +15,24 @@ def base_configs():
     dbmigration.TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE = "success_code"
 
     dbconn_config = {"host": "localhost", "user": "admin"}
-    toml_config = {
-        "tools": {
-            "my_tool": {
-                "exec": "dummy_path/tool.exe",
-                "args": ["${host}", "-u", "${user}", "${file}", "${schema_name}", "static_arg"],
-                "success_code": 0
-            }
-        }
+    tool_config = {
+        "exec": "dummy_path/tool.exe",
+        "args": ["${host}", "-u", "${user}", "${file}", "${schema_name}", "static_arg"],
+        "success_code": 0
     }
-    return dbconn_config, toml_config
+    return dbconn_config, tool_config
 
 
 @patch("pathlib.Path.is_file", return_value=True)
 @patch("pathlib.Path.exists", return_value=True)
 def test_tool_initialization_and_variable_matching(mock_exists, mock_is_file, base_configs):
-    dbconn_config, toml_config = base_configs
+    dbconn_config, tool_config = base_configs
     
     tool = ExternalTool(
         tool_name="my_tool",
         schema_name="public",
         dbconn_config=dbconn_config,
-        toml_config=toml_config
+        tool_config=tool_config
     )
     
     assert tool.tool_name == "my_tool"
@@ -58,7 +54,7 @@ def test_init_raises_missing_config_group(base_configs):
     
     with pytest.raises(CommandError) as exc_info:
         ExternalTool("my_tool", "public", dbconn_config, invalid_toml)
-    assert "There is no configuration group" in str(exc_info.value)
+    assert "Missing required attribute 'exec'" in str(exc_info.value)
 
 
 @patch("pathlib.Path.exists", return_value=False)
@@ -100,8 +96,8 @@ def test_tool_run_success(mock_popen, mock_exists, mock_is_file, base_configs, c
 @patch("pathlib.Path.exists", return_value=True)
 @patch("subprocess.Popen")
 def test_tool_run_unsuccessful_code(mock_popen, mock_exists, mock_is_file, base_configs):
-    dbconn_config, toml_config = base_configs
-    tool = ExternalTool("my_tool", "public", dbconn_config, toml_config)
+    dbconn_config, tool_config = base_configs
+    tool = ExternalTool("my_tool", "public", dbconn_config, tool_config)
     
     mock_process = MagicMock()
     mock_process.wait.return_value = 1
