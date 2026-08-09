@@ -1994,11 +1994,11 @@ class VerifyCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
+            print(f"The scripts path '{scripts_dir}' does not contain the '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
-            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in repeatable scripts subdirectory '{repeatable_dir}'.")
+            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exist in repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
         latest_installed_version = self.get_latest_version_installed()
         if latest_installed_version is None:
