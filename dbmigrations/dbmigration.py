@@ -1838,7 +1838,7 @@ class VerifyCommand (BaseCommand):
             script_builder.write_body(sql_text)
             for i in script_infos:
                 script_builder.write_body(f"BEGIN;\n")
-                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid})".format(path=i.relative_path, oid=i.oid))                    
+                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid:.8})".format(path=i.relative_path, oid=i.oid))                    
                 script_builder.write_body(sql_text)
                 script_builder.write_body_lines(i.text)
                 script_builder.write_body(f"\n-- End of script.\n")
@@ -1894,7 +1894,7 @@ class VerifyCommand (BaseCommand):
             script_builder.write_body(sql_text)
             script_builder.write_body(f"\nBEGIN;\n")
             for i in script_infos:
-                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid})".format(path=i.relative_path, oid=i.oid))                    
+                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid:.8})".format(path=i.relative_path, oid=i.oid))                    
                 script_builder.write_body(sql_text)
                 script_builder.write_body_lines(i.text)
                 script_builder.write_body(f"\n-- End of script.\n")
@@ -1961,7 +1961,7 @@ class VerifyCommand (BaseCommand):
             for git_blob_sha1, script_path in scripts_dict.items():
                 relative_script_path = get_script_path_for_log(scripts_dir, script_path)
                 script_builder.write_body(f"\nBEGIN;\n")
-                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid})".format(path=relative_script_path, oid=git_blob_sha1))  
+                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid:.8})".format(path=relative_script_path, oid=git_blob_sha1))  
                 script_builder.write_body(sql_text)
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
