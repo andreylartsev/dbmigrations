@@ -796,6 +796,18 @@ class BaseCommand(ABC):
                 sorted_files.insert(0, cleanup_file_path)
         return sorted_files
 
+    def format_sql_comment(self, comment : str) -> str:
+        """
+        PostgreSQL's format() function ignores lines that start with a comment.
+        This can lead to SQL injection vulnerability if a formatted placeholder 
+        contains a newline character, for example:
+        'BAD VERSION\n;TRUNCATE dbmigration_environment_id CASCADE; --'
+        """
+        result_str = comment.replace("\n", " ").replace("\r", "").strip() + "\n"
+        if not result_str.startswith("--"):
+            result_str = f"-- {result_str}"
+        return result_str
+
     def format_sql_text(self, sql : str, **params) -> str:
         if self.dbconn is None:
             raise CommandError(f"DB connection is not initialized yet")
@@ -1820,10 +1832,11 @@ class VerifyCommand (BaseCommand):
 
     def write_search_path(self, search_path: str, builder: UpdateScriptBuilder) -> None:
         with builder:
-            formatted_sql_text = self.format_sql_text(
-                "-- Setting session search path to: {search_path}\n"
+            sql_comment = self.format_sql_comment(f"Setting session search path to: {search_path}")
+            builder.write_header(sql_comment)
+            sql_text = self.format_sql_text(
                 "SELECT pg_catalog.set_config('search_path', {search_path}, false);\n\n", search_path=search_path)
-            builder.write_header(formatted_sql_text)
+            builder.write_header(sql_text)
 
     def write_baseline_scripts(self, version: str, scripts_dir: Path, scripts: list[Path], script_builder: UpdateScriptBuilder) -> None:
         encoding = self.file_read_encoding 
@@ -1833,13 +1846,12 @@ class VerifyCommand (BaseCommand):
                 scripts_dir, s, encoding=encoding, encoding_errors=errors) for s in scripts
         ]
         with script_builder:
-            sql_text = self.format_sql_text(
-                "-- --------- BASELINE VERSION: {version_id} ---------\n", version_id=version)
-            script_builder.write_body(sql_text)
+            sql_comment = self.format_sql_comment(f"-- --------- BASELINE VERSION: {version} ---------")
+            script_builder.write_body(sql_comment)
             for i in script_infos:
                 script_builder.write_body(f"BEGIN;\n")
-                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid:.8})".format(path=i.relative_path, oid=i.oid))                    
-                script_builder.write_body(sql_text)
+                sql_comment = self.format_sql_comment(f"-- Apply script: [{i.relative_path} (OID:{i.oid:.8})]")                    
+                script_builder.write_body(sql_comment)
                 script_builder.write_body_lines(i.text)
                 script_builder.write_body(f"\n-- End of script.\n")
                 script_builder.write_body(f"COMMIT;\n")
@@ -1890,12 +1902,12 @@ class VerifyCommand (BaseCommand):
                 scripts_dir, s, encoding=encoding, encoding_errors=errors) for s in scripts
         ]
         with script_builder:            
-            sql_text = self.format_sql_text("\n-- --------- VERSION: {version_id} ---------\n", version_id=version)
-            script_builder.write_body(sql_text)
+            sql_comment = self.format_sql_comment(f"-- --------- VERSION: {version} ---------")
+            script_builder.write_body(sql_comment)
             script_builder.write_body(f"\nBEGIN;\n")
             for i in script_infos:
-                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid:.8})".format(path=i.relative_path, oid=i.oid))                    
-                script_builder.write_body(sql_text)
+                sql_comment = self.format_sql_comment(f"-- Apply script: [{i.relative_path} (OID:{i.oid:.8})]")
+                script_builder.write_body(sql_comment)
                 script_builder.write_body_lines(i.text)
                 script_builder.write_body(f"\n-- End of script.\n")
             schema_id = self.get_schema_name()
@@ -1955,14 +1967,14 @@ class VerifyCommand (BaseCommand):
 
     def write_repeatable_scripts(self, target_version: str, scripts_dict: dict[str,str], scripts_dir: Path, script_builder: UpdateScriptBuilder) -> None:
         with script_builder:
-            sql_text = self.format_sql_text("\n-- --------- REPEATABLE SCRIPTS FOR VERSION: {version_id} ---------\n", version_id=target_version)
-            script_builder.write_body(sql_text)
+            sql_comment = self.format_sql_comment(f"-- --------- REPEATABLE SCRIPTS FOR VERSION: {target_version} ---------")
+            script_builder.write_body(sql_comment)
             schema_id = self.get_schema_name()
             for git_blob_sha1, script_path in scripts_dict.items():
                 relative_script_path = get_script_path_for_log(scripts_dir, script_path)
                 script_builder.write_body(f"\nBEGIN;\n")
-                sql_text = self.format_sql_text("-- Apply script: {script_id}\n", script_id="{path} (OID:{oid:.8})".format(path=relative_script_path, oid=git_blob_sha1))  
-                script_builder.write_body(sql_text)
+                sql_comment = self.format_sql_comment(f"-- Apply script: [{relative_script_path} (OID:{git_blob_sha1:.8})]")
+                script_builder.write_body(sql_comment)
                 with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
                     lines = source_file.readlines()
                 script_builder.write_body_lines(lines)
