@@ -1660,16 +1660,16 @@ class VerifyCommand (BaseCommand):
             raise CommandError(f"Failed to check target version '{target_version}' because no version is installed and no versioned scripts were provided in the scripts directory.")
         elif latest_version_in_scripts is None:
             if target_version != latest_installed_version:
-                raise CommandError(f"The target version '{target_version}' does not match to the latest installed version '{latest_installed_version}'.")
+                raise CommandError(f"The target version '{target_version}' does not match the latest installed version '{latest_installed_version}'.")
         elif latest_installed_version is None:
             if target_version != latest_version_in_scripts:
-                raise CommandError(f"The target version '{target_version}' does not match to the latest version in scripts '{latest_version_in_scripts}'.")
+                raise CommandError(f"The target version '{target_version}' does not match the latest scripts version '{latest_version_in_scripts}'.")
         elif latest_version_in_scripts > latest_installed_version:
             if target_version != latest_version_in_scripts:
-                raise CommandError(f"The target version '{target_version}' does not match to the latest version in scripts '{latest_version_in_scripts}'.")
+                raise CommandError(f"The target version '{target_version}' does not match the latest scripts version '{latest_version_in_scripts}'.")
         elif latest_version_in_scripts <= latest_installed_version:
             if target_version != latest_installed_version:
-                raise CommandError(f"The target version '{target_version}' does not match to the latest installed version '{latest_installed_version}'.")
+                raise CommandError(f"The target version '{target_version}' does not match the latest installed version '{latest_installed_version}'.")
     
     def check_if_target_script_file_path_accessible_for_write(self, script_path):
         path = pathlib.Path(script_path)
