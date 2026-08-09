@@ -27,6 +27,7 @@ from typing import NamedTuple, Self, Any, TextIO, Iterable, Type, List, Dict, Se
 # prerequire packages listed in requirements.txt
 # 
 import psycopg
+from psycopg.rows import TupleRow
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
@@ -1700,7 +1701,7 @@ class VerifyCommand (BaseCommand):
         else:
             self.display_verification_changes_by_commits(scripts_dir, scripts_sorted)
 
-    def get_recent_changes_from_db(self, limit=10, window_minutes=30):
+    def get_recent_changes_from_db(self, limit:int, window_minutes:int) -> list[TupleRow]:
         sql = """
             WITH latest_time AS (
                 SELECT COALESCE(MAX(applied_at), NOW()) AS max_at
@@ -1737,16 +1738,15 @@ class VerifyCommand (BaseCommand):
             LIMIT {limit};
 
         """
-
-        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name(), limit=limit, window_minutes=window_minutes)        
-        cursor = self.dbconn.cursor()
-        cursor.execute(formatted_sql, [])
-        rows = cursor.fetchall()
+        schema_id = self.get_schema_name()
+        formatted_sql = self.format_sql(sql, schema_name=schema_id, limit=limit, window_minutes=window_minutes)        
+        with self.dbconn.cursor() as cursor:
+            cursor.execute(formatted_sql, [])
+            rows = cursor.fetchall()
         return rows
 
-    def display_recent_changes_grouped_by_git_commits(self, rows):
+    def display_recent_changes_grouped_by_git_commits(self, rows: list[TupleRow]) -> None:
         assert self.git is not None
-        assert rows is not None
 
         commits_group = collections.defaultdict(list)
 
@@ -1771,7 +1771,7 @@ class VerifyCommand (BaseCommand):
             for s in scripts:
                 print(f"  {s!r}")
 
-    def display_recent_changes(self, limit=10, window_minutes=30):
+    def display_recent_changes(self, limit:int = 10, window_minutes:int = 30):
         
         rows = self.get_recent_changes_from_db(limit, window_minutes)
         if not rows:
@@ -1791,48 +1791,67 @@ class VerifyCommand (BaseCommand):
             self.display_recent_changes_grouped_by_git_commits(rows)
 
 
-
-    def __init__(self, config, subparsers): 
+    def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
         super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
-        self.parser.add_argument("--skip-git-checks",  action="store_true", default=False, help="skip grouping changes by git commits")
-        self.parser.add_argument("--skip-display-recent-changes",  action="store_true", default=False, help="skip display recent changes stored within target db schema")
-        self.parser.add_argument("--build-update-script", type=str, default=None, help="the update script path if you want one as an additional result of the verify command")
-        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
-        self.latest_version_in_scripts = None
+        
+        # for action="store_true" the value False is by default  
+        self.parser.add_argument(
+            "--skip-git-checks",  
+            action="store_true", 
+            help="skip grouping changes by git commits"
+        )
+        self.parser.add_argument(
+            "--skip-display-recent-changes",  
+            action="store_true", 
+            help="skip display recent changes stored within target db schema"
+        )
+        self.parser.add_argument(
+            "--build-update-script", 
+            type=str, 
+            help="the update script path if you want one as an additional result of the verify command"
+        )
+        self.parser.add_argument(
+            "scripts_path", 
+            type=str, 
+            help="source scripts repository path"
+        )        
+        self.latest_version_in_scripts: str | None = None
 
-    def write_search_path(self, search_path, builder):
-        assert builder is not None
+
+    def write_search_path(self, search_path: str, builder: UpdateScriptBuilder) -> None:
         with builder:
-            formatted_sql_text = self.format_sql_text("SELECT pg_catalog.set_config('search_path', {search_path}, false);\n", search_path=search_path)
+            formatted_sql_text = self.format_sql_text(
+                "SELECT pg_catalog.set_config('search_path', {search_path}, false);\n", search_path=search_path)
             builder.write_header(formatted_sql_text)
 
-    def write_baseline_scripts(self, version, scripts_dir, scripts, script_builder):
-        assert script_builder is not None
+    def write_baseline_scripts(self, version: str, scripts_dir: Path, scripts: list[Path], script_builder: UpdateScriptBuilder) -> None:
+        encoding = self.file_read_encoding 
+        errors = self.file_read_encoding_errors 
         with script_builder:
-            formatted_sql_text = self.format_sql_text("-- Baseline scripts for version {version_id}\n", version_id=version)
+            formatted_sql_text = self.format_sql_text(
+                "-- Baseline scripts for version {version_id}\n", version_id=version)
             script_builder.write_body(formatted_sql_text)
-            for script_path in scripts:
-                relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-                with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
-                    lines = source_file.readlines()
-                formatted_sql_text = self.format_sql_text("--{script_path}\n", script_path=str(relative_script_path))                    
+            script_infos = [ 
+                ScriptFsInfo.get_info_with_text(
+                    scripts_dir, s, encoding=encoding, encoding_errors=errors) for s in scripts
+            ]
+            for i in script_infos:
+                formatted_sql_text = self.format_sql_text("--{script_path}\n", script_path=str(i.relative_path))                    
                 script_builder.write_body(formatted_sql_text)
                 script_builder.write_body(f"BEGIN;\n")
-                script_builder.write_body_lines(lines)
+                script_builder.write_body_lines(i.text)
                 script_builder.write_body(f"\n")
                 script_builder.write_body(f"COMMIT;\n")
-
+            schema_id = self.get_schema_name()
             script_builder.write_body(f"BEGIN;\n")
-            formatted_sql_text = self.format_sql_text("INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", 
-                                                 schema_name=self.get_schema_name(), version_id=version)
+            formatted_sql_text = self.format_sql_text(
+                "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES ({version_id}, TRUE);\n", 
+                schema_name=schema_id, version_id=version)
             script_builder.write_body(formatted_sql_text)
-            for script_path in scripts:
-                relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-                with open(script_path, 'rb') as f:
-                    script_bytes = f.read()
-                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                formatted_sql_text = self.format_sql_text("INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
-                                                    schema_name=self.get_schema_name(), version_id=version,relative_path=relative_script_path,git_blob_sha1=git_blob_sha1)
+            for i in script_infos:
+                formatted_sql_text = self.format_sql_text(
+                    "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES ({version_id}, {relative_path},{git_blob_sha1});\n", 
+                    schema_name=schema_id, version_id=version,relative_path=i.relative_path,git_blob_sha1=i.oid)
                 script_builder.write_body(formatted_sql_text)
             script_builder.write_body(f"COMMIT;\n")
 
