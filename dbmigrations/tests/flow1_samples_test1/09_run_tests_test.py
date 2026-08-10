@@ -41,10 +41,10 @@ def test_dbmigration_run_tests_failure(cfg):
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify target schema setup and tests initialization logs
-    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to: '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     assert "Running unit tests for scripts repository:" in result.stdout
-    assert "Target version matches the latest installed version 'V002'" in result.stdout
+    assert "Target version matches the latest installed version: 'V002'" in result.stdout
     
     # 4. Verify savepoint and transaction isolation lifecycle logs
     assert "Make savepoint..." in result.stdout

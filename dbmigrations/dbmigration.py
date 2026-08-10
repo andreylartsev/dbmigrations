@@ -932,7 +932,7 @@ class BaseCommand(ABC):
         return trimmed_str
     
     def set_session_search_path(self, search_path : str) -> None:
-        print(f"Set session search path to '{search_path}'.")
+        print(f"Set session search path to: '{search_path}'.")
         sql = f"""
             SELECT pg_catalog.set_config('search_path', %s, false)"""
         result = self.dbconn_get_single_value(sql, (search_path,))
@@ -1442,7 +1442,8 @@ class UpdateCommand (BaseCommand):
         if latest_installed_version != target_version:
             raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version '{latest_installed_version}'.")                  
 
-        print(f"Target version matches the latest installed version '{target_version}'")
+        print(f"Target version matches the latest installed version: '{target_version}'.")
+
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
 
         scripts_to_repeat = []
@@ -1888,7 +1889,7 @@ class VerifyCommand (BaseCommand):
         baseline_version = baseline_version_subdir.name
 
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH)
-        print(f"The baseline scripts to install: ")
+        print(f"Baseline scripts to install: ")
         self.display_required_changes(scripts_dir, scripts_sorted)
 
         if script_builder:
@@ -1959,7 +1960,7 @@ class VerifyCommand (BaseCommand):
 
         self.latest_version_in_scripts = latest_version
     
-        print(f"The versioned scripts to install: ")    
+        print(f"Versioned scripts to install: ")    
         for version_dir in newer_version_subdirs_sorted:    
             scripts_sorted = self.get_sorted_scripts_from_dir(version_dir, VERSIONED_FILES_DEPTH)
             if not scripts_sorted:
@@ -1995,12 +1996,13 @@ class VerifyCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not contain the '{REPEATABLE_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing the required '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
 
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
             raise CommandError(f"The target version file '{TARGET_VERSION_FILE}' does not exist in the repeatable scripts subdirectory '{repeatable_dir}'.")
+
         target_version = read_as_trimmed_string(target_version_file_path)
 
         latest_installed_version = self.get_latest_version_installed()
@@ -2009,24 +2011,34 @@ class VerifyCommand (BaseCommand):
 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
+        print(f"Target version for repeatable scripts: '{target_version}'.")
+
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
 
-        print(f"The target version for repeatable scripts is {target_version}.")
-        scripts_to_repeat = []
-        for script_path in repeatable_scripts_sorted:
-            with open(script_path, 'rb') as f:
-                script_bytes = f.read()
-            git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-            relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-            if not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
-                scripts_to_repeat.append(script_path)
+        script_infos = [
+            ScriptFsInfo.get_info(scripts_dir, s) for s in repeatable_scripts_sorted
+        ]
+        scripts_to_repeat = [
+            i.script_path
+            for i in script_infos
+            if not self.check_if_repeatable_script_installed(i.oid, target_version, i.relative_path)
+        ]
 
         if not scripts_to_repeat:
             print("No modified repeatable scripts found for (re)installation.")
             return
 
-        print("The repeatable scripts to (re)install: ")
-        scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
+        scripts_to_repeat = self.resolve_scripts_dependencies(
+            repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat
+        )
+        
+        script_infos = [
+            ScriptFsInfo.get_info_with_text(
+                scripts_dir, s, encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors
+            ) 
+            for s in scripts_to_repeat
+        ]
+        print("Repeatable scripts to (re)install: ")
         self.display_required_changes(scripts_dir, scripts_to_repeat)
 
         if script_builder:
@@ -2068,7 +2080,7 @@ class VerifyCommand (BaseCommand):
                 written = script_builder.get_written_body_bytes()
                 if written > 0:
                     script_builder.finalize()
-                    print(f"The update script is written to '{script_path}'.")
+                    print(f"Update script is written to '{script_path}'.")
                 else:
                     script_builder.cleanup()
                     print(f"No updates to write for script '{script_path}'. Temp file cleaned up")                
@@ -2304,7 +2316,7 @@ class RunTestsCommand (BaseCommand):
             latest_installed_version = self.check_if_any_latest_version_installed() 
             if latest_installed_version != target_version:
                 raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
-            print(f"Target version matches the latest installed version '{target_version}'")
+            print(f"Target version matches the latest installed version: '{target_version}'")
 
         scripts_sorted = self.get_sorted_scripts_from_dir(unit_tests_dir, TESTS_FILES_DEPTH)        
         self.run_test_scripts_each_in_own_tran(scripts_dir, scripts_sorted)

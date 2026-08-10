@@ -41,7 +41,7 @@ def test_dbmigration_update_baseline_with_dump_success(cfg):
     # 2. Verify database connection and search path logs
     db_conn_pattern = r"Opened db connection: '\S+@\S+:\d+/\S+'"
     assert re.search(db_conn_pattern, result.stdout) is not None, "Database connection log missing."
-    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to: '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     
     # 3. Verify that the correct external psql tool was picked up and used

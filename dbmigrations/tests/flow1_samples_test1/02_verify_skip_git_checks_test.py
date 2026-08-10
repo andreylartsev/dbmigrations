@@ -49,31 +49,31 @@ def test_dbmigration_verify_skip_git_checks_success(cfg):
             f"Database connection log string was not found or has an invalid format: {result.stdout}"
     
         # 3. Verify target schema connection log statements
-        assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+        assert f"Set session search path to: '{cfg.TARGET_SCHEMA}'." in result.stdout
         assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
         assert "Closed db connection." in result.stdout
         
         # 4. Verify baseline and versioned block summary messages
-        assert "The baseline scripts to install:" in result.stdout
+        assert "Baseline scripts to install:" in result.stdout
         assert "00_create_t1.sql" in result.stdout
         assert "01_insert_into_t1.sql" in result.stdout
         
-        assert "The versioned scripts to install:" in result.stdout
+        assert "Versioned scripts to install:" in result.stdout
         assert "00_create_t2.sql" in result.stdout
         assert "01_insert_into_t2.sql" in result.stdout
         assert "dummy.sql" in result.stdout
         
         # 5. Verify database schema status logs
         assert "No versions are installed in the database schema." in result.stdout
-        assert "The target version for repeatable scripts is V002." in result.stdout
+        assert "Target version for repeatable scripts: 'V002'." in result.stdout
         
         # 6. Verify repeatable scripts block summary messages
-        assert "The repeatable scripts to (re)install:" in result.stdout
+        assert "Repeatable scripts to (re)install:" in result.stdout
         assert "00_create_view_latest_t1.sql" in result.stdout
         assert "01_create_view_max_t2_kk.sql" in result.stdout
     
         # 7. Verify that the console logs the successful generation of the update script
-        assert f"The update script is written to '{output_sql_file}'." in result.stdout
+        assert f"Update script is written to '{output_sql_file}'." in result.stdout
     
         # 8. Verify the physical existence and contents of the generated .sql file
         assert output_sql_file.exists(), "The generated update script file does not exist on disk"

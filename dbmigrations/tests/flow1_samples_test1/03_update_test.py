@@ -44,7 +44,7 @@ def test_dbmigration_update_success(cfg):
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify target schema setup and initial consistency checks logs
-    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to: '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Performing updates from scripts repository:" in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     assert "Completed." in result.stdout
@@ -70,7 +70,7 @@ def test_dbmigration_update_success(cfg):
     
     # 6. Verify repeatable phase execution logs
     assert "Check repeatable scripts..." in result.stdout
-    assert "Target version matches the latest installed version 'V002'" in result.stdout
+    assert "Target version matches the latest installed version: 'V002'" in result.stdout
     assert "Found 2 scripts to re-run" in result.stdout
     assert "Apply repeatable scripts..." in result.stdout
     assert "00_create_view_latest_t1.sql" in result.stdout

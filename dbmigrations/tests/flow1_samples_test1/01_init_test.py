@@ -42,7 +42,7 @@ def test_dbmigration_init_success(cfg):
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify standard static output application log statements
-    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to: '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Created." in result.stdout
     assert "Closed db connection." in result.stdout
     

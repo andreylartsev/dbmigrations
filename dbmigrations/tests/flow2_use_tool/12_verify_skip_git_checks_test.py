@@ -43,11 +43,11 @@ def test_dbmigration_verify_skip_git_checks_success(cfg):
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify target schema connection log statements
-    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to: '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     assert "Closed db connection." in result.stdout
     
     # 4. Verify baseline and versioned block summary messages
-    assert "The baseline scripts to install:" in result.stdout
+    assert "Baseline scripts to install:" in result.stdout
     assert "00_esbdb_schema.sql" in result.stdout
     assert "01_esbdb_data.sql" in result.stdout

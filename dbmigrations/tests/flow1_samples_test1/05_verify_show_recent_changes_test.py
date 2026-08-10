@@ -41,7 +41,7 @@ def test_dbmigration_verify_success(cfg):
         f"Database connection log string was not found or has an invalid format: {result.stdout}"
 
     # 3. Verify target schema setup and verification initialization logs
-    assert f"Set session search path to '{cfg.TARGET_SCHEMA}'." in result.stdout
+    assert f"Set session search path to: '{cfg.TARGET_SCHEMA}'." in result.stdout
     assert "Target schema environment ID matches the scripts directory ID:" in result.stdout
     assert "Performing a cross-check for consistency" in result.stdout
     assert "Completed." in result.stdout
@@ -49,7 +49,7 @@ def test_dbmigration_verify_success(cfg):
     # 4. Verify version and script status summary logs
     assert "The target schema has the baseline version installed: V000" in result.stdout
     assert "The latest installed version is V002. No newer scripts found for installation." in result.stdout
-    assert "The target version for repeatable scripts is V002." in result.stdout
+    assert "Target version for repeatable scripts: 'V002'." in result.stdout
     assert "No modified repeatable scripts found for (re)installation." in result.stdout
     assert "The list of recent changes were applied to the target schema:" in result.stdout
 
