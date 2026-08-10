@@ -55,7 +55,7 @@ def test_dbmigration_update_success(cfg):
     assert "00_create_t1.sql" in result.stdout
     assert "01_insert_into_t1.sql" in result.stdout
     assert "Setting the baseline version as 'V000'." in result.stdout
-    assert "The baseline scripts were applied." in result.stdout
+    assert "Baseline scripts applied." in result.stdout
     
     # 5. Verify versioned phase execution logs
     assert "The latest installed version is V000." in result.stdout
@@ -66,7 +66,7 @@ def test_dbmigration_update_success(cfg):
     assert "01_insert_into_t2.sql" in result.stdout
     assert "Apply version V002..." in result.stdout
     assert "dummy.sql" in result.stdout
-    assert "The versioned scripts were applied." in result.stdout
+    assert "Versioned scripts applied." in result.stdout
     
     # 6. Verify repeatable phase execution logs
     assert "Check repeatable scripts..." in result.stdout
@@ -75,7 +75,7 @@ def test_dbmigration_update_success(cfg):
     assert "Apply repeatable scripts..." in result.stdout
     assert "00_create_view_latest_t1.sql" in result.stdout
     assert "01_create_view_max_t2_kk.sql" in result.stdout
-    assert "The repeatable scripts were applied." in result.stdout
+    assert "Repeatable scripts applied." in result.stdout
     
     # 7. Verify successful completion logs and connection closing
     assert "Updated." in result.stdout

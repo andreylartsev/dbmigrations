@@ -57,6 +57,6 @@ def test_dbmigration_update_baseline_with_dump_success(cfg):
     # 5. Verify the final successful lifecycle states
     assert "Setting the baseline version 'V000'..." in result.stdout
     assert "Committed." in result.stdout
-    assert "The baseline scripts were applied." in result.stdout
+    assert "Baseline scripts applied." in result.stdout
     assert "Updated." in result.stdout
     assert "Closed db connection." in result.stdout

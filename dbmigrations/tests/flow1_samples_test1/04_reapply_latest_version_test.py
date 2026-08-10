@@ -61,7 +61,7 @@ def test_dbmigration_force_reapply_latest_success(cfg):
     assert "Apply repeatable scripts..." in result.stdout
     assert "Running script: [test1/repeatable/00_create_view_latest_t1.sql" in result.stdout
     assert "Running script: [test1/repeatable/01_create_view_max_t2_kk.sql" in result.stdout
-    assert "The repeatable scripts were applied." in result.stdout
+    assert "Repeatable scripts applied." in result.stdout
     
     # 6. Verify successful completion logs for reapply action and connection closing
     assert "Reapplied." in result.stdout

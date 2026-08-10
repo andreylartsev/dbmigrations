@@ -1026,7 +1026,7 @@ class BaseCommand(ABC):
             filter(None, [latest_version_in_versioned, latest_version_in_baseline]), default=None)
 
         if latest_version_in_scripts is None:
-            print(f"Neither baseline nor versioned script updates were found in scripts dir: '{scripts_dir}'")
+            print(f"No baseline or versioned scripts found in scripts directory: '{scripts_dir}'")
             return
                 
         target_version_in_repeatable = None
@@ -1037,7 +1037,7 @@ class BaseCommand(ABC):
                 target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
 
         if target_version_in_repeatable is None:
-            print(f"No repeatable scripts were found in scripts dir: '{scripts_dir}'")
+            print(f"No repeatable scripts found in scripts directory: '{scripts_dir}'")
             return 
 
         if latest_version_in_scripts != target_version_in_repeatable:
@@ -1354,7 +1354,7 @@ class UpdateCommand (BaseCommand):
             self.run_baseline_scripts_each_in_own_tran(
                 baseline_version, scripts_dir, scripts_sorted)
 
-        print("The baseline scripts were applied.")       
+        print("Baseline scripts applied.")       
 
     def reapply_the_latest_version(self) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
@@ -1422,7 +1422,7 @@ class UpdateCommand (BaseCommand):
                 
             self.run_versioned_scripts_in_tran(version_id, scripts_dir, scripts_sorted)       
 
-        print("The versioned scripts were applied.")
+        print("Versioned scripts applied.")
 
     def apply_repeatable_scripts(self, force_reapply: bool = False) -> None:        
         scripts_dir = self.get_resolved_scripts_dir()
@@ -1490,7 +1490,7 @@ class UpdateCommand (BaseCommand):
                     cur.execute(repeatable_sql, (i.oid, target_version, i.relative_path))
             print("Committed.")
 
-        print("The repeatable scripts were applied.")
+        print("Repeatable scripts applied.")
 
     def run(self) -> None:
         if not self.args.skip_confirmation:
@@ -1503,7 +1503,7 @@ class UpdateCommand (BaseCommand):
         
         applied_count = self.apply_all_own_migrations()
         if applied_count > 0:
-            print(f"The version control tables were updated. Please rerun the tool to update the schema using your scripts.")
+            print(f"Version control tables updated. Please rerun the tool to update the schema using your scripts.")
             return
 
         self.check_if_all_version_control_tables_exist()
@@ -1936,7 +1936,7 @@ class VerifyCommand (BaseCommand):
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if not versioned_subdirs:
             raise CommandError(
-                f"The versioned scripts path {versioned_dir} must contain at least one subdirectory, but none were found")
+                f"Versioned scripts path {versioned_dir} must contain at least one subdirectory, but none were found")
 
         latest_installed_version = self.get_latest_version_installed()
         if latest_installed_version is not None:
