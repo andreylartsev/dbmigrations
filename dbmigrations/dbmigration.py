@@ -1329,7 +1329,7 @@ class UpdateCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing the required '{BASELINE_DIR_NAME}' subdirectory.")
             return
         if self.check_if_version_table_include_baseline_version():
             print("The target schema already has the baseline version installed. Baseline scripts will be skipped.")
@@ -1360,7 +1360,7 @@ class UpdateCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing the required '{VERSIONED_DIR_NAME}' subdirectory.")
             return
         
         latest_installed = self.check_if_any_latest_version_installed()
@@ -1386,7 +1386,8 @@ class UpdateCommand (BaseCommand):
         force_run_cleanup = self.args.force_run_cleanup
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing the required '{VERSIONED_DIR_NAME}' subdirectory.")
+            
             return
 
         if not self.check_if_version_table_include_baseline_version():
@@ -1427,7 +1428,7 @@ class UpdateCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{REPEATABLE_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing the required '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
 
         print("Check repeatable scripts...")
@@ -1872,7 +1873,7 @@ class VerifyCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include '{BASELINE_DIR_NAME}' subdirectory. ")
+            print(f"The scripts directory '{scripts_dir}' is missing the required '{BASELINE_DIR_NAME}' subdirectory. ")
             return
         
         if self.check_if_version_table_include_baseline_version():
@@ -1929,7 +1930,7 @@ class VerifyCommand (BaseCommand):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
 
         if not versioned_dir.exists():
-            print(f"The scripts path '{scripts_dir}' does not include the '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing the required the '{VERSIONED_DIR_NAME}' subdirectory.")
             return
         
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
@@ -1990,7 +1991,7 @@ class VerifyCommand (BaseCommand):
                 script_builder.write_body(sql_text)
                 script_builder.write_body(f"COMMIT;\n")
 
-    def verify_repeatable_scripts(self, script_builder: UpdateScriptBuilder) -> None:
+    def verify_repeatable_scripts(self, script_builder: UpdateScriptBuilder | None) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
@@ -2021,7 +2022,7 @@ class VerifyCommand (BaseCommand):
         print(f"The repeatable scripts to (re)install: ")
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         self.display_required_changes(scripts_dir, scripts_to_repeat)
-        if script_builder is not None:
+        if script_builder:
             scripts_to_repeat_dict = {}
             for script_path in scripts_to_repeat:
                 with open(script_path, 'rb') as f:
@@ -2286,7 +2287,7 @@ class RunTestsCommand (BaseCommand):
     def run_unit_test_scripts(self, scripts_dir):
         unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
         if not unit_tests_dir.exists():
-            raise CommandError(f"The scripts path '{scripts_dir}' does not include '{TESTS_DIR_NAME}' subdirectory.")
+            raise CommandError(f"The scripts directory '{scripts_dir}' is missing the required '{TESTS_DIR_NAME}' subdirectory.")
 
         if not self.args.skip_env_checks:
             target_version_file_path = unit_tests_dir.joinpath(TARGET_VERSION_FILE)
