@@ -64,7 +64,7 @@ def test_dbmigration_verify_skip_git_checks_success(cfg):
         assert "dummy.sql" in result.stdout
         
         # 5. Verify database schema status logs
-        assert "No versions were installed in the database schema." in result.stdout
+        assert "No versions are installed in the database schema." in result.stdout
         assert "The target version for repeatable scripts is V002." in result.stdout
         
         # 6. Verify repeatable scripts block summary messages

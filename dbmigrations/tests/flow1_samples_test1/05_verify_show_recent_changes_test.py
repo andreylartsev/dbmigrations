@@ -50,7 +50,7 @@ def test_dbmigration_verify_success(cfg):
     assert "The target schema has the baseline version installed: V000" in result.stdout
     assert "The latest installed version is V002. No newer scripts found for installation." in result.stdout
     assert "The target version for repeatable scripts is V002." in result.stdout
-    assert "No changed repeatable scripts found for (re)installation." in result.stdout
+    assert "No modified repeatable scripts found for (re)installation." in result.stdout
     assert "The list of recent changes were applied to the target schema:" in result.stdout
 
     # 5. Verify the audit log / history entries via strict substring checks

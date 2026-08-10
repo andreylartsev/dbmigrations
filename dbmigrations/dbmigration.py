@@ -1377,7 +1377,7 @@ class UpdateCommand (BaseCommand):
             latest_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=True)
         if not scripts_sorted:
             filters_str = ",".join(self.file_glob_filters)
-            raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not include any '{filters_str}' scripts")
+            raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not contain any '{filters_str}' scripts")
         
         self.rerun_versioned_scripts(latest_installed, scripts_dir, scripts_sorted)
 
@@ -1418,7 +1418,7 @@ class UpdateCommand (BaseCommand):
             
             if not scripts_sorted:
                 filters_str = ",".join(self.file_glob_filters)
-                raise CommandError(f"The scripts subdirectory '{version_dir}' does not include any '{filters_str}' scripts")
+                raise CommandError(f"The scripts subdirectory '{version_dir}' does not contain any '{filters_str}' scripts")
                 
             self.run_versioned_scripts_in_tran(version_id, scripts_dir, scripts_sorted)       
 
@@ -1459,7 +1459,7 @@ class UpdateCommand (BaseCommand):
             ]
 
         if not scripts_to_repeat:
-            print("No changed repeatable scripts found for (re)installation.")       
+            print("No modified repeatable scripts found for (re)installation.")       
             return
 
         scripts_to_repeat = self.resolve_scripts_dependencies(
@@ -1997,16 +1997,20 @@ class VerifyCommand (BaseCommand):
         if not repeatable_dir.exists():
             print(f"The scripts path '{scripts_dir}' does not contain the '{REPEATABLE_DIR_NAME}' subdirectory.")
             return
+
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
-            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exist in repeatable scripts subdirectory '{repeatable_dir}'.")
+            raise CommandError(f"The target version file '{TARGET_VERSION_FILE}' does not exist in the repeatable scripts subdirectory '{repeatable_dir}'.")
         target_version = read_as_trimmed_string(target_version_file_path)
+
         latest_installed_version = self.get_latest_version_installed()
         if latest_installed_version is None:
-           print(f"No versions were installed in the database schema.") 
+           print("No versions are installed in the database schema.") 
+
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
+
         print(f"The target version for repeatable scripts is {target_version}.")
         scripts_to_repeat = []
         for script_path in repeatable_scripts_sorted:
@@ -2016,12 +2020,15 @@ class VerifyCommand (BaseCommand):
             relative_script_path = get_script_path_for_log(scripts_dir, script_path)
             if not self.check_if_repeatable_script_installed(git_blob_sha1, target_version, relative_script_path):
                 scripts_to_repeat.append(script_path)
-        if len(scripts_to_repeat) == 0:
-            print(f"No changed repeatable scripts found for (re)installation.")
+
+        if not scripts_to_repeat:
+            print("No modified repeatable scripts found for (re)installation.")
             return
-        print(f"The repeatable scripts to (re)install: ")
+
+        print("The repeatable scripts to (re)install: ")
         scripts_to_repeat = self.resolve_scripts_dependencies(repeatable_dir, REPEATABLE_FILES_DEPTH, repeatable_scripts_sorted, scripts_to_repeat)
         self.display_required_changes(scripts_dir, scripts_to_repeat)
+
         if script_builder:
             scripts_to_repeat_dict = {}
             for script_path in scripts_to_repeat:
