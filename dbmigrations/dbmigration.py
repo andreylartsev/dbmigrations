@@ -1224,7 +1224,7 @@ class UpdateCommand (BaseCommand):
                 with self.dbconn.cursor() as cur:
                     cur.execute(i.text)                                  
             print(f"Committed.")
-        print(f"Setting the baseline version as '{version}'.")
+        print(f"Setting the baseline version to: '{version}'.")
         schema_id = self.get_schema_name()
         version_sql = self.format_sql(
             "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)",  
@@ -1662,7 +1662,7 @@ class VerifyCommand (BaseCommand):
         with self.dbconn.cursor() as cur:
             cur.execute(sql)
 
-    def get_baseline_version_installed(self) -> None:
+    def get_baseline_version_installed(self) -> str|None:
         sql = """
                 SELECT version_id FROM {schema_name}.dbmigration_versions WHERE is_baseline IS TRUE ORDER BY version_id DESC LIMIT 1"""
         schema_id = self.get_schema_name()
@@ -1686,15 +1686,13 @@ class VerifyCommand (BaseCommand):
             if target_version != latest_installed_version:
                 raise CommandError(f"The target version '{target_version}' does not match the latest installed version '{latest_installed_version}'.")
     
-    def display_required_changes_by_commits(self, scripts_dir: Path, files_sorted : list[Path]) -> None:
+    def display_required_changes_by_commits(self, script_infos: list[ScriptFsInfo]) -> None:
         assert self.git is not None
-        assert isinstance(files_sorted, collections.abc.Iterable)
 
         commits_group = collections.defaultdict(list)        
-        for file_path in files_sorted:
-            commit_info = self.git.get_latest_commit(file_path)
-            script_info = ScriptFsInfo.get_info(scripts_dir, file_path)            
-            commits_group[commit_info].append(script_info)
+        for i in script_infos:
+            commit_info = self.git.get_latest_commit(i.script_path)
+            commits_group[commit_info].append(i)
 
         sorted_commits = sorted(
             commits_group.items(),
@@ -1707,13 +1705,20 @@ class VerifyCommand (BaseCommand):
             for s in scripts:
                 print(f"    {s!r}")                
 
-    def display_required_changes(self, scripts_dir: Path, scripts_sorted: list[Path]) -> None:
+    def display_required_changes(self, script_infos: list[ScriptFsInfo]) -> None:
         if self.git is None:
-            script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts_sorted] 
             for i in script_infos:
                 print(f"  {i!r}")
         else:
-            self.display_required_changes_by_commits(scripts_dir, scripts_sorted)
+            self.display_required_changes_by_commits(script_infos)
+
+    def display_required_changes_by_path(self, scripts_dir: Path, scripts_sorted: list[Path]) -> None:
+        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts_sorted] 
+        if self.git is None:
+            for i in script_infos:
+                print(f"  {i!r}")
+        else:
+            self.display_required_changes_by_commits(script_infos)
 
     def get_recent_changes_from_db(self, limit:int, window_minutes:int) -> list[TupleRow]:
         sql = """
@@ -1890,7 +1895,7 @@ class VerifyCommand (BaseCommand):
 
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH)
         print(f"Baseline scripts to install: ")
-        self.display_required_changes(scripts_dir, scripts_sorted)
+        self.display_required_changes_by_path(scripts_dir, scripts_sorted)
 
         if script_builder:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
@@ -1966,29 +1971,28 @@ class VerifyCommand (BaseCommand):
             if not scripts_sorted:
                 filters_str = ",".join(self.file_glob_filters)
                 raise CommandError(f"The scripts subdirectory '{version_dir}' does not contain any '{filters_str}' scripts.")
-            self.display_required_changes(scripts_dir, scripts_sorted)
+            self.display_required_changes_by_path(scripts_dir, scripts_sorted)
             if script_builder:
                 version_id = version_dir.name
                 self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, script_builder)
 
-    def write_repeatable_scripts(self, target_version: str, scripts_dict: dict[str,str], scripts_dir: Path, script_builder: UpdateScriptBuilder) -> None:
+    def write_repeatable_scripts(self, target_version: str, script_info_with_text_list: list[ScriptFsInfo], script_builder: UpdateScriptBuilder) -> None:
         with script_builder:
             sql_comment = self.format_sql_comment(f"-- --------- REPEATABLE SCRIPTS FOR VERSION: {target_version} ---------")
             script_builder.write_body(sql_comment)
             schema_id = self.get_schema_name()
-            for git_blob_sha1, script_path in scripts_dict.items():
-                relative_script_path = get_script_path_for_log(scripts_dir, script_path)
+            for i in script_info_with_text_list:
                 script_builder.write_body(f"\nBEGIN;\n")
-                sql_comment = self.format_sql_comment(f"-- Apply script: [{relative_script_path} (OID:{git_blob_sha1:.8})]")
-                script_builder.write_body(sql_comment)
-                with script_path.open("r", encoding="utf-8-sig", errors="ignore") as source_file:
-                    lines = source_file.readlines()
-                script_builder.write_body_lines(lines)
+                sql_comment = self.format_sql_comment(f"-- Apply script: [{i.relative_path} (OID:{i.oid:.8})]")
+                script_builder.write_body(sql_comment) 
+                if not i.text:
+                    ValueError(f"The text property of script info must not be empty string")
+                script_builder.write_body_lines(i.text)
                 script_builder.write_body(f"\n")
                 script_builder.write_body("-- End of script.\n")  
                 sql_text = self.format_sql_text(
                     "INSERT INTO {schema_name}.dbmigration_repeatable_scripts (git_blob_sha1, version_id, relative_path) VALUES ({git_blob_sha1}, {version_id}, {relative_path});\n", 
-                    schema_name=schema_id, git_blob_sha1=git_blob_sha1, version_id=target_version, relative_path=str(relative_script_path))
+                    schema_name=schema_id, git_blob_sha1=i.oid, version_id=target_version, relative_path=str(i.relative_path))
                 script_builder.write_body(sql_text)
                 script_builder.write_body(f"COMMIT;\n")
 
@@ -2039,16 +2043,10 @@ class VerifyCommand (BaseCommand):
             for s in scripts_to_repeat
         ]
         print("Repeatable scripts to (re)install: ")
-        self.display_required_changes(scripts_dir, scripts_to_repeat)
+        self.display_required_changes(script_infos)
 
         if script_builder:
-            scripts_to_repeat_dict = {}
-            for script_path in scripts_to_repeat:
-                with open(script_path, 'rb') as f:
-                    script_bytes = f.read()
-                git_blob_sha1 = get_git_blob_sha1_for_bytes(script_bytes)
-                scripts_to_repeat_dict[git_blob_sha1] = script_path
-            self.write_repeatable_scripts(target_version, scripts_to_repeat_dict, scripts_dir, script_builder)
+            self.write_repeatable_scripts(target_version, script_infos, script_builder)
 
     def run(self):
         self.make_dbconn_session_readonly()

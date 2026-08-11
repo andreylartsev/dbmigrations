@@ -54,7 +54,7 @@ def test_dbmigration_update_success(cfg):
     assert "Apply baseline scripts..." in result.stdout
     assert "00_create_t1.sql" in result.stdout
     assert "01_insert_into_t1.sql" in result.stdout
-    assert "Setting the baseline version as 'V000'." in result.stdout
+    assert "Setting the baseline version to: 'V000'" in result.stdout
     assert "Baseline scripts applied." in result.stdout
     
     # 5. Verify versioned phase execution logs
