@@ -885,7 +885,7 @@ class BaseCommand(ABC):
     def get_resolved_scripts_dir(self) -> Path:
         return self.get_scripts_path_arg().resolve()
     
-    def get_scripts_path_environment_id(self) -> str:            
+    def get_scripts_environment_id(self) -> str:            
         scripts_path = self.get_scripts_path_arg()
             
         target_environment_id_file_name = scripts_path.joinpath(TARGET_ENVIRONMENT_ID_FILE_NAME)
@@ -1060,7 +1060,7 @@ class BaseCommand(ABC):
 
     def check_if_stored_environment_id_matches_to_scripts_dir(self) -> None:
         stored_environment_id = self.get_stored_environment_id()
-        scripts_environment_id = self.get_scripts_path_environment_id()
+        scripts_environment_id = self.get_scripts_environment_id()
         if stored_environment_id != scripts_environment_id:
             scripts_path = self.get_scripts_path_arg()
             raise CommandError(f"The stored environment ID '{stored_environment_id}' in the target schema does not match the scripts directory '{scripts_path}'")
@@ -2188,7 +2188,7 @@ class InitCommand (BaseCommand):
             self.check_if_all_version_control_tables_do_not_exist()
             print(f"WARNING: Schema is not empty!")
 
-        environment_id = self.get_scripts_path_environment_id()
+        environment_id = self.get_scripts_environment_id()
 
         print(f"Creating the version control tables with environment ID: '{environment_id}'")
         self.create_version_tracking_tables(environment_id)
