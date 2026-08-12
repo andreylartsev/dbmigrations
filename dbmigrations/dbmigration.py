@@ -667,7 +667,7 @@ class BaseCommand(ABC):
         no_password = config_copy.pop(NO_PASSWORD_ATTRIBUTE, False)
         return config_copy, run_tests_by, no_password
 
-    def get_script_dependencies(self, base_dir, depth_within_base_dir, script_path):
+    def get_script_dependencies(self, base_dir:Path, depth_within_base_dir:int, script_path:Path)->list[Path]:
         if not script_path.exists():
             raise CommandError(f"The path {script_path} does not exists.")
         if not script_path.is_file():
@@ -688,7 +688,7 @@ class BaseCommand(ABC):
                         result_list.append(dependency_path)
         return result_list
     
-    def resolve_scripts_dependencies_inner_recursive_loop(self, reversed_deps, script_to_add, visited=None):
+    def resolve_scripts_dependencies_inner_recursive_loop(self, reversed_deps: dict[Path, list[Path]], script_to_add: Path, visited: list[Path] | None = None) -> list[Path]:
         # print(visited)
         if visited is None:
             visited = []
@@ -707,7 +707,9 @@ class BaseCommand(ABC):
                 result_list = [*result_list, *l]
         return result_list
 
-    def resolve_scripts_dependencies(self, base_dir, depth_within_base_dir, orig_script_list, changed_scripts):
+    def resolve_scripts_dependencies(self, base_dir:Path, depth_within_base_dir:int, orig_script_list:list[Path], changed_scripts:list[Path]) -> list[Path]:
+        assert depth_within_base_dir > 0
+
         resolved_changed_scripts = [p.resolve() for p in changed_scripts]     
         resolved_orig_script_list = [p.resolve() for p in orig_script_list]     
         reversed_deps = collections.defaultdict(list)
@@ -732,11 +734,11 @@ class BaseCommand(ABC):
         result_list = list(dict.fromkeys(result_list)) 
         return result_list
 
-    def get_sorted_scripts_from_dir(self, base_dir, depth_within_base_dir, force_run_cleanup = False, recursion_depth=0):
+    def get_sorted_scripts_from_dir(self, base_dir: Path, depth_within_base_dir: int, force_run_cleanup: bool = False, recursion_depth: int = 0):
         MAX_RECURSION_DEPTH = 25
         if recursion_depth > MAX_RECURSION_DEPTH:
             raise CommandError(f"Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' due to circular path references.")
-        start_path = pathlib.Path(base_dir) 
+        start_path = Path(base_dir) 
         if not start_path.exists():
             raise CommandError(f"The folder '{base_dir}' does not exists")
         if not start_path.is_dir():
@@ -744,7 +746,7 @@ class BaseCommand(ABC):
         script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
         sorted_files = []
         if script_list_file_path.exists():
-            with script_list_file_path.open("r", encoding="utf-8-sig", errors="ignore") as script_list_file:
+            with script_list_file_path.open("r", encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as script_list_file:
                 lines = script_list_file.readlines()
                 for line in lines:
                     trimmed_str = line.strip()
@@ -754,7 +756,7 @@ class BaseCommand(ABC):
                         print(f"Skip: {trimmed_str}")
                         continue
                     if trimmed_str.startswith("@"):
-                        script_path = resolve_relative_script_path(base_dir, depth_within_base_dir, trimmed_str)
+                        script_path = resolve_relative_script_path(start_path, depth_within_base_dir, trimmed_str)
                     else:
                         script_path = start_path.joinpath(trimmed_str)
                     script_name = script_path.name
@@ -916,6 +918,8 @@ class BaseCommand(ABC):
                 SELECT id FROM {schema_name_identity}.dbmigration_environment_id ORDER BY created_at ASC LIMIT 1"""        
         formatted_sql = self.format_sql(sql, schema_name_identity=schema_id) 
         value = self.dbconn_get_single_value(formatted_sql, [])
+        if value is None:
+            raise CommandError("Schema consistency check failed: environment ID not found in table 'dbmigration_environment_id'.")            
         return value
     
     def get_search_path_for_scripts(self) -> str:            
@@ -1790,7 +1794,7 @@ class VerifyCommand (BaseCommand):
             for s in scripts:
                 print(f"  {s!r}")
 
-    def display_recent_changes(self, limit:int = 10, window_minutes:int = 30):
+    def display_recent_changes(self, limit:int = 10, window_minutes:int = 30) -> None:
         
         rows = self.get_recent_changes_from_db(limit, window_minutes)
         if not rows:
