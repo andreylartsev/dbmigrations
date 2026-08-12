@@ -7,7 +7,6 @@ default_dbenv = "local_windows"
 # you can specify the git command line here
 #git_cmd_path = "C:/Program Files/Git/cmd/git.exe"
 
-
 [dbenvs.local_windows]
 host = "localhost"
 port = 5432
@@ -18,60 +17,12 @@ connect_timeout = 10
 no_password = true
 # sslmode = "prefer"
 
-[dbenvs.local_windows_test_2]
-host = "localhost"
-port = 5432
-dbname = "test2"
-user = "postgres"
-run_tests_by = "postgres"  
-connect_timeout = 10
-no_password = false
-# sslmode = "prefer"
-
-
 [dbenvs.local_macbook]
 host = "localhost"
 port = 5432
 dbname = "esbdb7"
 connect_timeout = 10
 no_password = true
-
-[dbenvs.test1]
-host = "10.70.41.240"
-port = 5433
-dbname = "test1"
-user = "dbinstall"
-run_tests_by = "zapkesb"
-no_password = false 
-connect_timeout = 5
-# sslmode = "prefer"
-
-[dbenvs.dev_korotin]
-host = "10.70.41.240"
-port = 5433
-dbname = "dev_korotin"
-user = "dbinstall"
-#run_tests_by = "zapkesb"  
-no_password = false 
-# sslmode = "prefer"
-
-[dbenvs.ish_import_zapk_smft_01]
-host = "10.70.41.240"
-port = 5433
-dbname = "ish_import_zapk_smft_01"
-user = "dbinstall"
-#run_tests_by = "zapkesb"  
-no_password = false 
-# sslmode = "prefer"
-
-[dbenvs.ish_import_zapk_smft_02]
-host = "10.70.41.240"
-port = 5433
-dbname = "ish_import_zapk_smft_02"
-user = "dbinstall"
-#run_tests_by = "zapkesb"  
-no_password = false 
-# sslmode = "prefer"
 
 # command options
 [options]
