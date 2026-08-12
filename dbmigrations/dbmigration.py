@@ -869,7 +869,7 @@ class BaseCommand(ABC):
             SELECT EXISTS (
                 SELECT 1 FROM pg_catalog.pg_namespace WHERE nspname = %s)"""
         value = self.dbconn_get_single_value(sql, (schema_name,))
-        return value is True
+        return bool(value)
 
     def get_scripts_path_arg(self) -> Path:
         if not self.args.scripts_path:
@@ -951,7 +951,7 @@ class BaseCommand(ABC):
             );
         """
         value = self.dbconn_get_single_value(sql, (schema_name, table_name))
-        return value is True
+        return bool(value)
     
     def check_if_version_table_include_baseline_version(self) -> bool:
         schema_id = self.get_schema_name()
@@ -964,7 +964,7 @@ class BaseCommand(ABC):
         """
         formatted_sql = self.format_sql(sql, schema_name=schema_id)
         value = self.dbconn_get_single_value(formatted_sql, [])
-        return value is True
+        return bool(value)
     
     def get_latest_version_installed(self) -> str|None:
         schema_id = self.get_schema_name()
@@ -997,7 +997,7 @@ class BaseCommand(ABC):
         formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())        
         params = (relative_path, version, git_blob_sha1)        
         value = self.dbconn_get_single_value(formatted_sql, params)
-        return value is True
+        return bool(value)
 
 
     def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self) -> None:
@@ -2096,20 +2096,18 @@ class VerifyCommand (BaseCommand):
 class InitCommand (BaseCommand):
     """Creates version control tables in an empty database schema."""
 
-    def check_if_schema_is_empty(self):
+    def check_if_schema_is_empty(self) -> bool:
         sql = """
-            SELECT count(*)
-            FROM pg_class c
-            JOIN pg_namespace s ON s.oid = c.relnamespace
-            WHERE s.nspname = %s
-            AND s.nspname NOT IN ('pg_catalog', 'information_schema')
-            AND s.nspname NOT LIKE 'pg_toast%%'
-            AND s.nspname NOT LIKE 'pg_temp%%'
+            SELECT NOT EXISTS (
+                SELECT 1
+                FROM pg_class c
+                JOIN pg_namespace s ON s.oid = c.relnamespace
+                WHERE s.nspname = %s
+            )
         """
-        value = self.dbconn_get_single_value(sql, (self.args.schema_name,))
-        if value is None:
-            raise CommandError(f"Unable to check whether target schema exists because the query returned nothing: '{sql}' ")
-        return (value == 0)
+        schema_name = self.get_schema_name_arg()        
+        value = self.dbconn_get_single_value(sql, (schema_name,))
+        return bool(value)
     
     def create_version_tracking_tables(self, environment_id):
         sql_script = """
