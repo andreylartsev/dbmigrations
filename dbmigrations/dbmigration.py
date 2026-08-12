@@ -95,6 +95,48 @@ UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
 UNCOMMITTED_DATE_LABEL = "-------"
 UNCOMMITTED_MESSAGE_LABEL = "Uncommitted changes"
 
+def main():
+    try:
+        config = read_toml_config()
+
+        parser = argparse.ArgumentParser(description=__doc__)    
+        subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
+
+        UpdateCommand(config, subparsers)
+        VerifyCommand(config, subparsers)
+        InitCommand(config, subparsers)
+        RunTestsCommand(config, subparsers)
+
+        # Parse arguments
+        args = parser.parse_args()
+
+        # Call the function associated with the subcommand
+        if hasattr(args, 'call'):
+            args.call(args)
+        else:
+            # If no subcommand is given, print help (or handle as needed)
+            parser.print_help()
+        return 0
+    except CommandError as e:    
+        error_type_name = type(e).__name__ 
+        print(f"Command error:", e)
+        return 1
+    except psycopg.Error as e:    
+        error_type_name = type(e).__name__ 
+        print(f"Server error:", e)
+        return 1
+    except Exception as e:
+        error_type_name = type(e).__name__ 
+        print(f"Error: {error_type_name}:", e)
+        traceback.print_exc()
+        return 1
+
+def read_toml_config() -> dict[str, Any]:
+    script_dir = pathlib.Path(__file__).absolute().parent
+    target_path = script_dir.joinpath(TOML_CONFIG_FILE)
+    with open(target_path, 'rb') as f:
+        config = tomllib.load(f)
+        return config
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -2343,49 +2385,7 @@ class RunTestsCommand (BaseCommand):
         print(f"Running unit tests for scripts repository: '{scripts_dir}'")
         self.run_unit_test_scripts(scripts_dir)
 
-def read_toml_config() -> dict[str, Any]:
-    script_dir = pathlib.Path(__file__).absolute().parent
-    target_path = script_dir.joinpath(TOML_CONFIG_FILE)
-    with open(target_path, 'rb') as f:
-        config = tomllib.load(f)
-        return config
-
-def main():
-    try:
-        config = read_toml_config()
-
-        parser = argparse.ArgumentParser(description=__doc__)    
-        subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
-
-        UpdateCommand(config, subparsers)
-        VerifyCommand(config, subparsers)
-        InitCommand(config, subparsers)
-        RunTestsCommand(config, subparsers)
-
-        # Parse arguments
-        args = parser.parse_args()
-
-        # Call the function associated with the subcommand
-        if hasattr(args, 'call'):
-            args.call(args)
-        else:
-            # If no subcommand is given, print help (or handle as needed)
-            parser.print_help()
-        return 0
-    except CommandError as e:    
-        error_type_name = type(e).__name__ 
-        print(f"Command error:", e)
-        return 1
-    except psycopg.Error as e:    
-        error_type_name = type(e).__name__ 
-        print(f"Server error:", e)
-        return 1
-    except Exception as e:
-        error_type_name = type(e).__name__ 
-        print(f"Error: {error_type_name}:", e)
-        traceback.print_exc()
-        return 1
-
+# main entry point
 if __name__ == "__main__":
     sys.exit(main())
 
