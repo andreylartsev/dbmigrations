@@ -298,6 +298,10 @@ class CommitInfo(NamedTuple):
             message=message or UNKNOWN_MESSAGE_LABEL
         )
 
+    @property
+    def is_uncommitted(self):
+        return self.oid is None 
+
     def __repr__(self) -> str:
         date_label = self.date.strftime("%Y-%m-%d") if self.date is not None else UNCOMMITTED_DATE_LABEL
         oid_label = self.oid[:8] if self.oid else UNCOMMITTED_SHA_LABEL
