@@ -37,7 +37,7 @@ def test_successful_script_building_lifecycle() -> None:
         assert not builder.temp_script_path.exists()
         
         # Validate the written SQL content match
-        content = target_path.read_text(encoding="utf-8")
+        content = target_path.read_text(encoding="utf-8", errors="replace")
         assert "BEGIN;" in content
         assert "CREATE TABLE users" in content
         assert "COMMIT;" in content
@@ -145,7 +145,7 @@ def test_finalize_handles_existing_target_file_unlinking() -> None:
         builder.finalize()
         
         assert target_path.exists()
-        assert target_path.read_text(encoding="utf-8") == "ALTER TABLE users ADD COLUMN age INT;"
+        assert target_path.read_text(encoding="utf-8", errors="replace") == "ALTER TABLE users ADD COLUMN age INT;"
     finally:
         builder.cleanup()
         target_path.unlink(missing_ok=True)

@@ -23,7 +23,7 @@ def test_dbmigration_update_success(cfg):
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8-sig",  # Handles Windows console BOM character matching properly
+        encoding="utf-8",
         errors="replace" 
     )
     

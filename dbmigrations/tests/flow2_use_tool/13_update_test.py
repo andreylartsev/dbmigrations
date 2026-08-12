@@ -23,7 +23,8 @@ def test_dbmigration_update_baseline_with_dump_success(cfg):
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8-sig"
+        encoding="utf-8",
+        errors="replace"
     )
     
     # Print outputs to console (pytest shows this only if the test fails)

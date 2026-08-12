@@ -25,7 +25,8 @@ def test_dbmigration_verify_skip_git_checks_success(cfg):
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8-sig"  # Handles Windows console BOM character matching properly
+        encoding="utf-8",
+        errors="replace"
     )
     
     # Print outputs with a fallback to "EMPTY" if stdout/stderr are empty or contain only whitespaces

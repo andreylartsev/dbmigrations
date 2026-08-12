@@ -28,6 +28,7 @@ from typing import NamedTuple, Self, Any, TextIO, Iterable, Type, List, Dict, Se
 # 
 import psycopg
 from psycopg.rows import TupleRow
+from psycopg import Cursor
 
 TOML_CONFIG_FILE = 'dbmigration.toml'
 OPTIONS_CONFIG_GROUP = "options"
@@ -372,7 +373,7 @@ class GitChecker:
     def _run_git(self, args: list[str]) -> str:
         """Helper method to safely execute Git commands."""
         cmd = [str(self.git_cmd), "-C", str(self.repo_root)] + args
-        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore")
+        res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if res.returncode != 0:
             return ""
         return res.stdout
@@ -674,7 +675,7 @@ class BaseCommand(ABC):
             raise CommandError(f"The path {script_path} is not a file.")
         start_path = pathlib.Path(base_dir)
         result_list = []
-        with script_path.open("r", encoding="utf-8-sig", errors="ignore") as script_file:
+        with script_path.open("r", encoding="utf-8-sig", errors="replace") as script_file:
             lines = script_file.readlines()
             for line in lines:
                 match = re.search(DEPENDS_ON_PATTERN, line)
@@ -734,7 +735,7 @@ class BaseCommand(ABC):
         result_list = list(dict.fromkeys(result_list)) 
         return result_list
 
-    def get_sorted_scripts_from_dir(self, base_dir: Path, depth_within_base_dir: int, force_run_cleanup: bool = False, recursion_depth: int = 0):
+    def get_sorted_scripts_from_dir(self, base_dir: Path, depth_within_base_dir: int, force_run_cleanup: bool = False, recursion_depth: int = 0) -> list[Path]:
         MAX_RECURSION_DEPTH = 25
         if recursion_depth > MAX_RECURSION_DEPTH:
             raise CommandError(f"Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' due to circular path references.")
@@ -1091,11 +1092,11 @@ class BaseCommand(ABC):
                 )
 
     def __init__(
-            self, 
-            config: dict[str, Any], 
-            subparsers: Any, 
-            command_name: str, 
-            command_help: str
+        self, 
+        config: dict[str, Any], 
+        subparsers: Any, 
+        command_name: str, 
+        command_help: str
     ) -> None:
         self.config = config
         self.default_dbenv = self.get_default_dbenv(config)
@@ -1175,7 +1176,7 @@ class BaseCommand(ABC):
         return False # propagate the exception
 
     @abstractmethod
-    def run(self):
+    def run(self) -> None:
         pass
     
     def __call__(self, args):
@@ -2052,7 +2053,7 @@ class VerifyCommand (BaseCommand):
         if script_builder:
             self.write_repeatable_scripts(target_version, script_infos, script_builder)
 
-    def run(self):
+    def run(self) -> None:
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()        
         self.check_if_all_own_migrations_are_applied()
@@ -2109,10 +2110,8 @@ class InitCommand (BaseCommand):
         value = self.dbconn_get_single_value(sql, (schema_name,))
         return bool(value)
     
-    def create_version_tracking_tables(self, environment_id):
-        sql_script = """
-            BEGIN;
-
+    def create_version_tracking_tables(self, environment_id: str) -> None:
+        ddl = """
             CREATE TABLE {schema_name}.dbmigration_environment_id (
                 id VARCHAR(64) NOT NULL,
                 is_singleton BOOL NOT NULL DEFAULT TRUE, 
@@ -2160,29 +2159,33 @@ class InitCommand (BaseCommand):
                     ON DELETE CASCADE
             );
             GRANT SELECT ON TABLE {schema_name}.dbmigration_repeatable_scripts TO PUBLIC;
+        """
+        dml = """
+            INSERT INTO {schema_name}.dbmigration_environment_id (id, is_singleton) VALUES (%s, TRUE);
+        """
+        schema_id = self.get_schema_name()
+        with self.dbconn.transaction():        
+            with self.dbconn.cursor() as cur:
+                formatted_ddl = self.format_sql(ddl, schema_name=schema_id)
+                cur.execute(formatted_ddl, [])
+                formatted_dml = self.format_sql(dml, schema_name=schema_id)
+                cur.execute(formatted_dml, (environment_id,))
 
-            -- insert environment id
-            INSERT INTO {schema_name}.dbmigration_environment_id (id, is_singleton) VALUES ({environment_id_str}, TRUE);
-
-            COMMIT;
-        """        
-        with self.dbconn.cursor() as cur:
-            formatted_sql = self.format_sql(sql_script, schema_name=self.get_schema_name(), environment_id_str=environment_id)
-            cur.execute(formatted_sql)
-
-    def __init__(self, config, subparsers): 
+    def __init__(self, config: dict[str,Any], subparsers: Any) -> None: 
         super().__init__(config, subparsers, "init", InitCommand.__doc__)
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.parser.add_argument("--force-init",  action="store_true", default=False, help="Force create version control tables even on non empty schema")
 
-    def run(self):
+    def run(self) -> None:
+        schema_name = self.get_schema_name_arg()
         if not self.check_if_schema_exists():
-            raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
-        self.set_session_search_path(self.args.schema_name)
+            raise CommandError(f"The target schema '{schema_name}' is not accessible")
+        self.set_session_search_path(schema_name)
 
+        force_init = self.args.force_init
         if not self.check_if_schema_is_empty():
-            if not self.args.force_init:
-                raise CommandError(f"The target schema '{self.args.schema_name}' must be empty")
+            if not force_init:
+                raise CommandError(f"The target schema '{schema_name}' must be empty")
             self.check_if_all_version_control_tables_do_not_exist()
             print(f"WARNING: Schema is not empty!")
 
@@ -2198,8 +2201,8 @@ class TestFailed(Exception):
 class RunTestsCommand (BaseCommand):
     """Runs db unit test scripts to the target database schema."""
 
-    def run_conditional(self, cursor, scripts_dir, script_path, script_text):
-        path = pathlib.Path(script_path)
+    def run_conditional(self, cursor: Cursor[TupleRow], scripts_dir: Path, script_path:Path, script_text: str) -> None:
+        path = Path(script_path)
         file_name = path.name
         relative_script_path = get_script_path_for_log(scripts_dir, script_path)
         print(f"Running test: '{relative_script_path}'...", end="", flush=True)
@@ -2236,16 +2239,16 @@ class RunTestsCommand (BaseCommand):
             raise TestFailed(f"Unable to detect test type from script name '{file_name}'. It should start with one of the following prefixes: '{IS_TRUE_THAT_TEST_PREFIX}','{DETECT_MISSING_TEST_PREFIX}','{ASSURE_THAT_TEST_PREFIX}'")
         print(f"PASS")
 
-    def is_subpath_of(self, child, parent):
-        child_parts = pathlib.Path(child).absolute().parts
-        parent_parts = pathlib.Path(parent).absolute().parts        
+    def is_subpath_of(self, child: Path, parent: Path) -> bool:
+        child_parts = Path(child).absolute().parts
+        parent_parts = Path(parent).absolute().parts        
         return child_parts[:len(parent_parts)] == parent_parts
     
-    def make_savepoint_id(self, folder):
+    def make_savepoint_id(self, folder: Path) -> psycopg.sql.Identifier:
         hash_str = str(hash(folder))
         return psycopg.sql.Identifier("savepoint_" + hash_str)
 
-    def run_test_scripts_each_in_own_tran(self, scripts_dir, scripts):
+    def run_test_scripts_each_in_own_tran(self, scripts_dir:Path, scripts: list[Path]) -> None:
         self.fail_count = 0
         self.pass_count = 0
         with self.dbconn.cursor() as cur:
@@ -2294,16 +2297,16 @@ class RunTestsCommand (BaseCommand):
 
             cur.execute("ROLLBACK") # rollback global tran for tests
 
-    def __init__(self, config, subparsers):       
+    def __init__(self, config: dict[str, Any], subparsers: Any) -> None:       
         super().__init__(config, subparsers, "run-tests", RunTestsCommand.__doc__)
         self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
         self.parser.add_argument("--skip-env-checks",  action="store_true", default=False, help="Skip version and environment ID checks to run tests in any plain environment not made by the tool itself")
     
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.use_run_tests_by_user = True
         return super().__enter__()
 
-    def run_unit_test_scripts(self, scripts_dir):
+    def run_unit_test_scripts(self, scripts_dir: Path) -> None:
         unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
         if not unit_tests_dir.exists():
             raise CommandError(f"The scripts directory '{scripts_dir}' is missing the required '{TESTS_DIR_NAME}' subdirectory.")
@@ -2326,7 +2329,7 @@ class RunTestsCommand (BaseCommand):
             print(f"All {self.pass_count} tests passed.")
             
 
-    def run(self):
+    def run(self) -> None:
         self.do_initial_cross_checks()
         if not self.args.skip_env_checks:
             self.check_if_all_own_migrations_are_applied()
@@ -2336,7 +2339,7 @@ class RunTestsCommand (BaseCommand):
         print(f"Running unit tests for scripts repository: '{scripts_dir}'")
         self.run_unit_test_scripts(scripts_dir)
 
-def read_toml_config():
+def read_toml_config() -> dict[str, Any]:
     script_dir = pathlib.Path(__file__).absolute().parent
     target_path = script_dir.joinpath(TOML_CONFIG_FILE)
     with open(target_path, 'rb') as f:

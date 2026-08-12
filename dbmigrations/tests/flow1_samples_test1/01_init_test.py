@@ -22,7 +22,8 @@ def test_dbmigration_init_success(cfg):
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8-sig"  # Handles Windows console BOM character matching properly
+        encoding="utf-8",
+        errors="replace"
     )
     
     # Print tool output execution logs for manual check inside pytest -v -s

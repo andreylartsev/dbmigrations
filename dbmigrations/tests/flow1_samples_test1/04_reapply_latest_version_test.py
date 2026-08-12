@@ -24,7 +24,7 @@ def test_dbmigration_force_reapply_latest_success(cfg):
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8-sig",
+        encoding="utf-8-",
         errors="replace" 
     )
     

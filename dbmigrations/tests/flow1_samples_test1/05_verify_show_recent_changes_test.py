@@ -22,7 +22,7 @@ def test_dbmigration_verify_success(cfg):
         command,
         capture_output=True,
         text=True,
-        encoding="utf-8-sig",
+        encoding="utf-8",
         errors="replace" 
     )
     
