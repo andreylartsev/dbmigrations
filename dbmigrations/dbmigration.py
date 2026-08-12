@@ -150,13 +150,13 @@ def read_as_trimmed_string(file_path : str|Path) -> str:
 def resolve_relative_script_path(start_path: Path, depth_within_base_dir: int, path_str : str) -> Path:
     if not path_str.startswith("@"):
         raise CommandError(f"The relative environment path must start with @ symbol, but '{path_str}' was found")
+    # path normalization for windows style paths
+    path_str = path_str.replace("\\", "/")
     start = path_str.find("@") + 1
-    end = path_str.find(os.path.sep, start)
+    end = path_str.find("/", start)
     if end == -1:
-        end = path_str.find("/", start)
-        if end == -1:
-            script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
-            raise CommandError(f"No path separator found after environment name in path '{path_str}' specified in file '{script_list_file_path}'.")
+        script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
+        raise CommandError(f"No path separator found after environment name in path '{path_str}' specified in file '{script_list_file_path}'.")
     env_name = path_str[start:end]
     script_sub_path = path_str[end + 1:]
     result = start_path
@@ -1329,7 +1329,7 @@ class UpdateCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing the required '{BASELINE_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing '{BASELINE_DIR_NAME}' subdirectory. Baseline scripts will be skipped.")
             return
         if self.check_if_version_table_include_baseline_version():
             print("The target schema already has the baseline version installed. Baseline scripts will be skipped.")
@@ -1386,7 +1386,7 @@ class UpdateCommand (BaseCommand):
         force_run_cleanup = self.args.force_run_cleanup
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing the required '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing '{VERSIONED_DIR_NAME}' subdirectory. Version scripts will be skipped.")
             
             return
 
@@ -1879,7 +1879,7 @@ class VerifyCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing the required '{BASELINE_DIR_NAME}' subdirectory. ")
+            print(f"The scripts directory '{scripts_dir}' is missing '{BASELINE_DIR_NAME}' subdirectory. Baseline scripts will be skipped.")
             return
         
         if self.check_if_version_table_include_baseline_version():
@@ -1936,7 +1936,7 @@ class VerifyCommand (BaseCommand):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
 
         if not versioned_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing the required the '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing '{VERSIONED_DIR_NAME}' subdirectory. Version scripts will be skipped.")
             return
         
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
@@ -2000,7 +2000,7 @@ class VerifyCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing the required '{REPEATABLE_DIR_NAME}' subdirectory.")
+            print(f"The scripts directory '{scripts_dir}' is missing '{REPEATABLE_DIR_NAME}' subdirectory. Repeatable scrips will be skipped.")
             return
 
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
