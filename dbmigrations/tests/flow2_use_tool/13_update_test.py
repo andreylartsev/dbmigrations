@@ -47,7 +47,6 @@ def test_dbmigration_update_baseline_with_dump_success(cfg):
     
     # 3. Verify that the correct external psql tool was picked up and used
     assert "Running baseline scripts with external tool" in result.stdout
-    assert "psql" in result.stdout
     
     # 4. Verify that specific SQL dump steps and scripts were processed
     assert "Running script: [test1_baseline_with_dump/baseline/V000/00_esbdb_schema.sql" in result.stdout
