@@ -1114,7 +1114,8 @@ class BaseCommand(ABC):
         scripts_environment_id = self.get_scripts_environment_id()
         if stored_environment_id != scripts_environment_id:
             scripts_path = self.get_scripts_path_arg()
-            raise CommandError(f"The stored environment ID '{stored_environment_id}' in the target schema does not match the scripts directory '{scripts_path}'")
+            raise CommandError(f"The stored environment ID '{stored_environment_id}' in the target schema"
+                               f" does not match the environment ID of the scripts directory '{scripts_path}'")
         print(f"Target schema environment ID matches the scripts directory ID: {stored_environment_id}")
 
 
