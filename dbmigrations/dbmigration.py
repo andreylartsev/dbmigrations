@@ -134,6 +134,10 @@ def main():
 def read_toml_config() -> dict[str, Any]:
     script_dir = pathlib.Path(__file__).absolute().parent
     target_path = script_dir.joinpath(TOML_CONFIG_FILE)
+    if not target_path.exists():
+        raise CommandError(f"The configuration file '{TOML_CONFIG_FILE}' is not found at path '{target_path}'")
+    if not target_path.is_file():
+        raise CommandError(f"The configuration file '{target_path}' is not a regular file")
     with open(target_path, 'rb') as f:
         config = tomllib.load(f)
         return config
