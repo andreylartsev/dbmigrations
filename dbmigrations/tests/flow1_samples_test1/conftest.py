@@ -1,3 +1,4 @@
+import os
 import pytest
 import psycopg
 from typing import NamedTuple
@@ -26,3 +27,10 @@ def setup_database_session(cfg):
             
     print(f"\n[SESSION SETUP] Target schema '{cfg.TARGET_SCHEMA}' has been successfully recreated via psycopg.")
     yield
+
+def pytest_configure(config):
+    # use messages from the code
+    os.environ["LC_MESSAGES"] = "C"
+    os.environ["LC_ALL"] = "C"
+    os.environ["LANG"] = "C"    
+    os.environ["LANGUAGE"] = "en_US:en"
