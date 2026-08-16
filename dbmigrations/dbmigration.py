@@ -3,9 +3,11 @@ Simple database migrations tool
 """
 
 import argparse
+import builtins
 import collections
 import copy
 import getpass
+import gettext
 import hashlib
 import mmap
 import os
@@ -97,6 +99,8 @@ UNCOMMITTED_MESSAGE_LABEL = "Uncommitted changes"
 
 def main():
     try:
+        setup_translations()
+
         config = read_toml_config()
 
         parser = argparse.ArgumentParser(description=__doc__)    
@@ -135,12 +139,28 @@ def read_toml_config() -> dict[str, Any]:
     script_dir = pathlib.Path(__file__).absolute().parent
     target_path = script_dir.joinpath(TOML_CONFIG_FILE)
     if not target_path.exists():
-        raise CommandError(f"The configuration file '{TOML_CONFIG_FILE}' is not found at path '{target_path}'")
+        raise CommandError(_("The configuration file '{TOML_CONFIG_FILE}' is not found at path '{target_path}'").format(TOML_CONFIG_FILE=TOML_CONFIG_FILE, target_path=target_path))
     if not target_path.is_file():
-        raise CommandError(f"The configuration file '{target_path}' is not a regular file")
+        raise CommandError(_("The configuration file '{target_path}' is not a regular file").format(target_path=target_path))
     with open(target_path, 'rb') as f:
         config = tomllib.load(f)
         return config
+
+def setup_translations() -> None:
+    locales_dir = Path(__file__).resolve().parent / "translations"
+    if locales_dir.exists():
+        try:
+            translation = gettext.translation(
+                "messages",
+                localedir=str(locales_dir),
+                languages=["ru"],
+                fallback=False,
+            )
+            translation.install()
+        except FileNotFoundError:
+            builtins._ = lambda text: text
+    else:
+        builtins._ = lambda text: text
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""

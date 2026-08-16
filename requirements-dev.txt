@@ -8,3 +8,6 @@ tzdata==2025.3
 
 # Testing Framework
 pytest>=8.0.0
+
+# Babel
+Babel
