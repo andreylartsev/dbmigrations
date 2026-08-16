@@ -131,16 +131,14 @@ def main():
             parser.print_help()
         return 0
     except CommandError as e:    
-        error_type_name = type(e).__name__ 
-        print(f"Command error:", e)
+        print("Command error:", e)
         return 1
     except psycopg.Error as e:    
-        error_type_name = type(e).__name__ 
-        print(f"Server error:", e)
+        print("Server error:", e)
         return 1
     except Exception as e:
         error_type_name = type(e).__name__ 
-        print(f"Error: {error_type_name}:", e)
+        print("Error: {error_type_name}:".format(error_type_name=error_type_name), e)
         traceback.print_exc()
         return 1
 
@@ -219,18 +217,26 @@ def read_as_trimmed_string(file_path : str|Path) -> str:
             trimmed_str = decoded_str.strip()
             if trimmed_str:
                 return trimmed_str
-    raise CommandError(f"The file '{file_path}' contains no valid text data")
+    raise CommandError(_("The file '{file_path}' contains no valid text data").format(file_path=file_path))
 
 def resolve_relative_script_path(start_path: Path, depth_within_base_dir: int, path_str : str) -> Path:
     if not path_str.startswith("@"):
-        raise CommandError(f"The relative environment path must start with @ symbol, but '{path_str}' was found")
+        raise CommandError(
+            _("The relative environment path must start with @ symbol, but '{path_str}' was found")
+            .format(path_str=path_str)
+        )
     # path normalization for windows style paths
     path_str = path_str.replace("\\", "/")
     start = path_str.find("@") + 1
     end = path_str.find("/", start)
     if end == -1:
         script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
-        raise CommandError(f"No path separator found after environment name in path '{path_str}' specified in file '{script_list_file_path}'.")
+        raise CommandError(
+            _(
+                "No path separator found after environment name in path '{path_str}' "
+                "specified in file '{script_list_file_path}'."
+            ).format(path_str=path_str, script_list_file_path=script_list_file_path)
+        )
     env_name = path_str[start:end]
     script_sub_path = path_str[end + 1:]
     result = start_path
@@ -248,7 +254,10 @@ def resolve_relative_script_path(start_path: Path, depth_within_base_dir: int, p
     return result
 
 def log_server_notices(diag):
-    print(f"Server: {diag.severity} - {diag.message_primary}")
+    print(
+        _("Server: {severity} - {message_primary}")
+        .format(severity=diag.severity, message_primary=diag.message_primary)
+    )
 
 def get_char() -> str:
     result = ""    
@@ -380,7 +389,15 @@ class CommitInfo(NamedTuple):
         oid_label = self.oid[:8] if self.oid else UNCOMMITTED_SHA_LABEL
         message_label = self.message if self.message else UNCOMMITTED_MESSAGE_LABEL
         author_label = self.author if self.author else UNKNOWN_AUTHOR_LABEL
-        return f"[{oid_label}] {date_label} - {message_label}\n  Author: {author_label}"
+        return _(
+            "[{oid_label}] {date_label} - {message_label}\n"
+            "  Author: {author_label}"
+        ).format(
+            oid_label=oid_label,
+            date_label=date_label,
+            message_label=message_label,
+            author_label=author_label
+        )
     
     def sort_key(self) -> tuple[datetime, str, str]:
         if self.date is not None:
@@ -419,13 +436,15 @@ class GitChecker:
             cmd_path = Path(cmd_path_str)
             if not cmd_path.exists():
                 raise CommandError(
-                    f"The git cmd specified in {GIT_CMD_CONFIG_ATTRIBUTE} of TOML config does not exist!"
+                    _(
+                        "The git cmd specified in {git_cmd_config_attribute} of TOML config does not exist!"
+                    ).format(git_cmd_config_attribute=GIT_CMD_CONFIG_ATTRIBUTE)
                 )
             return cmd_path        
         
         cmd_path_str = shutil.which("git")
         if cmd_path_str is None:
-            print("Warning: Git executable was not found in system PATH. Git features are disabled.")
+            print(_("Warning: Git executable was not found in system PATH. Git features are disabled."))
             return None
             
         return Path(cmd_path_str)
@@ -434,7 +453,10 @@ class GitChecker:
     def _try_get_git_repo_root(cls, git_cmd: Path, scripts_dir: Path) -> Path | None:
         resolved_dir = Path(scripts_dir).resolve()
         if not resolved_dir.is_dir():
-            raise CommandError(f"The specified path '{scripts_dir}' is invalid or not a directory!")        
+            raise CommandError(
+                _("The specified path '{scripts_dir}' is invalid or not a directory!")
+                .format(scripts_dir=scripts_dir)
+            )
         
         try:
             # Find the .git root directory using the rev-parse command
@@ -444,7 +466,12 @@ class GitChecker:
             )
             return Path(res.stdout.strip())
         except (subprocess.CalledProcessError, FileNotFoundError):
-            print(f"Warning: A valid Git repository root was not found for '{scripts_dir}'. Git features are disabled.")
+            print(
+                _(
+                    "Warning: A valid Git repository root was not found for '{scripts_dir}'. "
+                    "Git features are disabled."
+                ).format(scripts_dir=scripts_dir)
+            )
             return None
 
     def _run_git(self, args: list[str]) -> str:
@@ -471,9 +498,11 @@ class GitChecker:
             if len(entry) >= 4:
                 status_code = entry[:2]
                 if "??" in status_code:
-                    return CommitInfo.uncommitted("File is untracked by Git")
+                    return CommitInfo.uncommitted(_("File is untracked by Git"))
                 else:
-                    return CommitInfo.uncommitted(f"File is modified ({status_code.strip()})")
+                    return CommitInfo.uncommitted(
+                        _("File is modified ({status_code})").format(status_code=status_code.strip())
+                    )
 
         # =========================================================================
         # STEP 2: Fetch the latest commit for a clean file via Git Log
@@ -496,7 +525,7 @@ class GitChecker:
         # =========================================================================
         # STEP 3: Fallback if the file has no commit history in the branch
         # =========================================================================
-        return CommitInfo.unknown("No commit history found in this branch")
+        return CommitInfo.unknown(_("No commit history found in this branch"))
 
     def get_commit_by_file_oid(self, file_oid: str) -> CommitInfo:
         """
@@ -505,7 +534,7 @@ class GitChecker:
         """
         clean_oid = str(file_oid).strip()
         if not clean_oid:
-            raise ValueError("Argument 'file_oid' must not be empty")
+            raise ValueError(_("Argument 'file_oid' must not be empty"))
 
         # Format: SHA | AUTHOR | TIMESTAMP | COMMIT_SUBJECT
         # We use %ct (timestamp) to match the datetime object initialization in CommitInfo
@@ -516,11 +545,14 @@ class GitChecker:
         
         if not log_output:
             # Fallback if the file OID exists locally (e.g., in index) but has never been committed
-            return CommitInfo.unknown("Content hash (OID) is completely untracked or modified locally")
+            return CommitInfo.unknown(_("Content hash (OID) is completely untracked or modified locally"))
 
         parts = log_output.strip().split("|", 3)
         if len(parts) != 4:
-            raise CommandError(f"Unexpected git log output format for OID '{clean_oid}': {log_output}")
+            raise CommandError(
+                _("Unexpected git log output format for OID '{clean_oid}': {log_output}")
+                .format(clean_oid=clean_oid, log_output=log_output)
+            )
             
         oid, author, timestamp_str, message = parts
         
@@ -551,21 +583,57 @@ class ExternalTool:
 
         # Read tool config
         if TOOL_EXEC_ATTRIBUTE not in tool_config:
-            raise CommandError(f"Missing required attribute '{TOOL_EXEC_ATTRIBUTE}' in tool configuration '{tool_name}'.")
+            raise CommandError(
+                _(
+                    "Missing required attribute '{tool_exec_attribute}' "
+                    "in tool configuration '{tool_name}'."
+                ).format(tool_exec_attribute=TOOL_EXEC_ATTRIBUTE, tool_name=tool_name)
+            )
         exec_attribute = tool_config[TOOL_EXEC_ATTRIBUTE]
         exec_path = Path(exec_attribute)
         if not exec_path.exists():
-            raise CommandError(f"The path '{exec_path}' specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' does not exists.")
+            raise CommandError(
+                _(
+                    "The path '{exec_path}' specified by attribute '{tool_exec_attribute}' "
+                    "in the tool configuration '{tool_name}' does not exists."
+                ).format(
+                    exec_path=exec_path,
+                    tool_exec_attribute=TOOL_EXEC_ATTRIBUTE,
+                    tool_name=tool_name,
+                )
+            )
         if not exec_path.is_file():
-            raise CommandError(f"The path '{exec_path}' specified by attribute '{TOOL_EXEC_ATTRIBUTE}' in the tool configuration '{tool_name}' is not a file.")
+            raise CommandError(
+                _(
+                    "The path '{exec_path}' specified by attribute '{tool_exec_attribute}' "
+                    "in the tool configuration '{tool_name}' is not a file."
+                ).format(
+                    exec_path=exec_path,
+                    tool_exec_attribute=TOOL_EXEC_ATTRIBUTE,
+                    tool_name=tool_name,
+                )
+            )
         self.exec_path = exec_path
 
         if TOOL_ARGS_ATTRIBUTE not in tool_config:
-            raise CommandError(f"There is no attribute '{TOOL_ARGS_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+            raise CommandError(
+                _(
+                    "There is no attribute '{tool_args_attribute}' "
+                    "in the tool configuration '{tool_name}'."
+                ).format(tool_args_attribute=TOOL_ARGS_ATTRIBUTE, tool_name=tool_name)
+            )
         self.args = tool_config[TOOL_ARGS_ATTRIBUTE]
 
         if TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE not in tool_config:
-            raise CommandError(f"There is no attribute '{TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE}' in the tool configuration '{tool_name}'.")
+            raise CommandError(
+                _(
+                    "There is no attribute '{tool_success_result_code_attribute}' "
+                    "in the tool configuration '{tool_name}'."
+                ).format(
+                    tool_success_result_code_attribute=TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE,
+                    tool_name=tool_name,
+                )
+            )
         self.success_result_code = tool_config[TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE]
 
     @classmethod
@@ -581,11 +649,23 @@ class ExternalTool:
             return None
 
         if TOOLS_CONFIG_GROUP not in toml_config:
-            raise CommandError(f"Missing configuration group '{TOOLS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
-        tools_config = toml_config[TOOLS_CONFIG_GROUP]        
-        
+            raise CommandError(
+                _(
+                    "Missing configuration group '{tools_config_group}' "
+                    "in configuration file '{toml_config_file}'."
+                ).format(
+                    tools_config_group=TOOLS_CONFIG_GROUP,
+                    toml_config_file=TOML_CONFIG_FILE,
+                )
+            )
+        tools_config = toml_config[TOOLS_CONFIG_GROUP]                
         if tool_name not in tools_config:
-            raise CommandError(f"Unable find the specified external tool name '{tool_name}' in configuration group '{TOOLS_CONFIG_GROUP}'.")
+            raise CommandError(
+                _(
+                    "Unable find the specified external tool name '{tool_name}' "
+                    "in configuration group '{tools_config_group}'."
+                ).format(tool_name=tool_name, tools_config_group=TOOLS_CONFIG_GROUP)
+            )
         tool_config = tools_config[tool_name]
         
         result = cls(
@@ -597,9 +677,13 @@ class ExternalTool:
     def _try_get_tool_name(cls, dir : Path) -> str|None:
         start_path = Path(dir) 
         if not start_path.exists():
-            raise CommandError(f"The folder '{dir}' does not exists")
+            raise CommandError(
+                _("The folder '{dir}' does not exists").format(dir=dir)
+            )
         if not start_path.is_dir():
-            raise CommandError(f"The path '{dir}' is not a directory")        
+            raise CommandError(
+                _("The path '{dir}' is not a directory").format(dir=dir)
+            )       
         use_tool_file_name = start_path.joinpath(USE_TOOL_NAME_FILE_NAME)
         if not use_tool_file_name.exists():
             return None
@@ -652,7 +736,10 @@ class ExternalTool:
             result_code = process.wait() 
 
         if result_code != self.success_result_code:
-            raise CommandError(f"The tool '{self.tool_name}' returned unsuccessful result code {result_code}!")
+            raise CommandError(
+                _("The tool '{tool_name}' returned unsuccessful result code {result_code}!")
+                .format(tool_name=self.tool_name, result_code=result_code)
+            )
             
         return result_code 
 
@@ -681,12 +768,18 @@ class MigrationCheckForOlderVersionControlTables (OwnMigration):
         """
         return sql
     def get_migration_ddl(self) -> str:
-        raise CommandError(f"This version of dbmigration tools is incompatible with this schema.\n" 
-                            "Please use the previous version available by tag 0.9.x or upgrade the current schema by deleting dbmigration_version and dbmigration_repeatable tables and running the update subcommand with --force-run-cleanup flag: \n" 
-                            "i.e. dbmigration.py update <schema_name> <scripts_folder> --force-run-cleanup")
-                           
+        raise CommandError(
+            _(
+                "This version of dbmigration tools is incompatible with this schema.\n"
+                "Please use the previous version available by tag 0.9.x or upgrade the current schema by "
+                "deleting dbmigration_version and dbmigration_repeatable tables and running the update "
+                "subcommand with --force-run-cleanup flag: \n"
+                "i.e. dbmigration.py update <schema_name> <scripts_folder> --force-run-cleanup"
+            )
+        )
+                  
     def get_migration_desc(self) -> str:
-        desc = "Check for older version control tables"
+        desc = _("Check for older version control tables")
         return desc
 
 class BaseCommand(ABC):
@@ -699,7 +792,7 @@ class BaseCommand(ABC):
         applied_count = 0
         for m in self._all_own_migrations:
             if not isinstance(m, OwnMigration):
-                raise CommandError(f"Not a 'Migration' object found within the migrations collection")
+                raise CommandError(_T("Not a 'Migration' object found within the migrations collection"))
             sql = m.get_sql_to_check_if_need_migration()
             formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
             result = self.dbconn_get_single_value(formatted_sql, [])
@@ -716,17 +809,30 @@ class BaseCommand(ABC):
     def check_if_all_own_migrations_are_applied(self) -> None:
         for m in self._all_own_migrations:
             if not isinstance(m, OwnMigration):
-                raise CommandError(f"Not a 'Migration' object found within the migrations collection")
+                raise CommandError(_T("Not a 'Migration' object found within the migrations collection"))
             sql = m.get_sql_to_check_if_need_migration()
             formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
             result = self.dbconn_get_single_value(formatted_sql, [])
             if result:
                 desc = m.get_migration_desc()
-                raise CommandError(f"Run 'update' subcommand to update version control tables within the schema. The following migration need to be applied: {desc}")
+                raise CommandError(
+                    _(
+                        "Run 'update' subcommand to update version control tables within the schema. "
+                        "The following migration need to be applied: {desc}"
+                    ).format(desc=desc)
+                )
 
     def get_default_dbenv(self, toml_config : dict[str, Any]) -> str:
         if DEFAULT_DBENV_CONFIG_ATTRIBUTE not in toml_config:
-            raise CommandError(f"Missing required key '{DEFAULT_DBENV_CONFIG_ATTRIBUTE}' in configuration file '{TOML_CONFIG_FILE}'.")
+            raise CommandError(
+                _(
+                    "Missing required key '{default_dbenv_config_attribute}' "
+                    "in configuration file '{toml_config_file}'."
+                ).format(
+                    default_dbenv_config_attribute=DEFAULT_DBENV_CONFIG_ATTRIBUTE,
+                    toml_config_file=TOML_CONFIG_FILE,
+                )
+            )
         default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
         return str(default_dbenv)
 
@@ -736,10 +842,27 @@ class BaseCommand(ABC):
             dbenv_param : str
     ) -> tuple[dict[str, Any], str | None, bool]:
         if DBENVS_CONFIG_GROUP not in toml_config:
-            raise CommandError(f"Missing required configuration group '{DBENVS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")
+            raise CommandError(
+                _(
+                    "Missing required configuration group '{dbenvs_config_group}' "
+                    "in configuration file '{toml_config_file}'."
+                ).format(
+                    dbenvs_config_group=DBENVS_CONFIG_GROUP,
+                    toml_config_file=TOML_CONFIG_FILE,
+                )
+            )
         dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
         if dbenv_param not in dbenvs_config:
-            raise CommandError(f"Missing configuration group '{DBENVS_CONFIG_GROUP}.{dbenv_param}' in configuration file '{TOML_CONFIG_FILE}'.")
+            raise CommandError(
+                _(
+                    "Missing configuration group '{dbenvs_config_group}.{dbenv_param}' "
+                    "in configuration file '{toml_config_file}'."
+                ).format(
+                    dbenvs_config_group=DBENVS_CONFIG_GROUP,
+                    dbenv_param=dbenv_param,
+                    toml_config_file=TOML_CONFIG_FILE,
+                )
+            )
         config_copy = copy.deepcopy(dbenvs_config[dbenv_param])
         run_tests_by = config_copy.pop(RUN_TESTS_BY_ATTRIBUTE, None)
         no_password = config_copy.pop(NO_PASSWORD_ATTRIBUTE, False)
@@ -747,9 +870,13 @@ class BaseCommand(ABC):
 
     def get_script_dependencies(self, base_dir:Path, depth_within_base_dir:int, script_path:Path)->list[Path]:
         if not script_path.exists():
-            raise CommandError(f"The path {script_path} does not exists.")
+            raise CommandError(
+                _("The path {script_path} does not exists.").format(script_path=script_path)
+            )
         if not script_path.is_file():
-            raise CommandError(f"The path {script_path} is not a file.")
+            raise CommandError(
+                _("The path {script_path} is not a file.").format(script_path=script_path)
+            )
         start_path = pathlib.Path(base_dir)
         result_list = []
         with script_path.open("r", encoding="utf-8-sig", errors="replace") as script_file:
@@ -772,7 +899,9 @@ class BaseCommand(ABC):
             visited = []
         if script_to_add in visited:
             cycle_path = " -> ".join([f"'{p.name}'" for p in visited]) + f" -> '{script_to_add.name}'"
-            raise CommandError(f"Circular dependency detected! Path loop: {cycle_path}")
+            raise CommandError(
+                _("Circular dependency detected! Path loop: {cycle_path}").format(cycle_path=cycle_path)
+            )
         result_list = [script_to_add]
         if script_to_add in reversed_deps:
             deps = reversed_deps[script_to_add]
@@ -796,11 +925,30 @@ class BaseCommand(ABC):
             for dependency in script_deps:
                 resolved_dependency = dependency.resolve()
                 if not resolved_dependency.exists():
-                    raise CommandError(f"The script '{dependency}' specified in '{script_path}' as a dependency does not exist.")
+                    raise CommandError(
+                        _(
+                            "The script '{dependency}' specified in '{script_path}' "
+                            "as a dependency does not exist."
+                        ).format(dependency=dependency, script_path=script_path)
+                    )
                 if not resolved_dependency.is_file():
-                    raise CommandError(f"The script '{dependency}' specified in '{script_path}' as a dependency is not a valid file.")
+                    raise CommandError(
+                        _(
+                            "The script '{dependency}' specified in '{script_path}' "
+                            "as a dependency is not a valid file."
+                        ).format(dependency=dependency, script_path=script_path)
+                    )
                 if resolved_dependency not in resolved_orig_script_list:
-                    raise CommandError(f"The script '{dependency}' (specified in '{script_path}') was not found in '{SCRIPT_LIST_FILE_NAME}' or in the origin scripts folder.")
+                    raise CommandError(
+                        _(
+                            "The script '{dependency}' (specified in '{script_path}') "
+                            "was not found in '{script_list_file_name}' or in the origin scripts folder."
+                        ).format(
+                            dependency=dependency,
+                            script_path=script_path,
+                            script_list_file_name=SCRIPT_LIST_FILE_NAME,
+                        )
+                    )
                 reversed_deps[resolved_dependency].append(script_path)
         # print(reversed_deps)     
         result_list = []
@@ -815,12 +963,21 @@ class BaseCommand(ABC):
     def get_sorted_scripts_from_dir(self, base_dir: Path, depth_within_base_dir: int, force_run_cleanup: bool = False, recursion_depth: int = 0) -> list[Path]:
         MAX_RECURSION_DEPTH = 25
         if recursion_depth > MAX_RECURSION_DEPTH:
-            raise CommandError(f"Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' due to circular path references.")
+            raise CommandError(
+                _(
+                    "Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' "
+                    "due to circular path references."
+                ).format(recursion_depth=recursion_depth, base_dir=base_dir)
+            )
         start_path = Path(base_dir) 
         if not start_path.exists():
-            raise CommandError(f"The folder '{base_dir}' does not exists")
+            raise CommandError(
+                _("The folder '{base_dir}' does not exists").format(base_dir=base_dir)
+            )
         if not start_path.is_dir():
-            raise CommandError(f"The path '{base_dir}' is not a directory")        
+            raise CommandError(
+                _("The path '{base_dir}' is not a directory").format(base_dir=base_dir)
+            )                
         script_list_file_path = start_path.joinpath(SCRIPT_LIST_FILE_NAME)
         sorted_files = []
         if script_list_file_path.exists():
@@ -845,14 +1002,33 @@ class BaseCommand(ABC):
                     else:
                         if force_run_cleanup:
                             if len(sorted_files) == 0 and (not script_name == VERSION_CLEANUP_FILE_NAME):
-                                raise CommandError(f"The list of scripts '{script_list_file_path}' must start with '{VERSION_CLEANUP_FILE_NAME}', but '{script_name}' was given.")
+                                raise CommandError(
+                                    _(
+                                        "The list of scripts '{script_list_file_path}' must start with "
+                                        "'{version_cleanup_file_name}', but '{script_name}' was given."
+                                    ).format(
+                                        script_list_file_path=script_list_file_path,
+                                        version_cleanup_file_name=VERSION_CLEANUP_FILE_NAME,
+                                        script_name=script_name,
+                                    )
+                                )
                         else:
                             if (script_name == VERSION_CLEANUP_FILE_NAME):
                                 continue
                         if not script_path.exists():
-                            raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' does not exists") 
+                            raise CommandError(
+                                _(
+                                    "The file '{trimmed_str}' specified in script list file "
+                                    "'{script_list_file_path}' does not exists"
+                                ).format(trimmed_str=trimmed_str, script_list_file_path=script_list_file_path)
+                            )
                         if not script_path.is_file():
-                            raise CommandError(f"The file '{trimmed_str}' specified in script list file '{script_list_file_path}' is not a file")
+                            raise CommandError(
+                                _(
+                                    "The file '{trimmed_str}' specified in script list file "
+                                    "'{script_list_file_path}' is not a file"
+                                ).format(trimmed_str=trimmed_str, script_list_file_path=script_list_file_path)
+                            )
                         sorted_files.append(script_path)
         else:
             all_files = []

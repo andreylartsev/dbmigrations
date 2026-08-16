@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-16 23:12+0400\n"
+"POT-Creation-Date: 2026-08-17 00:22+0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,23 +17,286 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: dbmigrations/dbmigration.py:115
+#: dbmigration.py:115
 msgid "Simple database migrations tool"
 msgstr ""
 
-#: dbmigrations/dbmigration.py:116
+#: dbmigration.py:116
 msgid "Available subcommands"
 msgstr ""
 
-#: dbmigrations/dbmigration.py:151
+#: dbmigration.py:149
 #, python-brace-format
 msgid ""
 "The configuration file '{TOML_CONFIG_FILE}' is not found at path "
 "'{target_path}'"
 msgstr ""
 
-#: dbmigrations/dbmigration.py:153
+#: dbmigration.py:151
 #, python-brace-format
 msgid "The configuration file '{target_path}' is not a regular file"
+msgstr ""
+
+#: dbmigration.py:220
+#, python-brace-format
+msgid "The file '{file_path}' contains no valid text data"
+msgstr ""
+
+#: dbmigration.py:225
+#, python-brace-format
+msgid ""
+"The relative environment path must start with @ symbol, but '{path_str}' "
+"was found"
+msgstr ""
+
+#: dbmigration.py:236
+#, python-brace-format
+msgid ""
+"No path separator found after environment name in path '{path_str}' "
+"specified in file '{script_list_file_path}'."
+msgstr ""
+
+#: dbmigration.py:258
+#, python-brace-format
+msgid "Server: {severity} - {message_primary}"
+msgstr ""
+
+#: dbmigration.py:393
+#, python-brace-format
+msgid ""
+"[{oid_label}] {date_label} - {message_label}\n"
+"  Author: {author_label}"
+msgstr ""
+
+#: dbmigration.py:440
+#, python-brace-format
+msgid ""
+"The git cmd specified in {git_cmd_config_attribute} of TOML config does "
+"not exist!"
+msgstr ""
+
+#: dbmigration.py:447
+msgid ""
+"Warning: Git executable was not found in system PATH. Git features are "
+"disabled."
+msgstr ""
+
+#: dbmigration.py:457
+#, python-brace-format
+msgid "The specified path '{scripts_dir}' is invalid or not a directory!"
+msgstr ""
+
+#: dbmigration.py:471
+#, python-brace-format
+msgid ""
+"Warning: A valid Git repository root was not found for '{scripts_dir}'. "
+"Git features are disabled."
+msgstr ""
+
+#: dbmigration.py:501
+msgid "File is untracked by Git"
+msgstr ""
+
+#: dbmigration.py:504
+#, python-brace-format
+msgid "File is modified ({status_code})"
+msgstr ""
+
+#: dbmigration.py:528
+msgid "No commit history found in this branch"
+msgstr ""
+
+#: dbmigration.py:537
+msgid "Argument 'file_oid' must not be empty"
+msgstr ""
+
+#: dbmigration.py:548
+msgid "Content hash (OID) is completely untracked or modified locally"
+msgstr ""
+
+#: dbmigration.py:553
+#, python-brace-format
+msgid "Unexpected git log output format for OID '{clean_oid}': {log_output}"
+msgstr ""
+
+#: dbmigration.py:588
+#, python-brace-format
+msgid ""
+"Missing required attribute '{tool_exec_attribute}' in tool configuration "
+"'{tool_name}'."
+msgstr ""
+
+#: dbmigration.py:597
+#, python-brace-format
+msgid ""
+"The path '{exec_path}' specified by attribute '{tool_exec_attribute}' in "
+"the tool configuration '{tool_name}' does not exists."
+msgstr ""
+
+#: dbmigration.py:608
+#, python-brace-format
+msgid ""
+"The path '{exec_path}' specified by attribute '{tool_exec_attribute}' in "
+"the tool configuration '{tool_name}' is not a file."
+msgstr ""
+
+#: dbmigration.py:621
+#, python-brace-format
+msgid ""
+"There is no attribute '{tool_args_attribute}' in the tool configuration "
+"'{tool_name}'."
+msgstr ""
+
+#: dbmigration.py:630
+#, python-brace-format
+msgid ""
+"There is no attribute '{tool_success_result_code_attribute}' in the tool "
+"configuration '{tool_name}'."
+msgstr ""
+
+#: dbmigration.py:654
+#, python-brace-format
+msgid ""
+"Missing configuration group '{tools_config_group}' in configuration file "
+"'{toml_config_file}'."
+msgstr ""
+
+#: dbmigration.py:665
+#, python-brace-format
+msgid ""
+"Unable find the specified external tool name '{tool_name}' in "
+"configuration group '{tools_config_group}'."
+msgstr ""
+
+#: dbmigration.py:681
+#, python-brace-format
+msgid "The folder '{dir}' does not exists"
+msgstr ""
+
+#: dbmigration.py:685
+#, python-brace-format
+msgid "The path '{dir}' is not a directory"
+msgstr ""
+
+#: dbmigration.py:740
+#, python-brace-format
+msgid "The tool '{tool_name}' returned unsuccessful result code {result_code}!"
+msgstr ""
+
+#: dbmigration.py:773
+msgid ""
+"This version of dbmigration tools is incompatible with this schema.\n"
+"Please use the previous version available by tag 0.9.x or upgrade the "
+"current schema by deleting dbmigration_version and dbmigration_repeatable"
+" tables and running the update subcommand with --force-run-cleanup flag:"
+" \n"
+"i.e. dbmigration.py update <schema_name> <scripts_folder> --force-run-"
+"cleanup"
+msgstr ""
+
+#: dbmigration.py:782
+msgid "Check for older version control tables"
+msgstr ""
+
+#: dbmigration.py:820
+#, python-brace-format
+msgid ""
+"Run 'update' subcommand to update version control tables within the "
+"schema. The following migration need to be applied: {desc}"
+msgstr ""
+
+#: dbmigration.py:829
+#, python-brace-format
+msgid ""
+"Missing required key '{default_dbenv_config_attribute}' in configuration "
+"file '{toml_config_file}'."
+msgstr ""
+
+#: dbmigration.py:847
+#, python-brace-format
+msgid ""
+"Missing required configuration group '{dbenvs_config_group}' in "
+"configuration file '{toml_config_file}'."
+msgstr ""
+
+#: dbmigration.py:858
+#, python-brace-format
+msgid ""
+"Missing configuration group '{dbenvs_config_group}.{dbenv_param}' in "
+"configuration file '{toml_config_file}'."
+msgstr ""
+
+#: dbmigration.py:874
+#, python-brace-format
+msgid "The path {script_path} does not exists."
+msgstr ""
+
+#: dbmigration.py:878
+#, python-brace-format
+msgid "The path {script_path} is not a file."
+msgstr ""
+
+#: dbmigration.py:903
+#, python-brace-format
+msgid "Circular dependency detected! Path loop: {cycle_path}"
+msgstr ""
+
+#: dbmigration.py:930
+#, python-brace-format
+msgid ""
+"The script '{dependency}' specified in '{script_path}' as a dependency "
+"does not exist."
+msgstr ""
+
+#: dbmigration.py:937
+#, python-brace-format
+msgid ""
+"The script '{dependency}' specified in '{script_path}' as a dependency is"
+" not a valid file."
+msgstr ""
+
+#: dbmigration.py:944
+#, python-brace-format
+msgid ""
+"The script '{dependency}' (specified in '{script_path}') was not found in"
+" '{script_list_file_name}' or in the origin scripts folder."
+msgstr ""
+
+#: dbmigration.py:968
+#, python-brace-format
+msgid ""
+"Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' due "
+"to circular path references."
+msgstr ""
+
+#: dbmigration.py:975
+#, python-brace-format
+msgid "The folder '{base_dir}' does not exists"
+msgstr ""
+
+#: dbmigration.py:979
+#, python-brace-format
+msgid "The path '{base_dir}' is not a directory"
+msgstr ""
+
+#: dbmigration.py:1007
+#, python-brace-format
+msgid ""
+"The list of scripts '{script_list_file_path}' must start with "
+"'{version_cleanup_file_name}', but '{script_name}' was given."
+msgstr ""
+
+#: dbmigration.py:1021
+#, python-brace-format
+msgid ""
+"The file '{trimmed_str}' specified in script list file "
+"'{script_list_file_path}' does not exists"
+msgstr ""
+
+#: dbmigration.py:1028
+#, python-brace-format
+msgid ""
+"The file '{trimmed_str}' specified in script list file "
+"'{script_list_file_path}' is not a file"
 msgstr ""
 
