@@ -28,6 +28,7 @@
         "psycopg",
         "regclass",
         "sslmode",
+        "subdirs",
         "timestamptz",
         "tomllib",
         "topsecret",
@@ -36,13 +37,17 @@
         "xmloption",
         "xzvf",
         "zapkesb",
+        "бэйзлайн",
         "версионированного",
+        "Версионированные",
+        "версионированных",
         "Версионные",
         "логирует",
         "смоук",
         "фидбэк",
         "хотфикс",
-        "хотфиксов"
+        "хотфиксов",
+        "юнит"
     ],
     "cSpell.language": "en,ru",
     "python.analysis.diagnosticSeverityOverrides": {

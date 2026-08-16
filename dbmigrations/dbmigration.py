@@ -131,14 +131,14 @@ def main():
             parser.print_help()
         return 0
     except CommandError as e:    
-        print("Command error:", e)
+        print(_("Command error:"), e)
         return 1
     except psycopg.Error as e:    
-        print("Server error:", e)
+        print(_("Server error:"), e)
         return 1
     except Exception as e:
         error_type_name = type(e).__name__ 
-        print("Error: {error_type_name}:".format(error_type_name=error_type_name), e)
+        print(_("Error: {error_type_name}:").format(error_type_name=error_type_name), e)
         traceback.print_exc()
         return 1
 
@@ -1046,9 +1046,13 @@ class BaseCommand(ABC):
             if force_run_cleanup:
                 cleanup_file_path = start_path.joinpath(VERSION_CLEANUP_FILE_NAME)
                 if not cleanup_file_path.exists():
-                    raise CommandError(f"The file '{cleanup_file_path}' does not exists")
+                    raise CommandError(
+                        _("The file '{cleanup_file_path}' does not exists").format(cleanup_file_path=cleanup_file_path)
+                    )
                 if not cleanup_file_path.is_file():
-                    raise CommandError(f"The path '{cleanup_file_path}' is not a file")
+                    raise CommandError(
+                        _("The path '{cleanup_file_path}' is not a file").format(cleanup_file_path=cleanup_file_path)
+                    )
                 sorted_files.insert(0, cleanup_file_path)
         return sorted_files
 
@@ -1066,7 +1070,7 @@ class BaseCommand(ABC):
 
     def format_sql_text(self, sql : str, **params) -> str:
         if self.dbconn is None:
-            raise CommandError(f"DB connection is not initialized yet")
+            raise CommandError(_("DB connection is not initialized yet"))
         composed_query = psycopg.sql.SQL(sql).format(**params)
         result_str = composed_query.as_string(self.dbconn)
         return result_str        
@@ -1110,7 +1114,7 @@ class BaseCommand(ABC):
     def get_schema_name_arg(self) -> str:
         schema_name = self.args.schema_name
         if not schema_name:
-            raise CommandError(f"The attribute self.args.schema_name must not be empty")
+            raise CommandError(_("The attribute self.args.schema_name must not be empty"))
         return schema_name
 
     def get_schema_name(self) -> psycopg.sql.Identifier:
@@ -1127,13 +1131,19 @@ class BaseCommand(ABC):
 
     def get_scripts_path_arg(self) -> Path:
         if not self.args.scripts_path:
-            raise CommandError("The path specified by 'scripts_path' must not be an empty string")
+            raise CommandError(_("The path specified by 'scripts_path' must not be an empty string"))
             
         scripts_path = Path(self.args.scripts_path)
         if not scripts_path.exists():
-            raise CommandError(f"The path specified by 'scripts_path' argument does not exist: {str(scripts_path)}")
+            raise CommandError(
+                _("The path specified by 'scripts_path' argument does not exist: {scripts_path}")
+                .format(scripts_path=str(scripts_path))
+            )
         if not scripts_path.is_dir():
-            raise CommandError(f"The path specified by 'scripts_path' argument is not a valid directory: {str(scripts_path)}")        
+            raise CommandError(
+                _("The path specified by 'scripts_path' argument is not a valid directory: {scripts_path}")
+                .format(scripts_path=str(scripts_path))
+            )        
         return scripts_path
 
     def get_resolved_scripts_dir(self) -> Path:
@@ -1147,23 +1157,30 @@ class BaseCommand(ABC):
         if target_environment_id_file_name.exists():
             environment_id = read_as_trimmed_string(target_environment_id_file_name)
             if not environment_id:
-                raise CommandError("The environment ID must not be an empty string")
+                raise CommandError(_("The environment ID must not be an empty string"))
             if len(environment_id) > NAME_LENGTH_LIMIT:
                 raise CommandError(
-                    f"The length of the environment ID taken from '{target_environment_id_file_name}' "
-                    f"exceeds the limit: {NAME_LENGTH_LIMIT}"
+                    _(
+                        "The length of the environment ID taken from '{target_environment_id_file_name}' "
+                        "exceeds the limit: {name_length_limit}"
+                    ).format(
+                        target_environment_id_file_name=target_environment_id_file_name,
+                        name_length_limit=NAME_LENGTH_LIMIT,
+                    )
                 )
         else: 
             # Considering directory name as environment ID
             environment_id = scripts_path.resolve().name
             if not environment_id:
-                raise CommandError("The environment ID must not be an empty string")
+                raise CommandError(_("The environment ID must not be an empty string"))
             if len(environment_id) > NAME_LENGTH_LIMIT:
                 raise CommandError(
-                    f"The length of the directory name specified by 'scripts_path' argument "
-                    f"exceeds the limit: {NAME_LENGTH_LIMIT}"
+                    _(
+                        "The length of the directory name specified by 'scripts_path' argument "
+                        "exceeds the limit: {name_length_limit}"
+                    ).format(name_length_limit=NAME_LENGTH_LIMIT)
                 )
-                
+
         return environment_id
 
     def get_stored_environment_id(self) -> str:
@@ -1173,7 +1190,7 @@ class BaseCommand(ABC):
         formatted_sql = self.format_sql(sql, schema_name_identity=schema_id) 
         value = self.dbconn_get_single_value(formatted_sql, [])
         if value is None:
-            raise CommandError("Schema consistency check failed: environment ID not found in table 'dbmigration_environment_id'.")            
+            raise CommandError(_("Schema consistency check failed: environment ID not found in table 'dbmigration_environment_id'."))           
         return value
     
     def get_search_path_for_scripts(self) -> str:            
@@ -1183,19 +1200,23 @@ class BaseCommand(ABC):
             return self.get_schema_name_arg()
         if not set_search_path_file.is_file():
             raise CommandError(
-                f"The search path file '{SEARCH_PATH_FILE_NAME}' "
-                f"within scripts directory '{scripts_path}' is not a valid file"
+                _(
+                    "The search path file '{search_path_file_name}' "
+                    "within scripts directory '{scripts_path}' is not a valid file"
+                ).format(search_path_file_name=SEARCH_PATH_FILE_NAME, scripts_path=scripts_path)
             )
         trimmed_str = read_as_trimmed_string(set_search_path_file)
         return trimmed_str
     
     def set_session_search_path(self, search_path : str) -> None:
-        print(f"Set session search path to: '{search_path}'.")
+        print(_("Set session search path to: '{search_path}'.").format(search_path=search_path))
         sql = f"""
             SELECT pg_catalog.set_config('search_path', %s, false)"""
         result = self.dbconn_get_single_value(sql, (search_path,))
         if result != search_path:
-            raise CommandError(f"Unexpected value '{result}' returned on attempt to set the search path")
+            raise CommandError(
+                _("Unexpected value '{result}' returned on attempt to set the search path").format(result=result)
+            )
 
     def check_if_table_exists(self, table_name : str) -> bool:
         schema_name = self.get_schema_name_arg()
@@ -1231,7 +1252,7 @@ class BaseCommand(ABC):
     def check_if_any_latest_version_installed(self) -> str:
         value = self.get_latest_version_installed()
         if value is None:
-            raise CommandError(f"Unable to get latest installed version")
+            raise CommandError(_("Unable to get latest installed version"))
         return value
 
     def check_if_repeatable_script_installed(self, git_blob_sha1: str, version: str, relative_path: str) -> bool:
@@ -1256,7 +1277,7 @@ class BaseCommand(ABC):
 
     def check_if_max_version_of_versioned_scripts_matches_repeatable_target(self) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
-        print(f"Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts...")
+        print(_("Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts..."))
         latest_version_in_baseline = None
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if baseline_dir.exists():
@@ -1264,8 +1285,10 @@ class BaseCommand(ABC):
             baseline_subdirs_len = len(baseline_subdirs)
             if baseline_subdirs_len != 1:
                 raise CommandError(
-                    f"The baseline directory must include exactly one subdirectory with version scripts, "
-                    f"but {baseline_subdirs_len} present."
+                    _(
+                        "The baseline directory must include exactly one subdirectory with version scripts, "
+                        "but {baseline_subdirs_len} present."
+                    ).format(baseline_subdirs_len=baseline_subdirs_len)
                 )
             latest_version_in_baseline = baseline_subdirs[0]
 
@@ -1276,15 +1299,24 @@ class BaseCommand(ABC):
 
         if latest_version_in_versioned and latest_version_in_baseline and latest_version_in_versioned <= latest_version_in_baseline:
             raise CommandError(
-                f"The latest version of the subdirectory with the versions '{latest_version_in_versioned}' "
-                f"must be greater than the version of the baseline scripts '{latest_version_in_baseline}'."
+                _(
+                    "The latest version of the subdirectory with the versions '{latest_version_in_versioned}' "
+                    "must be greater than the version of the baseline scripts '{latest_version_in_baseline}'."
+                ).format(
+                    latest_version_in_versioned=latest_version_in_versioned,
+                    latest_version_in_baseline=latest_version_in_baseline
+                )
             )
     
         latest_version_in_scripts = max(
             filter(None, [latest_version_in_versioned, latest_version_in_baseline]), default=None)
 
         if latest_version_in_scripts is None:
-            print(f"No baseline or versioned scripts found in scripts directory: '{scripts_dir}'")
+            print(
+                _("No baseline or versioned scripts found in scripts directory: '{scripts_dir}'").format(
+                    scripts_dir=scripts_dir
+                )
+            )
             return
                 
         target_version_in_repeatable = None
@@ -1295,32 +1327,58 @@ class BaseCommand(ABC):
                 target_version_in_repeatable = read_as_trimmed_string(target_version_file_path)
 
         if target_version_in_repeatable is None:
-            print(f"No repeatable scripts found in scripts directory: '{scripts_dir}'")
+            print(
+                _("No repeatable scripts found in scripts directory: '{scripts_dir}'").format(
+                    scripts_dir=scripts_dir
+                )
+            )
             return 
 
         if latest_version_in_scripts != target_version_in_repeatable:
-            raise CommandError(f"The target version for repeatable scripts '{target_version_in_repeatable}' does not match the latest version in versioned scripts '{latest_version_in_scripts}'")
-
-        print(f"Completed.")
+            raise CommandError(
+                _(
+                    "The target version for repeatable scripts '{target_version_in_repeatable}' "
+                    "does not match the latest version in versioned scripts '{latest_version_in_scripts}'"
+                ).format(
+                    target_version_in_repeatable=target_version_in_repeatable,
+                    latest_version_in_scripts=latest_version_in_scripts
+                )
+            )
+        
+        print(_("Completed."))
 
     def do_initial_cross_checks(self) -> None:
         if not self.check_if_schema_exists():
-            raise CommandError(f"The target schema '{self.args.schema_name}' is not accessible")
+            raise CommandError(
+                _("The target schema '{schema_name}' is not accessible").format(
+                    schema_name=self.args.schema_name
+                )
+            )
         search_path = self.get_search_path_for_scripts()
         if search_path != DEFAULT_SEARCH_PATH:
             self.set_session_search_path(search_path)
         else:
-            print(f"Use the default users search path")     
+            print(_("Use the default users search path"))
 
     def check_if_stored_environment_id_matches_to_scripts_dir(self) -> None:
         stored_environment_id = self.get_stored_environment_id()
         scripts_environment_id = self.get_scripts_environment_id()
         if stored_environment_id != scripts_environment_id:
             scripts_path = self.get_scripts_path_arg()
-            raise CommandError(f"The stored environment ID '{stored_environment_id}' in the target schema"
-                               f" does not match the environment ID of the scripts directory '{scripts_path}'")
-        print(f"Target schema environment ID matches the scripts directory ID: {stored_environment_id}")
-
+            raise CommandError(
+                _(
+                    "The stored environment ID '{stored_environment_id}' in the target schema "
+                    "does not match the environment ID of the scripts directory '{scripts_path}'"
+                ).format(
+                    stored_environment_id=stored_environment_id,
+                    scripts_path=scripts_path
+                )
+            )
+        print(
+            _("Target schema environment ID matches the scripts directory ID: {stored_environment_id}").format(
+                stored_environment_id=stored_environment_id
+            )
+        )
 
     _required_version_control_tables = [
             "dbmigration_environment_id",
@@ -1334,7 +1392,10 @@ class BaseCommand(ABC):
         for table_name in self._required_version_control_tables:
             if not self.check_if_table_exists(table_name):
                 raise CommandError(
-                    f"The schema '{schema_name}' is missing the version control table '{table_name}'"
+                    _("The schema '{schema_name}' is missing the version control table '{table_name}'").format(
+                        schema_name=schema_name,
+                        table_name=table_name
+                    )
                 )
             
     def check_if_all_version_control_tables_do_not_exist(self) -> None:
@@ -1342,7 +1403,10 @@ class BaseCommand(ABC):
         for table_name in self._required_version_control_tables:
             if self.check_if_table_exists(table_name):
                 raise CommandError(
-                    f"The schema '{schema_name}' already contains the version control table '{table_name}'"
+                    _("The schema '{schema_name}' already contains the version control table '{table_name}'").format(
+                        schema_name=schema_name,
+                        table_name=table_name
+                    )
                 )
 
     def __init__(
@@ -1358,7 +1422,12 @@ class BaseCommand(ABC):
         self.use_run_tests_by_user = False
 
         if OPTIONS_CONFIG_GROUP not in self.config:
-            raise CommandError(f"Missing configuration group '{OPTIONS_CONFIG_GROUP}' in configuration file '{TOML_CONFIG_FILE}'.")  
+            raise CommandError(
+                _(
+                    "Missing configuration group '{config_group}' "
+                    "in configuration file '{config_file}'."
+                ).format(config_group=OPTIONS_CONFIG_GROUP, config_file=TOML_CONFIG_FILE)
+            )
         self.options = config[OPTIONS_CONFIG_GROUP]
     
         self.file_read_encoding =  self.options.get("file_read_encoding", OPTIONS_DEFAULT_FILE_READ_ENCODING)
@@ -1366,13 +1435,13 @@ class BaseCommand(ABC):
         self.file_glob_filters =  self.options.get("file_glob_filters", OPTIONS_DEFAULT_FILE_GLOB_FILTERS)
         
         self.parser = subparsers.add_parser(command_name, help=command_help)
-        self.parser.add_argument("schema_name", type=str, help="the name of target database schema")
-        self.parser.add_argument("--dbenv", type=str, default=self.default_dbenv, help="db environment name within TOML config")
-        self.parser.add_argument("--host", type=str, default=None, help="db server host name")
-        self.parser.add_argument("--port", type=int, default=None, help="db server port")
-        self.parser.add_argument("--dbname", type=str, default=None, help="database name")
-        self.parser.add_argument("--user", type=str, default=None, help="user name")
-        self.parser.add_argument("-n","--no-password",  action="store_true", default=False, help="don't ask user password")
+        self.parser.add_argument("schema_name", type=str, help=_("the name of target database schema"))
+        self.parser.add_argument("--dbenv", type=str, default=self.default_dbenv, help=_("db environment name within TOML config"))
+        self.parser.add_argument("--host", type=str, default=None, help=_("db server host name"))
+        self.parser.add_argument("--port", type=int, default=None, help=_("db server port"))
+        self.parser.add_argument("--dbname", type=str, default=None, help=_("database name"))
+        self.parser.add_argument("--user", type=str, default=None, help=_("user name"))
+        self.parser.add_argument("-n","--no-password",  action="store_true", default=False, help=_("don't ask user password"))
         self.parser.set_defaults(call=self) 
 
     def __enter__(self) -> Self:
@@ -1400,7 +1469,10 @@ class BaseCommand(ABC):
             else:
                 password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
             if password is None:
-                raise CommandError(f"The database user password must be specified via the environment variable '{DBCONN_USER_PASSWORD_ENVVAR_NAME}'.")
+                raise CommandError(
+                    _("The database user password must be specified via the environment variable '{env_var_name}'.")
+                    .format(env_var_name=DBCONN_USER_PASSWORD_ENVVAR_NAME)
+                )
             self.dbconn_settings["password"]=password
         else:
             self.dbconn_settings["password"]=None
@@ -1409,8 +1481,15 @@ class BaseCommand(ABC):
             self.dbconn = psycopg.connect(**self.dbconn_settings)
         except psycopg.Error as pg_error:
             error_message = str(pg_error)
-            raise CommandError(f"Unable to establish connection to database server. Inner error: {error_message}")
-        print(f"Opened db connection: '{self.dbconn_get_connection_string(self.dbconn)}'")
+            raise CommandError(
+                _("Unable to establish connection to database server. Inner error: {error_message}")
+                .format(error_message=error_message)
+            )
+        print(
+            _("Opened db connection: '{connection_string}'").format(
+                connection_string=self.dbconn_get_connection_string(self.dbconn)
+            )
+        )
         self.dbconn.add_notice_handler(log_server_notices)
         self.dbconn.autocommit = True 
         return self
@@ -1423,10 +1502,10 @@ class BaseCommand(ABC):
     ) -> bool | None:
         if exc_type is not None:
             self.dbconn.rollback()
-            print(f"Rolled back transaction.")
+            print(_("Rolled back transaction."))
         if self.dbconn is not None:
             self.dbconn.close()
-            print(f"Closed db connection.")
+            print(_("Closed db connection."))
         return False # propagate the exception
 
     @abstractmethod
@@ -1448,10 +1527,14 @@ class UpdateCommand (BaseCommand):
         scripts: list[Path], 
         tool: ExternalTool
     ) -> None:
-        print(f"Running baseline scripts with external tool '{tool.exec_path}'")                
+        print(
+            _("Running baseline scripts with external tool '{tool_path}'").format(
+                tool_path=tool.exec_path
+            )
+        )               
         script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts]
         for i in script_infos:
-            print(f"Running script: {i!r}...")
+            print(_("Running script: {script_info}...").format(script_info=repr(i)))
             tool.run(i.script_path)            
         print(f"Setting the baseline version '{version}'...")        
         schema_id = self.get_schema_name()        
@@ -1468,7 +1551,7 @@ class UpdateCommand (BaseCommand):
                 cur.execute(version_sql, (version,))                
                 for i in script_infos:
                     cur.execute(script_sql, (version, i.relative_path, i.oid))                    
-        print("Committed.")
+        print(_("Committed."))
 
     def run_baseline_scripts_each_in_own_tran(
         self, 
@@ -1478,12 +1561,15 @@ class UpdateCommand (BaseCommand):
     ) -> None:        
         script_infos = [ScriptFsInfo.get_info_with_text(scripts_dir, s) for s in scripts]
         for i in script_infos:
-            print(f"Running script: {i!r}...")
+            print(_("Running script: {script_info}...").format(script_info=repr(i)))
             with self.dbconn.transaction():
                 with self.dbconn.cursor() as cur:
                     cur.execute(i.text)                                  
-            print(f"Committed.")
-        print(f"Setting the baseline version to: '{version}'.")
+            print(_("Committed."))
+        print(
+            _("Setting the baseline version to: '{version}'.")
+            .format(version=version)
+        )
         schema_id = self.get_schema_name()
         version_sql = self.format_sql(
             "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, TRUE)",  
@@ -1496,7 +1582,7 @@ class UpdateCommand (BaseCommand):
                 cur.execute(version_sql, (version,))
                 for i in script_infos:
                     cur.execute(script_sql, (version, i.relative_path, i.oid))
-        print(f"Committed.")
+        print(_("Committed."))
 
     def rerun_versioned_scripts(
         self, 
@@ -1504,7 +1590,7 @@ class UpdateCommand (BaseCommand):
         scripts_dir: Path, 
         scripts: list[Path]
     ) -> None: 
-        print(f"Reapply version {version}...")
+        print(_("Reapply version {version}...").format(version=version))
         script_infos = [
             ScriptFsInfo.get_info_with_text(
                 scripts_dir, s, self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) for s in scripts]
@@ -1518,7 +1604,7 @@ class UpdateCommand (BaseCommand):
                     "DELETE FROM {schema_name}.dbmigration_versions WHERE version_id=%s", schema_name=schema_id)
                 cur.execute(formatted_sql, (version,))    
                 for i in script_infos:
-                    print(f"Running script: {i!r}...")
+                    print(_("Running script: {script_info}...").format(script_info=repr(i)))
                     cur.execute(i.text)                              
                 formatted_sql = self.format_sql(
                     "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, FALSE)", schema_name=schema_id)                                  
@@ -1527,7 +1613,7 @@ class UpdateCommand (BaseCommand):
                     formatted_sql = self.format_sql(
                         "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES (%s, %s, %s);\n", schema_name=schema_id)
                     cur.execute(formatted_sql, (version, i.relative_path, i.oid))        
-        print(f"Committed.")
+        print(_("Committed."))
 
     def run_versioned_scripts_in_tran(
         self, 
@@ -1538,12 +1624,12 @@ class UpdateCommand (BaseCommand):
         script_infos = [
             ScriptFsInfo.get_info_with_text(
                 scripts_dir, s, self.file_read_encoding, encoding_errors=self.file_read_encoding_errors) for s in scripts]        
-        print(f"Apply version {version}...")
+        print(_("Apply version {version}...").format(version=version))
         schema_id=self.get_schema_name() 
         with self.dbconn.transaction():
             with self.dbconn.cursor() as cur:
                 for i in script_infos:
-                    print(f"Running script: {i!r}...")
+                    print(_("Running script: {script_info}...").format(script_info=repr(i)))
                     cur.execute(i.text)
                 formatted_sql = self.format_sql(
                     "INSERT INTO {schema_name}.dbmigration_versions (version_id, is_baseline) VALUES (%s, FALSE)", schema_name=schema_id)                                  
@@ -1552,55 +1638,64 @@ class UpdateCommand (BaseCommand):
                     formatted_sql = self.format_sql(
                         "INSERT INTO {schema_name}.dbmigration_version_scripts (version_id, relative_path, git_blob_sha1) VALUES (%s, %s, %s);\n", schema_name=schema_id)
                     cur.execute(formatted_sql, (version, i.relative_path, i.oid))
-        print(f"Committed.")
-
+        print(_("Committed."))
 
     def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
-        super().__init__(config, subparsers, "update", UpdateCommand.__doc__)
+        super().__init__(config, subparsers, "update", _("Applies base, versioned, and repeatable scripts to the target database schema."))
         
         self.parser.add_argument(
             "--force-reapply-latest-version",  
             action="store_true", 
-            help="clean up the latest version within the database and reapply the included *.sql scripts."
+            help=_("clean up the latest version within the database and reapply the included *.sql scripts.")
         )
         self.parser.add_argument(
             "--force-reapply-all-repeatable",  
             action="store_true", 
-            help="reapply all repeatable scripts, regardless of changes."
+            help=_("reapply all repeatable scripts, regardless of changes.")
         )
         self.parser.add_argument(
             "--force-run-cleanup",  
             action="store_true", 
-            help="run the cleanup script before executing version-specific scripts."
+            help=_("run the cleanup script before executing version-specific scripts.")
         )
         self.parser.add_argument(
             "--skip-confirmation",  
             action="store_true", 
-            help="skip confirmation before executing updates."
+            help=_("skip confirmation before executing updates.")
         )
         self.parser.add_argument(
             "scripts_path", 
             type=str, 
-            help="source scripts repository path"
+            help=_("source scripts repository path")
         )
 
     def apply_baseline_scripts(self) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing '{BASELINE_DIR_NAME}' subdirectory. Baseline scripts will be skipped.")
+            print(
+                _(
+                    "The scripts directory '{scripts_dir}' is missing '{baseline_dir_name}' subdirectory. "
+                    "Baseline scripts will be skipped."
+                ).format(scripts_dir=scripts_dir, baseline_dir_name=BASELINE_DIR_NAME)
+            )
             return
         if self.check_if_version_table_include_baseline_version():
-            print("The target schema already has the baseline version installed. Baseline scripts will be skipped.")
+            print(_("The target schema already has the baseline version installed. Baseline scripts will be skipped."))
             return
         baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
         baseline_subdirs_len = len(baseline_subdirs)
         if baseline_subdirs_len != 1:
-            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory with the baseline scripts but {baseline_subdirs_len} was found")
+            raise CommandError(
+                _(
+                    "The baseline path {baseline_dir} must have single subdirectory "
+                    "with the baseline scripts but {baseline_subdirs_len} was found"
+                ).format(baseline_dir=baseline_dir, baseline_subdirs_len=baseline_subdirs_len)
+            )
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
-        print(f"The baseline version to install {baseline_version}.")       
-        print("Apply baseline scripts...")
+        print(_("The baseline version to install {baseline_version}.").format(baseline_version=baseline_version))      
+        print(_("Apply baseline scripts..."))
         scripts_sorted = self.get_sorted_scripts_from_dir(
             baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
         
@@ -1613,30 +1708,47 @@ class UpdateCommand (BaseCommand):
             self.run_baseline_scripts_each_in_own_tran(
                 baseline_version, scripts_dir, scripts_sorted)
 
-        print("Baseline scripts applied.")       
+        print(_("Baseline scripts applied."))      
 
     def reapply_the_latest_version(self) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing the required '{VERSIONED_DIR_NAME}' subdirectory.")
+            print(
+                _("The scripts directory '{scripts_dir}' is missing the "
+                "required '{versioned_dir_name}' subdirectory.").format(
+                    scripts_dir=scripts_dir,
+                    versioned_dir_name=VERSIONED_DIR_NAME
+                )
+            )
             return
         
         latest_installed = self.check_if_any_latest_version_installed()
-        print(f"The latest installed version is {latest_installed}.")
+        print(
+            _("The latest installed version is {latest_installed}.")
+            .format(latest_installed=latest_installed)
+        )
 
         latest_version_dir = versioned_dir.joinpath(latest_installed)
         if not latest_version_dir.is_dir():
             raise CommandError(
-                f"There is no subdirectory with scripts that matched to the "
-                f"latest installed version '{latest_installed}'"
+                _("There is no subdirectory with scripts that matched to the "
+                "latest installed version '{latest_installed}'")
+                .format(latest_installed=latest_installed)
             )
         
         scripts_sorted = self.get_sorted_scripts_from_dir(
             latest_version_dir, VERSIONED_FILES_DEPTH, force_run_cleanup=True)
         if not scripts_sorted:
             filters_str = ",".join(self.file_glob_filters)
-            raise CommandError(f"The scripts subdirectory '{latest_version_dir}' does not contain any '{filters_str}' scripts")
+            raise CommandError(
+                _("The scripts subdirectory '{latest_version_dir}' does not "
+                "contain any '{filters_str}' scripts")
+                .format(
+                    latest_version_dir=latest_version_dir,
+                    filters_str=filters_str
+                )
+            )
         
         self.rerun_versioned_scripts(latest_installed, scripts_dir, scripts_sorted)
 
@@ -1645,27 +1757,46 @@ class UpdateCommand (BaseCommand):
         force_run_cleanup = self.args.force_run_cleanup
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing '{VERSIONED_DIR_NAME}' subdirectory. Version scripts will be skipped.")
-            
+            print(
+                _("The scripts directory '{scripts_dir}' is missing "
+                "'{versioned_dir_name}' subdirectory. Version scripts "
+                "will be skipped.")
+                .format(
+                    scripts_dir=scripts_dir,
+                    versioned_dir_name=VERSIONED_DIR_NAME
+                )
+            )            
             return
 
         if not self.check_if_version_table_include_baseline_version():
-            raise CommandError("The baseline version must be installed before running versioned scripts")
+            raise CommandError(
+                _("The baseline version must be installed before running versioned scripts")
+            )
 
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if not versioned_subdirs:
-            raise CommandError(f"The versioned scripts path {versioned_dir} must have at least one subdirectory but nothing was found")
+            raise CommandError(
+                _("The versioned scripts path {versioned_dir} must have at "
+                "least one subdirectory but nothing was found")
+                .format(versioned_dir=versioned_dir)
+            )
 
         latest_installed = self.check_if_any_latest_version_installed()
-        print(f"The latest installed version is {latest_installed}.")       
+        print(
+            _("The latest installed version is {latest_installed}.")
+            .format(latest_installed=latest_installed)
+        )       
 
         newer_version_subdirs = [item for item in versioned_subdirs if item.name > latest_installed]
         if not newer_version_subdirs:
-            print("No newer versions found for installation.")       
+            print(_("No newer versions found for installation."))       
             return
 
-        print(f"Found {len(newer_version_subdirs)} new versions for installation.")       
-        print("Apply versioned scripts...")
+        print(
+            _("Found {new_versions_count} new versions for installation.")
+            .format(new_versions_count=len(newer_version_subdirs))
+        )   
+        print(_("Apply versioned scripts..."))
 
         sorted_subdirs = sorted(newer_version_subdirs)
 
@@ -1677,31 +1808,63 @@ class UpdateCommand (BaseCommand):
             
             if not scripts_sorted:
                 filters_str = ",".join(self.file_glob_filters)
-                raise CommandError(f"The scripts subdirectory '{version_dir}' does not contain any '{filters_str}' scripts")
+                raise CommandError(
+                    _("The scripts subdirectory '{version_dir}' does not "
+                    "contain any '{filters_str}' scripts")
+                    .format(
+                        version_dir=version_dir,
+                        filters_str=filters_str
+                    )
+                )
                 
             self.run_versioned_scripts_in_tran(version_id, scripts_dir, scripts_sorted)       
 
-        print("Versioned scripts applied.")
+        print(_("Versioned scripts applied."))
 
     def apply_repeatable_scripts(self, force_reapply: bool = False) -> None:        
         scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing the required '{REPEATABLE_DIR_NAME}' subdirectory.")
+            print(
+                _("The scripts directory '{scripts_dir}' is missing the "
+                "required '{repeatable_dir_name}' subdirectory.")
+                .format(
+                    scripts_dir=scripts_dir,
+                    repeatable_dir_name=REPEATABLE_DIR_NAME
+                )
+            )
             return
 
-        print("Check repeatable scripts...")
+        print(_("Check repeatable scripts..."))
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
-            raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exist in repeatable scripts subdirectory '{repeatable_dir}'.")
-
+            raise CommandError(
+                _("The file with target version '{target_version_file}' does not "
+                "exist in repeatable scripts subdirectory '{repeatable_dir}'.")
+                .format(
+                    target_version_file=TARGET_VERSION_FILE,
+                    repeatable_dir=repeatable_dir
+                )
+            )
         target_version = read_as_trimmed_string(target_version_file_path)
 
         latest_installed_version = self.check_if_any_latest_version_installed() 
         if latest_installed_version != target_version:
-            raise CommandError(f"The target version {target_version} for repeatable scripts does not match the latest installed version '{latest_installed_version}'.")                  
+            raise CommandError(
+                _("The target version {target_version} for repeatable scripts "
+                "does not match the latest installed version "
+                "'{latest_installed_version}'.")
+                .format(
+                    target_version=target_version,
+                    latest_installed_version=latest_installed_version
+                )
+            )
 
-        print(f"Target version matches the latest installed version: '{target_version}'.")
+        print(
+            _("Target version matches the latest installed version: "
+            "'{target_version}'.")
+            .format(target_version=target_version)
+        )
 
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
 
@@ -1719,7 +1882,7 @@ class UpdateCommand (BaseCommand):
             ]
 
         if not scripts_to_repeat:
-            print("No modified repeatable scripts found for (re)installation.")       
+            print(_("No modified repeatable scripts found for (re)installation."))       
             return
 
         scripts_to_repeat = self.resolve_scripts_dependencies(
@@ -1733,8 +1896,11 @@ class UpdateCommand (BaseCommand):
             for s in scripts_to_repeat
         ]
         
-        print(f"Found {len(script_infos)} scripts to re-run")
-        print("Apply repeatable scripts...")
+        print(
+            _("Found {scripts_count} scripts to re-run")
+            .format(scripts_count=len(script_infos))
+        )
+        print(_("Apply repeatable scripts..."))
 
         schema_id = self.get_schema_name()
         repeatable_sql = self.format_sql(
@@ -1743,27 +1909,27 @@ class UpdateCommand (BaseCommand):
         )                                  
 
         for i in script_infos:
-            print(f"Running script: {i!r}...")
+            print(_("Running script: {script_info}...").format(script_info=repr(i)))
             with self.dbconn.transaction():
                 with self.dbconn.cursor() as cur:
                     cur.execute(i.text)
                     cur.execute(repeatable_sql, (i.oid, target_version, i.relative_path))
-            print("Committed.")
+            print(_("Committed."))
 
-        print("Repeatable scripts applied.")
+        print(_("Repeatable scripts applied."))
 
     def run(self) -> None:
         if not self.args.skip_confirmation:
-            print("You are going to run updates. Would you like to continue? [y/N]: ", end="", flush=True)
+            print(_("You are going to run updates. Would you like to continue? [y/N]: "), end="", flush=True)
             answer = get_char().lower()
             if answer != 'y':
-                raise CommandError("Cancelled by user")
+                raise CommandError(_("Cancelled by user"))
         
         self.do_initial_cross_checks()        
         
         applied_count = self.apply_all_own_migrations()
         if applied_count > 0:
-            print(f"Version control tables updated. Please rerun the tool to update the schema using your scripts.")
+            print(_("Version control tables updated. Please rerun the tool to update the schema using your scripts."))
             return
 
         self.check_if_all_version_control_tables_exist()
@@ -1771,17 +1937,24 @@ class UpdateCommand (BaseCommand):
 
         scripts_dir = self.get_scripts_path_arg()        
         if self.args.force_reapply_latest_version:
-            print(f"Performing reapply latest version from scripts repository: '{scripts_dir}'")
+            print(
+                _("Performing reapply latest version from scripts "
+                "repository: '{scripts_dir}'")
+                .format(scripts_dir=scripts_dir)
+            )
             self.reapply_the_latest_version()
             self.apply_repeatable_scripts(force_reapply=True)
-            print("Reapplied.")
+            print(_("Reapplied."))
         else:
-            print(f"Performing updates from scripts repository: '{scripts_dir}'")
+            print(
+                _("Performing updates from scripts repository: '{scripts_dir}'")
+                .format(scripts_dir=scripts_dir)
+            )
             self.check_if_max_version_of_versioned_scripts_matches_repeatable_target()
             self.apply_baseline_scripts()
             self.apply_versioned_scripts()
             self.apply_repeatable_scripts(force_reapply=self.args.force_reapply_all_repeatable)
-            print("Updated.")
+            print(_("Updated."))
 
 class UpdateScriptBuilder:
     target_script_path: Path
@@ -1796,40 +1969,49 @@ class UpdateScriptBuilder:
         self.temp_file = None
     
     def check(self) -> None:
-        assert self.target_script_path is not None, "self.target_script_path must be initialized"
-        assert isinstance(self.target_script_path, Path), "self.target_script_path must be a pathlib.Path"
+        assert self.target_script_path is not None, _("self.target_script_path must be initialized")
+        assert isinstance(self.target_script_path, Path), _("self.target_script_path must be a pathlib.Path")
 
         if not self.target_script_path.parent.exists():
             raise CommandError(
-                f"The parent directory '{self.target_script_path.parent}' does not exist"
+                _("The parent directory '{parent_dir}' does not exist")
+                .format(parent_dir=self.target_script_path.parent)
             )
         try:
             self.target_script_path.touch(exist_ok=False)
         except FileExistsError:
             raise CommandError(
-                f"The specified script file '{self.target_script_path}' already exists"
+                _("The specified script file '{target_script_path}' already exists")
+                .format(target_script_path=self.target_script_path)
             )
         except PermissionError:
             raise CommandError(
-                f"The specified script file '{self.target_script_path}' is not accessible for write"
+                _("The specified script file '{target_script_path}' is not "
+                "accessible for write")
+                .format(target_script_path=self.target_script_path)
             )
         except OSError as e:
             raise CommandError(
-                f"System error while verifying path '{self.target_script_path}': {e}"
-            )        
+                _("System error while verifying path '{target_script_path}': {error}")
+                .format(
+                    target_script_path=self.target_script_path,
+                    error=e
+                )
+            )    
         try:
             self.temp_script_path.open("w").close()
         except Exception as e:
             raise CommandError(
-                f"Unable to write to temporary target script file '{self.temp_script_path}'"
+                _("Unable to write to temporary target script file '{temp_script_path}'")
+                .format(temp_script_path=self.temp_script_path)
             )
 
     def get_written_body_bytes(self) -> int:
         return self.written_body_bytes
 
     def __enter__(self) -> Self:
-        assert self.temp_script_path is not None, "self.temp_script_path must be initialized"
-        assert isinstance(self.temp_script_path, Path), "self.temp_script_path must be a pathlib.Path"
+        assert self.temp_script_path is not None, _("self.temp_script_path must be initialized")
+        assert isinstance(self.temp_script_path, Path), _("self.temp_script_path must be a pathlib.Path")
         self.temp_file = self.temp_script_path.open("a", encoding="utf-8")
         return self
 
@@ -1882,18 +2064,36 @@ class UpdateScriptBuilder:
                 self.temp_script_path.unlink()
             except Exception as e:
                 message = str(e)
-                print(f"Warning: Unable cleanup temporary file '{self.temp_script_path}'. Inner error: {message}")
+                print(
+                    _("Warning: Unable cleanup temporary file '{temp_script_path}'. "
+                    "Inner error: {error}")
+                    .format(
+                        temp_script_path=self.temp_script_path,
+                        error=message
+                    )
+                )
         else:
-            print(f"Warning: The temporary script path is not initialized")
+            print(
+                _("Warning: The temporary script path is not initialized")
+            )
 
         if self.target_script_path is not None:
             try:
                 self.target_script_path.unlink()
             except Exception as e:
                 message = str(e)
-                print(f"Warning: Unable cleanup target file '{self.target_script_path}'. Inner error: {message}")
+                print(
+                    _("Warning: Unable cleanup target file '{target_script_path}'. "
+                    "Inner error: {error}")
+                    .format(
+                        target_script_path=self.target_script_path,
+                        error=message
+                    )
+                )
         else:
-            print(f"Warning: The target script path is not initialized")
+            print(
+                _("Warning: The target script path is not initialized")
+            )
 
     def finalize(self) -> None:
         assert isinstance(self.temp_script_path, Path)
@@ -1909,7 +2109,13 @@ class UpdateScriptBuilder:
         except Exception as e:
             message = str(e)
             raise CommandError(
-                f"Unable to rename temporary file '{self.temp_script_path}' to the target script file {self.target_script_path}. Inner error: {message}"
+                _("Unable to rename temporary file '{temp_script_path}' to the "
+                "target script file {target_script_path}. Inner error: {error}")
+                .format(
+                    temp_script_path=self.temp_script_path,
+                    target_script_path=self.target_script_path,
+                    error=message
+                )
             )
 
 class VerifyCommand (BaseCommand):
@@ -1931,19 +2137,52 @@ class VerifyCommand (BaseCommand):
 
     def cross_check_of_the_target_version_for_repeatable_scripts(self, target_version, latest_version_in_scripts, latest_installed_version):
         if latest_version_in_scripts is None and latest_installed_version is None:
-            raise CommandError(f"Failed to check target version '{target_version}' because no version is installed and no versioned scripts were provided in the scripts directory.")
+            raise CommandError(
+                _("Failed to check target version '{target_version}' because no "
+                "version is installed and no versioned scripts were provided "
+                "in the scripts directory.")
+                .format(target_version=target_version)
+            )
         elif latest_version_in_scripts is None:
             if target_version != latest_installed_version:
-                raise CommandError(f"The target version '{target_version}' does not match the latest installed version '{latest_installed_version}'.")
+                raise CommandError(
+                    _("The target version '{target_version}' does not match the latest "
+                    "installed version '{latest_installed_version}'.")
+                    .format(
+                        target_version=target_version,
+                        latest_installed_version=latest_installed_version
+                    )
+                )
         elif latest_installed_version is None:
             if target_version != latest_version_in_scripts:
-                raise CommandError(f"The target version '{target_version}' does not match the latest scripts version '{latest_version_in_scripts}'.")
+                raise CommandError(
+                    _("The target version '{target_version}' does not match the latest "
+                    "scripts version '{latest_version_in_scripts}'.")
+                    .format(
+                        target_version=target_version,
+                        latest_version_in_scripts=latest_version_in_scripts
+                    )
+                )
         elif latest_version_in_scripts > latest_installed_version:
             if target_version != latest_version_in_scripts:
-                raise CommandError(f"The target version '{target_version}' does not match the latest scripts version '{latest_version_in_scripts}'.")
+                raise CommandError(
+                    _("The target version '{target_version}' does not match the latest "
+                    "scripts version '{latest_version_in_scripts}'.")
+                    .format(
+                        target_version=target_version,
+                        latest_version_in_scripts=latest_version_in_scripts
+                    )
+                )
         elif latest_version_in_scripts <= latest_installed_version:
             if target_version != latest_installed_version:
-                raise CommandError(f"The target version '{target_version}' does not match the latest installed version '{latest_installed_version}'.")
+                raise CommandError(
+                    _("The target version '{target_version}' does not match the latest "
+                    "installed version '{latest_installed_version}'.")
+                    .format(
+                        target_version=target_version,
+                        latest_installed_version=latest_installed_version
+                    )
+                )
     
     def display_required_changes_by_commits(self, script_infos: list[ScriptFsInfo]) -> None:
         assert self.git is not None
@@ -2054,7 +2293,7 @@ class VerifyCommand (BaseCommand):
         rows = self.get_recent_changes_from_db(limit, window_minutes)
         if not rows:
             return
-        print(f"The list of recent changes were applied to the target schema:")
+        print(_("The list of recent changes were applied to the target schema:"))
 
         if self.git is None:
             for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
@@ -2070,28 +2309,28 @@ class VerifyCommand (BaseCommand):
 
 
     def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
-        super().__init__(config, subparsers, "verify", VerifyCommand.__doc__)
+        super().__init__(config, subparsers, "verify", _("Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."))
         
         # for action="store_true" the value False is by default  
         self.parser.add_argument(
             "--skip-git-checks",  
             action="store_true", 
-            help="skip grouping changes by git commits"
+            help=_("skip grouping changes by git commits")
         )
         self.parser.add_argument(
             "--skip-display-recent-changes",  
             action="store_true", 
-            help="skip display recent changes stored within target db schema"
+            help=_("skip display recent changes stored within target db schema")
         )
         self.parser.add_argument(
             "--build-update-script", 
             type=str, 
-            help="the update script path if you want one as an additional result of the verify command"
+            help=_("the update script path if you want one as an additional result of the verify command")
         )
         self.parser.add_argument(
             "scripts_path", 
             type=str, 
-            help="source scripts repository path"
+            help=_("source scripts repository path")
         )        
         self.latest_version_in_scripts: str | None = None
 
@@ -2138,22 +2377,40 @@ class VerifyCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         baseline_dir = scripts_dir.joinpath(BASELINE_DIR_NAME)
         if not baseline_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing '{BASELINE_DIR_NAME}' subdirectory. Baseline scripts will be skipped.")
+            print(
+                _("The scripts directory '{scripts_dir}' is missing "
+                "'{baseline_dir_name}' subdirectory. Baseline scripts "
+                "will be skipped.")
+                .format(
+                    scripts_dir=scripts_dir,
+                    baseline_dir_name=BASELINE_DIR_NAME
+                )
+            )
             return
         
         if self.check_if_version_table_include_baseline_version():
             installed_baseline_version = self.get_baseline_version_installed()
-            print(f"The target schema has the baseline version installed: {installed_baseline_version}")
+            print(
+                _("The target schema has the baseline version installed: "
+                "{installed_baseline_version}")
+                .format(installed_baseline_version=installed_baseline_version)
+            )
             return
         baseline_subdirs = [item for item in baseline_dir.iterdir() if item.is_dir()]
         if (baseline_subdirs_len := len(baseline_subdirs)) != 1:
-            raise CommandError(f"The baseline path {baseline_dir} must have single subdirectory "
-                               f"with the baseline scripts but {baseline_subdirs_len} was found")
+            raise CommandError(
+                _("The baseline path {baseline_dir} must have single subdirectory "
+                "with the baseline scripts but {baseline_subdirs_len} was found")
+                .format(
+                    baseline_dir=baseline_dir,
+                    baseline_subdirs_len=baseline_subdirs_len
+                )
+            )
         baseline_version_subdir = baseline_subdirs[0]
         baseline_version = baseline_version_subdir.name
 
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH)
-        print(f"Baseline scripts to install: ")
+        print(_("Baseline scripts to install: "))
         self.display_required_changes_by_path(scripts_dir, scripts_sorted)
 
         if script_builder:
@@ -2195,13 +2452,24 @@ class VerifyCommand (BaseCommand):
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
 
         if not versioned_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing '{VERSIONED_DIR_NAME}' subdirectory. Version scripts will be skipped.")
+            print(
+                _("The scripts directory '{scripts_dir}' is missing "
+                "'{versioned_dir_name}' subdirectory. Version scripts "
+                "will be skipped.")
+                .format(
+                    scripts_dir=scripts_dir,
+                    versioned_dir_name=VERSIONED_DIR_NAME
+                )
+            )
             return
         
         versioned_subdirs = [item for item in versioned_dir.iterdir() if item.is_dir()]
         if not versioned_subdirs:
             raise CommandError(
-                f"Versioned scripts path {versioned_dir} must contain at least one subdirectory, but none were found")
+                _("Versioned scripts path {versioned_dir} must contain at least "
+                "one subdirectory, but none were found")
+                .format(versioned_dir=versioned_dir)
+            )
 
         latest_installed_version = self.get_latest_version_installed()
         if latest_installed_version is not None:
@@ -2210,7 +2478,11 @@ class VerifyCommand (BaseCommand):
             newer_version_subdirs = versioned_subdirs
 
         if not newer_version_subdirs:
-            print(f"The latest installed version is {latest_installed_version}. No newer scripts found for installation.")       
+            print(
+                _("The latest installed version is {latest_installed_version}. "
+                "No newer scripts found for installation.")
+                .format(latest_installed_version=latest_installed_version)
+            )       
             return
         
         newer_version_subdirs_sorted = sorted(newer_version_subdirs)
@@ -2220,16 +2492,26 @@ class VerifyCommand (BaseCommand):
 
         if self.latest_version_in_scripts is not None and latest_version <= self.latest_version_in_scripts:
             raise CommandError(
-                f"The latest script version '{latest_version}' must be greater than the baseline script version '{self.latest_version_in_scripts}'.")
+                _("The latest script version '{latest_version}' must be greater "
+                "than the baseline script version '{baseline_version_in_scripts}'.")
+                .format(
+                    latest_version=latest_version,
+                    baseline_version_in_scripts=self.latest_version_in_scripts
+                )
+            )
 
         self.latest_version_in_scripts = latest_version
     
-        print(f"Versioned scripts to install: ")    
+        print(_("Versioned scripts to install: "))    
         for version_dir in newer_version_subdirs_sorted:    
             scripts_sorted = self.get_sorted_scripts_from_dir(version_dir, VERSIONED_FILES_DEPTH)
             if not scripts_sorted:
                 filters_str = ",".join(self.file_glob_filters)
-                raise CommandError(f"The scripts subdirectory '{version_dir}' does not contain any '{filters_str}' scripts.")
+                raise CommandError(
+                    _("The scripts subdirectory '{version_dir}' does not contain "
+                    "any '{filters_str}' scripts.")
+                    .format(version_dir=version_dir, filters_str=filters_str)
+                )
             self.display_required_changes_by_path(scripts_dir, scripts_sorted)
             if script_builder:
                 version_id = version_dir.name
@@ -2259,22 +2541,40 @@ class VerifyCommand (BaseCommand):
         scripts_dir = self.get_resolved_scripts_dir()
         repeatable_dir = scripts_dir.joinpath(REPEATABLE_DIR_NAME)
         if not repeatable_dir.exists():
-            print(f"The scripts directory '{scripts_dir}' is missing '{REPEATABLE_DIR_NAME}' subdirectory. Repeatable scrips will be skipped.")
+            print(
+                _("The scripts directory '{scripts_dir}' is missing "
+                "'{repeatable_dir_name}' subdirectory. Repeatable scrips "
+                "will be skipped.")
+                .format(
+                    scripts_dir=scripts_dir,
+                    repeatable_dir_name=REPEATABLE_DIR_NAME
+                )
+            )
             return
 
         target_version_file_path = repeatable_dir.joinpath(TARGET_VERSION_FILE)
         if not target_version_file_path.exists():
-            raise CommandError(f"The target version file '{TARGET_VERSION_FILE}' does not exist in the repeatable scripts subdirectory '{repeatable_dir}'.")
+            raise CommandError(
+                _("The target version file '{target_version_file}' does not "
+                "exist in the repeatable scripts subdirectory '{repeatable_dir}'.")
+                .format(
+                    target_version_file=TARGET_VERSION_FILE,
+                    repeatable_dir=repeatable_dir
+                )
+            )
 
         target_version = read_as_trimmed_string(target_version_file_path)
 
         latest_installed_version = self.get_latest_version_installed()
         if latest_installed_version is None:
-           print("No versions are installed in the database schema.") 
+           print(_("No versions are installed in the database schema.")) 
 
         self.cross_check_of_the_target_version_for_repeatable_scripts(target_version, self.latest_version_in_scripts, latest_installed_version)
 
-        print(f"Target version for repeatable scripts: '{target_version}'.")
+        print(
+            _("Target version for repeatable scripts: '{target_version}'.")
+            .format(target_version=target_version)
+        )
 
         repeatable_scripts_sorted = self.get_sorted_scripts_from_dir(repeatable_dir, REPEATABLE_FILES_DEPTH)
 
@@ -2288,7 +2588,7 @@ class VerifyCommand (BaseCommand):
         ]
 
         if not scripts_to_repeat:
-            print("No modified repeatable scripts found for (re)installation.")
+            print(_("No modified repeatable scripts found for (re)installation."))
             return
 
         scripts_to_repeat = self.resolve_scripts_dependencies(
@@ -2301,7 +2601,7 @@ class VerifyCommand (BaseCommand):
             ) 
             for s in scripts_to_repeat
         ]
-        print("Repeatable scripts to (re)install: ")
+        print(_("Repeatable scripts to (re)install: "))
         self.display_required_changes(script_infos)
 
         if script_builder:
@@ -2337,10 +2637,17 @@ class VerifyCommand (BaseCommand):
                 written = script_builder.get_written_body_bytes()
                 if written > 0:
                     script_builder.finalize()
-                    print(f"Update script is written to '{script_path}'.")
+                    print(
+                        _("Update script is written to '{script_path}'.")
+                        .format(script_path=script_path)
+                    )
                 else:
                     script_builder.cleanup()
-                    print(f"No updates to write for script '{script_path}'. Temp file cleaned up")                
+                    print(
+                        _("No updates to write for script '{script_path}'. Temp file cleaned up")
+                        .format(script_path=script_path)
+                    )
+
         except Exception:
             if script_builder is not None:
                 script_builder.cleanup()
@@ -2426,28 +2733,40 @@ class InitCommand (BaseCommand):
                 cur.execute(formatted_dml, (environment_id,))
 
     def __init__(self, config: dict[str,Any], subparsers: Any) -> None: 
-        super().__init__(config, subparsers, "init", InitCommand.__doc__)
-        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
-        self.parser.add_argument("--force-init",  action="store_true", default=False, help="Force create version control tables even on non empty schema")
+        super().__init__(
+            config, subparsers, "init", _("Creates version control tables in an empty database schema."))
+        self.parser.add_argument(
+            "scripts_path", type=str, help=_("source scripts repository path"))
+        self.parser.add_argument(
+            "--force-init",  action="store_true", default=False, help=_("Force create version control tables even on non empty schema"))
 
     def run(self) -> None:
         schema_name = self.get_schema_name_arg()
         if not self.check_if_schema_exists():
-            raise CommandError(f"The target schema '{schema_name}' is not accessible")
+            raise CommandError(
+                _("The target schema '{schema_name}' is not accessible")
+                .format(schema_name=schema_name)
+            )
         self.set_session_search_path(schema_name)
 
         force_init = self.args.force_init
         if not self.check_if_schema_is_empty():
             if not force_init:
-                raise CommandError(f"The target schema '{schema_name}' must be empty")
+                raise CommandError(
+                    _("The target schema '{schema_name}' must be empty")
+                    .format(schema_name=schema_name)
+                )
             self.check_if_all_version_control_tables_do_not_exist()
-            print(f"WARNING: Schema is not empty!")
+            print(_("WARNING: Schema is not empty!"))
 
         environment_id = self.get_scripts_environment_id()
 
-        print(f"Creating the version control tables with environment ID: '{environment_id}'")
+        print(
+            _("Creating the version control tables with environment ID: '{environment_id}'")
+            .format(environment_id=environment_id)
+        )
         self.create_version_tracking_tables(environment_id)
-        print(f"Created.")
+        print(_("Created."))
 
 class TestFailed(Exception):
     """A unit test error."""
@@ -2459,7 +2778,12 @@ class RunTestsCommand (BaseCommand):
         path = Path(script_path)
         file_name = path.name
         relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-        print(f"Running test: '{relative_script_path}'...", end="", flush=True)
+        print(
+            _("Running test: '{relative_script_path}'...")
+            .format(relative_script_path=relative_script_path),
+            end="",
+            flush=True
+        )
         if file_name.startswith(IS_TRUE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
             result_number = 0
@@ -2469,7 +2793,10 @@ class RunTestsCommand (BaseCommand):
                     row = cursor.fetchone()
                     value = row[0] if row is not None else False
                     if not value:
-                        raise TestFailed(f"({result_number}) Expected true, got {value}!") 
+                        raise TestFailed(
+                            _("({result_number}) Expected true, got {value}!")
+                            .format(result_number=result_number, value=value)
+                        )
         elif file_name.startswith(DETECT_MISSING_TEST_PREFIX):
             has_failed = False
             cursor.execute(script_text)
@@ -2478,7 +2805,10 @@ class RunTestsCommand (BaseCommand):
                 result_number += 1
                 if cursor.rowcount > 0:
                     columns = [desc[0] for desc in cursor.description]
-                    print(f"FAIL. ({result_number}) Missing records:")
+                    print(
+                        _("FAIL. ({result_number}) Missing records:")
+                        .format(result_number=result_number)
+                    )
                     print("=================================")
                     for row in cursor:
                         items = [f"{k}: {v}" for k, v in zip(columns, row)]
@@ -2486,12 +2816,23 @@ class RunTestsCommand (BaseCommand):
                         print(line)
                     has_failed = True
             if has_failed:
-                raise TestFailed(f"Expected no results!")
+                raise TestFailed(_("Expected no results!"))
         elif file_name.startswith(ASSURE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
         else:
-            raise TestFailed(f"Unable to detect test type from script name '{file_name}'. It should start with one of the following prefixes: '{IS_TRUE_THAT_TEST_PREFIX}','{DETECT_MISSING_TEST_PREFIX}','{ASSURE_THAT_TEST_PREFIX}'")
-        print(f"PASS")
+            raise TestFailed(
+                _(
+                    "Unable to detect test type from script name '{file_name}'. It should "
+                    "start with one of the following prefixes: '{is_true_prefix}',"
+                    "'{detect_missing_prefix}','{assure_that_prefix}'"
+                ).format(
+                    file_name=file_name,
+                    is_true_prefix=IS_TRUE_THAT_TEST_PREFIX,
+                    detect_missing_prefix=DETECT_MISSING_TEST_PREFIX,
+                    assure_that_prefix=ASSURE_THAT_TEST_PREFIX,
+                )
+            )
+        print(_("PASS"))
 
     def is_subpath_of(self, child: Path, parent: Path) -> bool:
         child_parts = Path(child).absolute().parts
@@ -2521,19 +2862,24 @@ class RunTestsCommand (BaseCommand):
                         savepoint_id = self.make_savepoint_id(setup_folder)
                         formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
                         cur.execute(formatted_sql)
-                        print(f"Rolled back to savepoint.")
+                        print(_("Rolled back to savepoint."))
                 
                 if script_name == SETUP_TESTS_FILE_NAME:
                     setup_folder = str(script_path.absolute().parent)
                     setup_folder_stack.append(setup_folder)
                     savepoint_id = self.make_savepoint_id(setup_folder)
                     formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
-                    print(f"Make savepoint...")
+                    print(_("Make savepoint..."))
                     cur.execute(formatted_sql)
                     relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-                    print(f"Running setup: '{relative_script_path}'...", end="", flush=True)
+                    print(
+                        _("Running setup: '{relative_script_path}'...")
+                        .format(relative_script_path=relative_script_path),
+                        end="",
+                        flush=True
+                    )
                     cur.execute(script_text)
-                    print(f"DONE")
+                    print(_("DONE"))
                     continue
                 else:
                     cur.execute("SAVEPOINT savepoint_test_boundary")
@@ -2542,19 +2888,32 @@ class RunTestsCommand (BaseCommand):
                         self.pass_count += 1
                     except TestFailed as e:
                         self.fail_count += 1
-                        print(f"FAIL.", e)
+                        print(_("FAIL."), e)
                     except Exception as e:
                         self.fail_count += 1
                         error_type_name = type(e).__name__ 
-                        print(f"FAIL. {error_type_name}:", e)
+                        print(
+                            _("FAIL. {error_type_name}:").format(error_type_name=error_type_name),
+                            e
+                        )
                     cur.execute("ROLLBACK TO SAVEPOINT savepoint_test_boundary")
 
             cur.execute("ROLLBACK") # rollback global tran for tests
 
     def __init__(self, config: dict[str, Any], subparsers: Any) -> None:       
-        super().__init__(config, subparsers, "run-tests", RunTestsCommand.__doc__)
-        self.parser.add_argument("scripts_path", type=str, help="source scripts repository path")
-        self.parser.add_argument("--skip-env-checks",  action="store_true", default=False, help="Skip version and environment ID checks to run tests in any plain environment not made by the tool itself")
+        super().__init__(
+            config, 
+            subparsers, 
+            "run-tests", 
+            _("Runs db unit test scripts to the target database schema."))
+        self.parser.add_argument(
+            "scripts_path", 
+            type=str, 
+            help=_("source scripts repository path"))
+        self.parser.add_argument(
+            "--skip-env-checks",  
+            action="store_true", 
+            help=_("Skip version and environment ID checks to run tests in any plain environment not made by the tool itself"))
     
     def __enter__(self) -> Self:
         self.use_run_tests_by_user = True
@@ -2563,25 +2922,56 @@ class RunTestsCommand (BaseCommand):
     def run_unit_test_scripts(self, scripts_dir: Path) -> None:
         unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
         if not unit_tests_dir.exists():
-            raise CommandError(f"The scripts directory '{scripts_dir}' is missing the required '{TESTS_DIR_NAME}' subdirectory.")
+            raise CommandError(
+                _("The scripts directory '{scripts_dir}' is missing the required "
+                "'{tests_dir_name}' subdirectory.")
+                .format(scripts_dir=scripts_dir, tests_dir_name=TESTS_DIR_NAME)
+            )
 
         if not self.args.skip_env_checks:
             target_version_file_path = unit_tests_dir.joinpath(TARGET_VERSION_FILE)
             if not target_version_file_path.exists():
-                raise CommandError(f"The file with target version '{TARGET_VERSION_FILE}' does not exists in unit tests scripts subdirectory '{unit_tests_dir}'.")
+                raise CommandError(
+                    _("The file with target version '{target_version_file}' does not "
+                    "exists in unit tests scripts subdirectory '{unit_tests_dir}'.")
+                    .format(
+                        target_version_file=TARGET_VERSION_FILE,
+                        unit_tests_dir=unit_tests_dir
+                    )
+                )
             target_version = read_as_trimmed_string(target_version_file_path)
             latest_installed_version = self.check_if_any_latest_version_installed() 
             if latest_installed_version != target_version:
-                raise CommandError(f"The target version {target_version} for unit test scripts does not match the latest installed version {latest_installed_version}.")                  
-            print(f"Target version matches the latest installed version: '{target_version}'")
+                raise CommandError(
+                    _("The target version {target_version} for unit test scripts "
+                    "does not match the latest installed version "
+                    "{latest_installed_version}.")
+                    .format(
+                        target_version=target_version,
+                        latest_installed_version=latest_installed_version
+                    )
+                )                  
+            print(
+                _("Target version matches the latest installed version: "
+                "'{target_version}'")
+                .format(target_version=target_version)
+            )
 
         scripts_sorted = self.get_sorted_scripts_from_dir(unit_tests_dir, TESTS_FILES_DEPTH)        
         self.run_test_scripts_each_in_own_tran(scripts_dir, scripts_sorted)
         if self.fail_count > 0:
-            raise CommandError(f"Tests failed: {self.fail_count}, passed: {self.pass_count}.")
+            raise CommandError(
+                _("Tests failed: {fail_count}, passed: {pass_count}.")
+                .format(
+                    fail_count=self.fail_count,
+                    pass_count=self.pass_count
+                )
+            )
         else:
-            print(f"All {self.pass_count} tests passed.")
-            
+            print(
+                _("All {pass_count} tests passed.")
+                .format(pass_count=self.pass_count)
+            )            
 
     def run(self) -> None:
         self.do_initial_cross_checks()
@@ -2590,7 +2980,10 @@ class RunTestsCommand (BaseCommand):
             self.check_if_all_version_control_tables_exist() 
             self.check_if_stored_environment_id_matches_to_scripts_dir()
         scripts_dir = self.get_resolved_scripts_dir()    
-        print(f"Running unit tests for scripts repository: '{scripts_dir}'")
+        print(
+            _("Running unit tests on scripts repository: '{scripts_dir}'")
+            .format(scripts_dir=scripts_dir)
+        )
         self.run_unit_test_scripts(scripts_dir)
 
 # main entry point
