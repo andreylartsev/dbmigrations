@@ -89,13 +89,8 @@ SETUP_TESTS_FILE_NAME = "_setup.sql"
 RECENT_CHANGES_WINDOW_MINUTES = 30
 RECENT_CHANGES_LIMIT = 1000
 
-UNKNOWN_SHA_LABEL = "UNKNOWN"
-UNKNOWN_AUTHOR_LABEL = "Unknown"
-UNKNOWN_MESSAGE_LABEL = "Content hash (OID) is completely untracked or modified locally"
 UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
-UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
 UNCOMMITTED_DATE_LABEL = "-------"
-UNCOMMITTED_MESSAGE_LABEL = "Uncommitted changes"
 
 TRANSLATIONS_SUBDIRECTORY = "translations"
 LANGUAGE_ATTR_NAME = "language"
@@ -368,7 +363,7 @@ class CommitInfo(NamedTuple):
             oid=None,
             author=getpass.getuser(),
             date=datetime.now(),
-            message=message or UNCOMMITTED_MESSAGE_LABEL
+            message=message or _("Uncommitted changes")
         )
 
     @classmethod
@@ -377,7 +372,7 @@ class CommitInfo(NamedTuple):
             oid=None,
             author=None,
             date=None,
-            message=message or UNKNOWN_MESSAGE_LABEL
+            message=message or L
         )
 
     @property
@@ -387,8 +382,8 @@ class CommitInfo(NamedTuple):
     def __repr__(self) -> str:
         date_label = self.date.strftime("%Y-%m-%d") if self.date is not None else UNCOMMITTED_DATE_LABEL
         oid_label = self.oid[:8] if self.oid else UNCOMMITTED_SHA_LABEL
-        message_label = self.message if self.message else UNCOMMITTED_MESSAGE_LABEL
-        author_label = self.author if self.author else UNKNOWN_AUTHOR_LABEL
+        message_label = self.message if self.message else _("Uncommitted changes")
+        author_label = self.author if self.author else _("Unknown author")
         return _(
             "[{oid_label}] {date_label} - {message_label}\n"
             "  Author: {author_label}"
