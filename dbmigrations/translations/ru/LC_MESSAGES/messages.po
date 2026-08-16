@@ -1024,7 +1024,7 @@ msgstr ""
 
 #: dbmigration.py:2296
 msgid "The list of recent changes were applied to the target schema:"
-msgstr "Список недавних изменений был применен к целевой схеме:"
+msgstr "Список недавних изменений целевой схемы:"
 
 #: dbmigration.py:2312
 msgid ""
@@ -1032,7 +1032,7 @@ msgid ""
 "to apply if the 'update' command is executed."
 msgstr ""
 "Проверяет целевую схему и выводит список версионированных и "
-"воспроизводимых скриптов для применения в случае выполнения команды "
+"повторяемых (repeatable) скриптов для применения в случае выполнения команды "
 "'update'."
 
 #: dbmigration.py:2318
