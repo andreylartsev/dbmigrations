@@ -44,5 +44,9 @@
         "хотфикс",
         "хотфиксов"
     ],
-    "cSpell.language": "en,ru"
+    "cSpell.language": "en,ru",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUndefinedVariable": "none"
+    }
+
 }

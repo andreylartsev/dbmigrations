@@ -97,14 +97,23 @@ UNCOMMITTED_AUTHOR_LABEL = "Local Changes"
 UNCOMMITTED_DATE_LABEL = "-------"
 UNCOMMITTED_MESSAGE_LABEL = "Uncommitted changes"
 
+TRANSLATIONS_SUBDIRECTORY = "translations"
+LANGUAGE_ATTR_NAME = "language"
+
 def main():
     try:
-        setup_translations()
+        setup_translations(None)
 
         config = read_toml_config()
 
-        parser = argparse.ArgumentParser(description=__doc__)    
-        subparsers = parser.add_subparsers(dest="cmd", help="Available subcommands")
+        if OPTIONS_CONFIG_GROUP in config:
+            options = config[OPTIONS_CONFIG_GROUP]
+            lang = options.get(LANGUAGE_ATTR_NAME, None)
+            if lang is not None:
+                setup_translations(lang)
+
+        parser = argparse.ArgumentParser(description=_("Simple database migrations tool"))    
+        subparsers = parser.add_subparsers(dest="cmd", help=_("Available subcommands"))
 
         UpdateCommand(config, subparsers)
         VerifyCommand(config, subparsers)
@@ -146,19 +155,17 @@ def read_toml_config() -> dict[str, Any]:
         config = tomllib.load(f)
         return config
 
-def setup_translations() -> None:
-    locales_dir = Path(__file__).resolve().parent / "translations"
-    if locales_dir.exists():
-        try:
-            translation = gettext.translation(
-                "messages",
-                localedir=str(locales_dir),
-                languages=["ru"],
-                fallback=False,
-            )
-            translation.install()
-        except FileNotFoundError:
-            builtins._ = lambda text: text
+def setup_translations(lang: str|None) -> None:
+    translations_dir = Path(__file__).resolve().parent.joinpath(TRANSLATIONS_SUBDIRECTORY)
+    if translations_dir.exists():
+        translation = gettext.translation(
+            "messages",
+            localedir=str(translations_dir),
+            languages=[lang] if lang else None, # in case of None it takes selected system languages from the system i.e. LC_MESSAGES variable 
+            fallback=True,
+        )
+        translation.install()
+        builtins._ = translation.gettext
     else:
         builtins._ = lambda text: text
 

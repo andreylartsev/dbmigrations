@@ -44,6 +44,8 @@ file_read_encoding = "utf-8-sig"
 # what to do if unknown unicode symbol appears
 # possible options: "ignore", "replace"
 file_read_encoding_errors = "ignore"
+# language
+language="ru"
 
 # external tools to apply baseline dumps, used if the name of tool specified by "use_tool.txt" file within baseline subdirectory  
 [tools.psql]
