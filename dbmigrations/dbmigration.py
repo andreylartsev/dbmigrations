@@ -93,9 +93,10 @@ UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
 UNCOMMITTED_DATE_LABEL = "-------"
 
 TRANSLATIONS_SUBDIRECTORY = "translations"
+TRANSLATIONS_DOMAIN = "messages"
 LANGUAGE_ATTR_NAME = "language"
 
-def main():
+def main() -> int:
     try:
         setup_translations(None)
 
@@ -150,17 +151,14 @@ def read_toml_config() -> dict[str, Any]:
 
 def setup_translations(lang: str|None) -> None:
     translations_dir = Path(__file__).resolve().parent.joinpath(TRANSLATIONS_SUBDIRECTORY)
-    if translations_dir.exists():
-        translation = gettext.translation(
-            "messages",
-            localedir=str(translations_dir),
-            languages=[lang] if lang else None, # in case of None it takes selected system languages from the system i.e. LC_MESSAGES variable 
-            fallback=True,
-        )
-        translation.install()
-        builtins._ = translation.gettext
-    else:
-        builtins._ = lambda text: text
+    translator = gettext.translation(
+        TRANSLATIONS_DOMAIN,
+        localedir=str(translations_dir) if translations_dir.exists() else None,
+        # in case of None it takes selected system languages from the system i.e. LC_MESSAGES variable 
+        languages=[lang] if lang else None, 
+        fallback=True # return NoneTranslator if nothing found
+    )
+    builtins._ = translator.gettext
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
