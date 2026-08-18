@@ -2769,30 +2769,22 @@ class TestFailed(Exception):
 class RunTestsCommand (BaseCommand):
     """Runs db unit test scripts to the target database schema."""
 
-    def run_conditional(
-        self, 
-        cursor: Cursor[TupleRow], 
-        scripts_dir: Path, 
-        script_path: Path, 
-        script_text: str
-    ) -> None:
-        relative_path = get_script_path_for_log(scripts_dir, script_path)
-        
+    def run_conditional(self, cursor: Any, script: ScriptFsInfo) -> None:
         print(
             _("Running test: '{relative_script_path}'...")
-            .format(relative_script_path=relative_path), 
-            end="", 
+            .format(relative_script_path=script.relative_path),
+            end="",
             flush=True
         )
-
-        file_name = script_path.name
+        
+        file_name = script.script_path.name
 
         if file_name.startswith(IS_TRUE_THAT_TEST_PREFIX):
-            self._run_is_true_test(cursor, script_text)
+            self._run_is_true_test(cursor, script.text)
         elif file_name.startswith(DETECT_MISSING_TEST_PREFIX):
-            self._run_detect_missing_test(cursor, script_text)
+            self._run_detect_missing_test(cursor, script.text)
         elif file_name.startswith(ASSURE_THAT_TEST_PREFIX):
-            cursor.execute(script_text)
+            cursor.execute(script.text)
         else:
             raise TestFailed(
                 _(
@@ -2809,7 +2801,7 @@ class RunTestsCommand (BaseCommand):
             
         print(_("PASS"))
 
-    def _run_is_true_test(self, cursor: Cursor[TupleRow], script_text: str) -> None:
+    def _run_is_true_test(self, cursor: Any, script_text: str) -> None:
         cursor.execute(script_text)
         for res_num, results in enumerate(cursor.results(), start=1):
             if cursor.rowcount <= 0:
@@ -2823,7 +2815,7 @@ class RunTestsCommand (BaseCommand):
                     .format(result_number=res_num, value=value)
                 )
 
-    def _run_detect_missing_test(self, cursor: Cursor[TupleRow], script_text: str) -> None:
+    def _run_detect_missing_test(self, cursor: Any, script_text: str) -> None:
         cursor.execute(script_text)
         has_failed = False
         
@@ -2856,62 +2848,80 @@ class RunTestsCommand (BaseCommand):
         hash_str = str(hash(folder))
         return psycopg.sql.Identifier("savepoint_" + hash_str)
 
-    def run_test_scripts_each_in_own_tran(self, scripts_dir:Path, scripts: list[Path]) -> None:
+    def run_test_scripts_each_in_own_tran(self, scripts: Iterable[ScriptFsInfo]) -> None:
         self.fail_count = 0
         self.pass_count = 0
+        
         with self.dbconn.cursor() as cur:
-            cur.execute("BEGIN") # start global tran for tests
-            setup_folder_stack = []            
-            for script_path in scripts:
-                script_name = script_path.name
-                with open(script_path, 'rt', encoding=self.file_read_encoding, errors=self.file_read_encoding_errors) as f:
-                    script_text = f.read()
-
-                if len(setup_folder_stack) > 0:
-                    script_folder = str(script_path.absolute().parent)
-                    latest_item = setup_folder_stack[-1]
-                    if not self.is_subpath_of(script_folder, latest_item):
-                        setup_folder_stack.pop()
-                        savepoint_id = self.make_savepoint_id(setup_folder)
-                        formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
-                        cur.execute(formatted_sql)
-                        print(_("Rolled back to savepoint."))
+            cur.execute("BEGIN")
+            try:
+                setup_folder_stack: list[str] = []            
                 
-                if script_name == SETUP_TESTS_FILE_NAME:
-                    setup_folder = str(script_path.absolute().parent)
-                    setup_folder_stack.append(setup_folder)
-                    savepoint_id = self.make_savepoint_id(setup_folder)
-                    formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
-                    print(_("Make savepoint..."))
-                    cur.execute(formatted_sql)
-                    relative_script_path = get_script_path_for_log(scripts_dir, script_path)
-                    print(
-                        _("Running setup: '{relative_script_path}'...")
-                        .format(relative_script_path=relative_script_path),
-                        end="",
-                        flush=True
-                    )
-                    cur.execute(script_text)
-                    print(_("DONE"))
-                    continue
-                else:
-                    cur.execute("SAVEPOINT savepoint_test_boundary")
-                    try:
-                        self.run_conditional(cur, scripts_dir, script_path, script_text)
-                        self.pass_count += 1
-                    except TestFailed as e:
-                        self.fail_count += 1
-                        print(_("FAIL."), e)
-                    except Exception as e:
-                        self.fail_count += 1
-                        error_type_name = type(e).__name__ 
-                        print(
-                            _("FAIL. {error_type_name}:").format(error_type_name=error_type_name),
-                            e
-                        )
-                    cur.execute("ROLLBACK TO SAVEPOINT savepoint_test_boundary")
+                for script in scripts:
+                    self._rollback_outdated_setups(cur, script, setup_folder_stack)
+                    
+                    if script.script_path.name == SETUP_TESTS_FILE_NAME:
+                        self._run_setup_script(cur, script, setup_folder_stack)
+                        continue
+                        
+                    self._run_single_test_with_boundary(cur, script)
+            finally:
+                cur.execute("ROLLBACK")
 
-            cur.execute("ROLLBACK") # rollback global tran for tests
+
+    def _rollback_outdated_setups(self, cur: Any, script: ScriptFsInfo, stack: list[str]) -> None:
+        if not stack:
+            return
+            
+        script_folder = str(script.script_path.absolute().parent)
+        latest_item = stack[-1]
+        
+        if not self.is_subpath_of(script_folder, latest_item):
+            stack.pop()
+            savepoint_id = self.make_savepoint_id(latest_item)
+            
+            formatted_sql = self.format_sql("ROLLBACK TO SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
+            cur.execute(formatted_sql)
+            print(_("Rolled back to savepoint."))
+
+
+    def _run_setup_script(self, cur: Any, script: ScriptFsInfo, stack: list[str]) -> None:
+        setup_folder = str(script.script_path.absolute().parent)
+        stack.append(setup_folder)
+        
+        savepoint_id = self.make_savepoint_id(setup_folder)
+        print(_("Make savepoint..."))
+        
+        formatted_sql = self.format_sql("SAVEPOINT {savepoint_id}", savepoint_id=savepoint_id)
+        cur.execute(formatted_sql)
+        
+        print(
+            _("Running setup: '{relative_script_path}'...")
+            .format(relative_script_path=script.relative_path),
+            end="",
+            flush=True
+        )
+        cur.execute(script.text)
+        print(_("DONE"))
+
+
+    def _run_single_test_with_boundary(self, cur: Any, script: ScriptFsInfo) -> None:
+        cur.execute("SAVEPOINT savepoint_test_boundary")
+        try:
+            self.run_conditional(cur, script)
+            self.pass_count += 1
+        except TestFailed as e:
+            self.fail_count += 1
+            print(_("FAIL."), e)
+        except Exception as e:
+            self.fail_count += 1
+            error_name = type(e).__name__ 
+            print(
+                _("FAIL. {error_type_name}:").format(error_type_name=error_name),
+                e
+            )
+        finally:
+            cur.execute("ROLLBACK TO SAVEPOINT savepoint_test_boundary")
 
     def __init__(self, config: dict[str, Any], subparsers: Any) -> None:       
         super().__init__(
@@ -2971,7 +2981,13 @@ class RunTestsCommand (BaseCommand):
             )
 
         scripts_sorted = self.get_sorted_scripts_from_dir(unit_tests_dir, TESTS_FILES_DEPTH)        
-        self.run_test_scripts_each_in_own_tran(scripts_dir, scripts_sorted)
+        script_infos = [
+            ScriptFsInfo.get_info_with_text(
+                scripts_dir, s, 
+                encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors)
+            for s in scripts_sorted
+        ]
+        self.run_test_scripts_each_in_own_tran(script_infos)
         if self.fail_count > 0:
             raise CommandError(
                 _("Tests failed: {fail_count}, passed: {pass_count}.")
