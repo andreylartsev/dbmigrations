@@ -2769,49 +2769,28 @@ class TestFailed(Exception):
 class RunTestsCommand (BaseCommand):
     """Runs db unit test scripts to the target database schema."""
 
-    def run_conditional(self, cursor: Cursor[TupleRow], scripts_dir: Path, script_path:Path, script_text: str) -> None:
-        path = Path(script_path)
-        file_name = path.name
-        relative_script_path = get_script_path_for_log(scripts_dir, script_path)
+    def run_conditional(
+        self, 
+        cursor: Cursor[TupleRow], 
+        scripts_dir: Path, 
+        script_path: Path, 
+        script_text: str
+    ) -> None:
+        relative_path = get_script_path_for_log(scripts_dir, script_path)
+        
         print(
             _("Running test: '{relative_script_path}'...")
-            .format(relative_script_path=relative_script_path),
-            end="",
+            .format(relative_script_path=relative_path), 
+            end="", 
             flush=True
         )
+
+        file_name = script_path.name
+
         if file_name.startswith(IS_TRUE_THAT_TEST_PREFIX):
-            cursor.execute(script_text)
-            result_number = 0
-            for results in cursor.results():
-                result_number += 1
-                if cursor.rowcount > 0:
-                    row = cursor.fetchone()
-                    value = row[0] if row is not None else False
-                    if not value:
-                        raise TestFailed(
-                            _("({result_number}) Expected true, got {value}!")
-                            .format(result_number=result_number, value=value)
-                        )
+            self._run_is_true_test(cursor, script_text)
         elif file_name.startswith(DETECT_MISSING_TEST_PREFIX):
-            has_failed = False
-            cursor.execute(script_text)
-            result_number = 0
-            for results in cursor.results():
-                result_number += 1
-                if cursor.rowcount > 0:
-                    columns = [desc[0] for desc in cursor.description]
-                    print(
-                        _("FAIL. ({result_number}) Missing records:")
-                        .format(result_number=result_number)
-                    )
-                    print("=================================")
-                    for row in cursor:
-                        items = [f"{k}: {v}" for k, v in zip(columns, row)]
-                        line = ", ".join(items)
-                        print(line)
-                    has_failed = True
-            if has_failed:
-                raise TestFailed(_("Expected no results!"))
+            self._run_detect_missing_test(cursor, script_text)
         elif file_name.startswith(ASSURE_THAT_TEST_PREFIX):
             cursor.execute(script_text)
         else:
@@ -2827,7 +2806,46 @@ class RunTestsCommand (BaseCommand):
                     assure_that_prefix=ASSURE_THAT_TEST_PREFIX,
                 )
             )
+            
         print(_("PASS"))
+
+    def _run_is_true_test(self, cursor: Cursor[TupleRow], script_text: str) -> None:
+        cursor.execute(script_text)
+        for res_num, results in enumerate(cursor.results(), start=1):
+            if cursor.rowcount <= 0:
+                continue
+                
+            row = cursor.fetchone()
+            value = row[0] if row is not None else False
+            if not value:
+                raise TestFailed(
+                    _("({result_number}) Expected true, got {value}!")
+                    .format(result_number=res_num, value=value)
+                )
+
+    def _run_detect_missing_test(self, cursor: Cursor[TupleRow], script_text: str) -> None:
+        cursor.execute(script_text)
+        has_failed = False
+        
+        for res_num, results in enumerate(cursor.results(), start=1):
+            if cursor.rowcount <= 0:
+                continue
+                
+            columns = [desc[0] for desc in cursor.description]
+            print(
+                _("FAIL. ({result_number}) Missing records:")
+                .format(result_number=res_num)
+            )
+            print("=================================")
+            
+            for row in results:
+                items = [f"{k}: {v}" for k, v in zip(columns, row)]
+                print(", ".join(items))
+                
+            has_failed = True
+            
+        if has_failed:
+            raise TestFailed(_("Expected no results!"))
 
     def is_subpath_of(self, child: Path, parent: Path) -> bool:
         child_parts = Path(child).absolute().parts
