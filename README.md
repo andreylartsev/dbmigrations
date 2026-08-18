@@ -123,7 +123,7 @@ Run `python3 .\dbmigration.py -h` to see global choices.
 ```
 
 ``` powershell
-(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker run --rm -e PGPASSWORD="1234561" -v "C:\Users\andrey.larcev\Projects\dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations/samples/test1 --host host.docker.internal --skip-git-checks
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker run --rm -e PGPASSWORD="topsecret123" -v "C:\Users\andrey.larcev\Projects\dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations/samples/test1 --host host.docker.internal --skip-git-checks
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
 Set session search path to: 'test3'.
 Target schema environment ID matches the scripts directory ID: 4a40342c-4546-4776-bf97-b02b2a858924
@@ -146,7 +146,7 @@ Closed db connection.
 ```
 
 ``` bash
-avl@n-LarcevAV:~/WinProjects/dbmigrations/dbmigrations$ docker run --rm -e PGPASSWORD="1234561" -v "/home/avl/WinProjects/dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations
+avl@n-LarcevAV:~/WinProjects/dbmigrations/dbmigrations$ docker run --rm -e PGPASSWORD="topsecret123" -v "/home/avl/WinProjects/dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations
 /samples/test1 --host host.docker.internal
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
 Set session search path to: 'test3'.
