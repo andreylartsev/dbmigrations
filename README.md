@@ -91,6 +91,9 @@ Run `python3 .\dbmigration.py -h` to see global choices.
 
 ## ❓ How to build & use Docker image
 
+
+Build on Windows host:
+
 ``` powershell
 (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker build .
 [+] Building 4.8s (15/15) FINISHED                                                                                                                                                          docker:desktop-linux
@@ -122,6 +125,8 @@ Run `python3 .\dbmigration.py -h` to see global choices.
  => => unpacking to moby-dangling@sha256:c405f3b0d2addb27c4b8948d994ceeafc06598b6d16534ec3f35863929f7e4a8                                                                                                   0.3s
 ```
 
+Use on Windows:
+
 ``` powershell
 (.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker run --rm -e PGPASSWORD="topsecret123" -v "C:\Users\andrey.larcev\Projects\dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations/samples/test1 --host host.docker.internal --skip-git-checks
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
@@ -144,6 +149,7 @@ The list of recent changes were applied to the target schema:
     [2026-08-19 00:55:02 | versioned  | V000   | test1/baseline/V000/00_create_t1.sql (OID: 9bdf76b3)]
 Closed db connection.
 ```
+And use on WSL as well:
 
 ``` bash
 avl@n-LarcevAV:~/WinProjects/dbmigrations/dbmigrations$ docker run --rm -e PGPASSWORD="topsecret123" -v "/home/avl/WinProjects/dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations
