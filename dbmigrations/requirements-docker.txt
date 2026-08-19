@@ -1,2 +1,7 @@
-﻿-r requirements-dev.txt
-psycopg==3.3.3
+﻿# Database Drivers (Psycopg 3 для Alpine)
+psycopg[binary]==3.3.3
+psycopg-pool==3.3.0
+
+# Utilities & Types
+typing_extensions==4.15.0
+tzdata==2025.3
