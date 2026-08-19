@@ -23,7 +23,7 @@ RUN /opt/venv/bin/python -m compileall -q /opt/venv
 RUN apk add --no-cache git
 
 COPY dbmigration.py .
-COPY dbmigration.toml .
+COPY dbmigration.example.toml dbmigration.toml
 COPY ./translations/ru/LC_MESSAGES/ ./translations/ru/LC_MESSAGES/
 
 RUN /opt/venv/bin/python -m compileall -q /app

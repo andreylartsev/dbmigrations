@@ -132,56 +132,51 @@ Build on Windows host:
 Use on Windows: (note using /migrations mount point as allowed Git repository root, see [Dockerfile](dbmigrations/Dockerfile))
 
 ``` powershell
-(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker run --rm -it -e PGPASSWORD="***" -v "..:/migrations" dbmigration verify dev1 /migrations/dbmigrations/samples/deps/dev1 --dbenv local_docker_test1
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker run --rm -it -e PGPASSWORD="1234561" -v "..:/migrations:ro" -v ".\dbmigration.toml:/app/dbmigration.toml:ro" -v ".:/out/" dbmigration verify dev1 /migrations/dbmigrations/samples/deps/dev1 --dbenv local_docker_test1 --skip-git-checks --build-update-script /out/xxx.sql
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
 Set session search path to: 'dev1'.
 Target schema environment ID matches the scripts directory ID: f47ac10b-58cc-4372-a567-0e02b2c3d479
 Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts...
 Completed.
-The target schema has the baseline version installed: V000
+Baseline scripts to install:
+  [common/baseline/V000/00_create_t1.sql (OID: 9bdf76b3)]
 The scripts directory '/migrations/dbmigrations/samples/deps/dev1' is missing 'versions' subdirectory. Version scripts will be skipped.
+No versions are installed in the database schema.
 Target version for repeatable scripts: 'V000'.
-No modified repeatable scripts found for (re)installation.
-The list of recent changes were applied to the target schema:
-[8498507e] 2026-06-30 - updated samples/envs, added samples/envs/dev2
-  Author: Andrey Lartsev
-    [2026-08-12 18:11:01 | repeatable | V000   | common/repeatable/fn_get_environment_name.sql (OID: ced95c6d)]
-[47a744b4] 2026-06-24 - reworked own version control migrations
-  Author: Andrey Lartsev
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_05.sql (OID: 23240e12)]
-[2d65334b] 2026-06-24 - update insert_into_t1_01.sql
-  Author: Andrey Lartsev
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_01.sql (OID: 2f3fd6c5)]
-[afc8d20e] 2026-06-23 - reworked own version control tables migrations
-  Author: Andrey Lartsev
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_04.sql (OID: fac92fec)]
-[a79ebc85] 2026-06-19 - initial dependency checking implementation
-  Author: Andrey Lartsev
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_03.sql (OID: 08e408c4)]
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_02.sql (OID: 1ef0147a)]
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/use_get_environment_name.sql (OID: da50070f)]
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/fn_get_environment_name.sql (OID: ae6980bb)]
-[5361d3a9] 2026-06-19 - modified deps sample
-  Author: Andrey Lartsev
-    [2026-08-12 18:11:01 | repeatable | V000   | common/repeatable/insert_into_t1_00.sql (OID: 55e1736c)]
-[7eb51752] 2026-05-28 - updated readme.md
-  Author: Andrey Lartsev
-    [2026-08-12 18:11:01 | versioned  | V000   | common/baseline/V000/00_create_t1.sql (OID: 9bdf76b3)]
-[UNCOMMITTED] ------- - Content hash (OID) is completely untracked or modified locally
-  Author: Unknown author
-    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/fn_get_null.sql (OID: 1ddc839b)]
+Repeatable scripts to (re)install:
+  [common/repeatable/fn_get_environment_name.sql (OID: ced95c6d)]
+  [dev1/repeatable/fn_get_environment_name.sql (OID: ae6980bb)]
+  [dev1/repeatable/use_get_environment_name.sql (OID: da50070f)]
+  [common/repeatable/insert_into_t1_00.sql (OID: 55e1736c)]
+  [dev1/repeatable/insert_into_t1_01.sql (OID: 2f3fd6c5)]
+  [dev1/repeatable/insert_into_t1_02.sql (OID: 1ef0147a)]
+  [dev1/repeatable/insert_into_t1_03.sql (OID: 08e408c4)]
+  [dev1/repeatable/insert_into_t1_04.sql (OID: fac92fec)]
+  [dev1/repeatable/insert_into_t1_05.sql (OID: 23240e12)]
+Update script is written to '/out/xxx.sql'.
 Closed db connection.
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> cat .\xxx.sql
+-- Setting session search path to: dev1
+SELECT pg_catalog.set_config('search_path', 'dev1', false);
+
+-- --------- BASELINE VERSION: V000 ---------
+BEGIN;
+-- Apply script: [common/baseline/V000/00_create_t1.sql (OID:9bdf76b3)]
+create table t1 (
+    v1 serial not null primary key
+);
+...
 ```
 And use on WSL as well:
 
 ``` bash
-avl@n-LarcevAV:~/WinProjects/dbmigrations$ docker run --rm -it -e PGPASSWORD="***" -v ".:/migrations" dbmigration init dev1 /migrations/dbmigrations/samples/deps/dev1
+avl@n-LarcevAV:~/WinProjects/dbmigrations$ docker run --rm -it -e PGPASSWORD="***" -v ".:/migrations" -v ".\dbmigration.toml:/app/dbmigration.toml" dbmigration init dev1 /migrations/dbmigrations/samples/deps/dev1
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
 Set session search path to: 'dev1'.
 Creating the version control tables with environment ID: 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
 Created.
 Closed db connection.
-avl@n-LarcevAV:~/WinProjects/dbmigrations$ docker run --rm -it -e PGPASSWORD="***" -v ".:/migrations" dbmigration update dev1 /migrations/dbmigrations/samples/deps/dev1
+avl@n-LarcevAV:~/WinProjects/dbmigrations$ docker run --rm -it -e PGPASSWORD="***" -v ".:/migrations" -v ".\dbmigration.toml:/app/dbmigration.toml" dbmigration update dev1 /migrations/dbmigrations/samples/deps/dev1
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
 You are going to run updates. Would you like to continue? [y/N]: y
 Set session search path to: 'dev1'.
