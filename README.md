@@ -95,94 +95,131 @@ Run `python3 .\dbmigration.py -h` to see global choices.
 Build on Windows host:
 
 ``` powershell
-(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker build .
-[+] Building 4.8s (15/15) FINISHED                                                                                                                                                          docker:desktop-linux
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker build -t dbmigration .
+[+] Building 9.3s (19/19) FINISHED                                                                                                                                                          docker:desktop-linux
  => [internal] load build definition from Dockerfile                                                                                                                                                        0.1s
- => => transferring dockerfile: 810B                                                                                                                                                                        0.0s
- => [internal] load metadata for docker.io/library/python:3.11-slim                                                                                                                                         0.9s
- => [internal] load .dockerignore                                                                                                                                                                           0.1s
+ => => transferring dockerfile: 952B                                                                                                                                                                        0.0s
+ => [internal] load metadata for docker.io/library/python:3.11-alpine                                                                                                                                       1.4s
+ => [internal] load .dockerignore                                                                                                                                                                           0.0s
  => => transferring context: 2B                                                                                                                                                                             0.0s
- => [internal] load build context                                                                                                                                                                           0.3s
- => => transferring context: 23.09kB                                                                                                                                                                        0.1s
- => [builder 1/6] FROM docker.io/library/python:3.11-slim@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7                                                                           0.5s
- => => resolve docker.io/library/python:3.11-slim@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7                                                                                   0.4s
- => CACHED [builder 2/6] WORKDIR /app                                                                                                                                                                       0.0s
- => CACHED [runner 3/6] RUN apt-get update && apt-get install -y --no-install-recommends     git     && rm -rf /var/lib/apt/lists/*                                                                         0.0s
- => CACHED [builder 3/6] RUN python -m pip install --no-cache-dir --upgrade pip     && python -m venv /opt/venv                                                                                             0.0s
- => CACHED [builder 4/6] COPY ../requirements-docker.txt .                                                                                                                                                  0.0s
- => CACHED [builder 5/6] COPY ../requirements-dev.txt .                                                                                                                                                     0.0s
- => CACHED [builder 6/6] RUN pip install --no-cache-dir -r ./requirements-docker.txt                                                                                                                        0.0s
- => CACHED [runner 4/6] COPY --from=builder /opt/venv /opt/venv                                                                                                                                             0.0s
- => CACHED [runner 5/6] RUN useradd --create-home appuser                                                                                                                                                   0.0s
- => [runner 6/6] COPY . .                                                                                                                                                                                   0.6s
- => exporting to image                                                                                                                                                                                      1.6s
- => => exporting layers                                                                                                                                                                                     0.8s
- => => exporting manifest sha256:59f6a061fc704b291eebbee778735eab2c53740b16519032cd844bd3d872a868                                                                                                           0.1s
- => => exporting config sha256:f934b243fae623df8a1b1d174531aa0ee5494470f00cc0aac97e5cf1173832f7                                                                                                             0.1s
- => => exporting attestation manifest sha256:3f54cae552ee4d243c0615c8c3eb3014a9ccf7180fd796f7fa6642c5c9e64da8                                                                                               0.2s
- => => exporting manifest list sha256:c405f3b0d2addb27c4b8948d994ceeafc06598b6d16534ec3f35863929f7e4a8                                                                                                      0.1s
- => => naming to moby-dangling@sha256:c405f3b0d2addb27c4b8948d994ceeafc06598b6d16534ec3f35863929f7e4a8                                                                                                      0.0s
- => => unpacking to moby-dangling@sha256:c405f3b0d2addb27c4b8948d994ceeafc06598b6d16534ec3f35863929f7e4a8                                                                                                   0.3s
+ => [internal] load build context                                                                                                                                                                           0.0s
+ => => transferring context: 3.20kB                                                                                                                                                                         0.0s
+ => [builder 1/5] FROM docker.io/library/python:3.11-alpine@sha256:6857d2dae63e052057f2db389a7061188ac9a92a3fa8d402bde68f36df6fada1                                                                         0.2s
+ => => resolve docker.io/library/python:3.11-alpine@sha256:6857d2dae63e052057f2db389a7061188ac9a92a3fa8d402bde68f36df6fada1                                                                                 0.2s
+ => CACHED [builder 2/5] WORKDIR /app                                                                                                                                                                       0.0s
+ => CACHED [builder 3/5] RUN python -m pip install --no-cache-dir --upgrade pip     && python -m venv /opt/venv                                                                                             0.0s
+ => CACHED [builder 4/5] COPY ../requirements-docker.txt .                                                                                                                                                  0.0s
+ => CACHED [builder 5/5] RUN pip install --no-cache-dir -r ./requirements-docker.txt                                                                                                                        0.0s
+ => CACHED [runner  3/11] COPY --from=builder /opt/venv /opt/venv                                                                                                                                           0.0s
+ => CACHED [runner  4/11] RUN /opt/venv/bin/python -m compileall -q /opt/venv                                                                                                                               0.0s
+ => CACHED [runner  5/11] RUN apk add --no-cache git                                                                                                                                                        0.0s
+ => CACHED [runner  6/11] COPY dbmigration.py .                                                                                                                                                             0.0s
+ => [runner  7/11] COPY dbmigration.toml .                                                                                                                                                                  0.4s
+ => [runner  8/11] COPY ./translations/ru/LC_MESSAGES/ ./translations/ru/LC_MESSAGES/                                                                                                                       0.4s
+ => [runner  9/11] RUN /opt/venv/bin/python -m compileall -q /app                                                                                                                                           0.8s
+ => [runner 10/11] RUN adduser -D appuser                                                                                                                                                                   0.8s
+ => [runner 11/11] RUN /usr/bin/git config --global --add safe.directory '/migrations'                                                                                                                      0.7s
+ => exporting to image                                                                                                                                                                                      4.3s
+ => => exporting layers                                                                                                                                                                                     3.3s
+ => => exporting manifest sha256:e735b4431ec467dc705e8032841183329bd976703f6934e33cc7fc30dc8200f5                                                                                                           0.1s
+ => => exporting config sha256:1c360f8d681a5f23ab48cdb722a6a8ab1a20f3a33bacd1bcdcf4170547d64a7c                                                                                                             0.1s
+ => => exporting attestation manifest sha256:69505f827f0b84f789e9df2e455ac5c2ce7c29bfa2deae23dca8b033d7a80e95                                                                                               0.1s
+ => => exporting manifest list sha256:0383de13757639259910506b25c7dcf02ced1e94a185e24a6a68080fc9300674                                                                                                      0.1s
+ => => naming to docker.io/library/dbmigration:latest                                                                                                                                                       0.0s
+ => => unpacking to docker.io/library/dbmigration:latest                                                                                                                                                    0.7s
 ```
 
-Use on Windows:
+Use on Windows: (note using /migrations mount point as allowed Git repository root, see [Dockerfile](dbmigrations/Dockerfile))
 
 ``` powershell
-(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker run --rm -e PGPASSWORD="topsecret123" -v "C:\Users\andrey.larcev\Projects\dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations/samples/test1 --host host.docker.internal --skip-git-checks
+(.venv) PS C:\Users\andrey.larcev\Projects\dbmigrations\dbmigrations> docker run --rm -it -e PGPASSWORD="***" -v "..:/migrations" dbmigration verify dev1 /migrations/dbmigrations/samples/deps/dev1 --dbenv local_docker_test1
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
-Set session search path to: 'test3'.
-Target schema environment ID matches the scripts directory ID: 4a40342c-4546-4776-bf97-b02b2a858924
+Set session search path to: 'dev1'.
+Target schema environment ID matches the scripts directory ID: f47ac10b-58cc-4372-a567-0e02b2c3d479
 Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts...
 Completed.
 The target schema has the baseline version installed: V000
-The latest installed version is V002. No newer scripts found for installation.
-Target version for repeatable scripts: 'V002'.
+The scripts directory '/migrations/dbmigrations/samples/deps/dev1' is missing 'versions' subdirectory. Version scripts will be skipped.
+Target version for repeatable scripts: 'V000'.
 No modified repeatable scripts found for (re)installation.
 The list of recent changes were applied to the target schema:
-    [2026-08-19 00:55:03 | repeatable | V002   | test1/repeatable/01_create_view_max_t2_kk.sql (OID: 1278759c)]
-    [2026-08-19 00:55:03 | repeatable | V002   | test1/repeatable/00_create_view_latest_t1.sql (OID: 1504cd9a)]
-    [2026-08-19 00:55:03 | versioned  | V002   | test1/versions/V002/dummy.sql (OID: 384d538d)]
-    [2026-08-19 00:55:03 | versioned  | V002   | test1/versions/V002/_cleanup.sql (OID: 384d538d)]
-    [2026-08-19 00:55:02 | versioned  | V001   | test1/versions/V001/01_insert_into_t2.sql (OID: ff5717bd)]
-    [2026-08-19 00:55:02 | versioned  | V001   | test1/versions/V001/00_create_t2.sql (OID: a3e53fb6)]
-    [2026-08-19 00:55:02 | versioned  | V000   | test1/baseline/V000/01_insert_into_t1.sql (OID: 2d3fb169)]
-    [2026-08-19 00:55:02 | versioned  | V000   | test1/baseline/V000/00_create_t1.sql (OID: 9bdf76b3)]
+[8498507e] 2026-06-30 - updated samples/envs, added samples/envs/dev2
+  Author: Andrey Lartsev
+    [2026-08-12 18:11:01 | repeatable | V000   | common/repeatable/fn_get_environment_name.sql (OID: ced95c6d)]
+[47a744b4] 2026-06-24 - reworked own version control migrations
+  Author: Andrey Lartsev
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_05.sql (OID: 23240e12)]
+[2d65334b] 2026-06-24 - update insert_into_t1_01.sql
+  Author: Andrey Lartsev
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_01.sql (OID: 2f3fd6c5)]
+[afc8d20e] 2026-06-23 - reworked own version control tables migrations
+  Author: Andrey Lartsev
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_04.sql (OID: fac92fec)]
+[a79ebc85] 2026-06-19 - initial dependency checking implementation
+  Author: Andrey Lartsev
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_03.sql (OID: 08e408c4)]
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/insert_into_t1_02.sql (OID: 1ef0147a)]
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/use_get_environment_name.sql (OID: da50070f)]
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/fn_get_environment_name.sql (OID: ae6980bb)]
+[5361d3a9] 2026-06-19 - modified deps sample
+  Author: Andrey Lartsev
+    [2026-08-12 18:11:01 | repeatable | V000   | common/repeatable/insert_into_t1_00.sql (OID: 55e1736c)]
+[7eb51752] 2026-05-28 - updated readme.md
+  Author: Andrey Lartsev
+    [2026-08-12 18:11:01 | versioned  | V000   | common/baseline/V000/00_create_t1.sql (OID: 9bdf76b3)]
+[UNCOMMITTED] ------- - Content hash (OID) is completely untracked or modified locally
+  Author: Unknown author
+    [2026-08-12 18:11:01 | repeatable | V000   | dev1/repeatable/fn_get_null.sql (OID: 1ddc839b)]
 Closed db connection.
 ```
 And use on WSL as well:
 
 ``` bash
-avl@n-LarcevAV:~/WinProjects/dbmigrations/dbmigrations$ docker run --rm -e PGPASSWORD="topsecret123" -v "/home/avl/WinProjects/dbmigrations:/repo" -w /repo dbmigration verify test3 dbmigrations
-/samples/test1 --host host.docker.internal
+avl@n-LarcevAV:~/WinProjects/dbmigrations$ docker run --rm -it -e PGPASSWORD="***" -v ".:/migrations" dbmigration init dev1 /migrations/dbmigrations/samples/deps/dev1
 Opened db connection: 'postgres@host.docker.internal:5432/test1'
-Set session search path to: 'test3'.
-Target schema environment ID matches the scripts directory ID: 4a40342c-4546-4776-bf97-b02b2a858924
+Set session search path to: 'dev1'.
+Creating the version control tables with environment ID: 'f47ac10b-58cc-4372-a567-0e02b2c3d479'
+Created.
+Closed db connection.
+avl@n-LarcevAV:~/WinProjects/dbmigrations$ docker run --rm -it -e PGPASSWORD="***" -v ".:/migrations" dbmigration update dev1 /migrations/dbmigrations/samples/deps/dev1
+Opened db connection: 'postgres@host.docker.internal:5432/test1'
+You are going to run updates. Would you like to continue? [y/N]: y
+Set session search path to: 'dev1'.
+Target schema environment ID matches the scripts directory ID: f47ac10b-58cc-4372-a567-0e02b2c3d479
+Performing updates from scripts repository: '/migrations/dbmigrations/samples/deps/dev1'
 Performing a cross-check for consistency between the target version's repeatable scripts and the versioned scripts...
 Completed.
-The target schema has the baseline version installed: V000
-The latest installed version is V002. No newer scripts found for installation.
-Target version for repeatable scripts: 'V002'.
-No modified repeatable scripts found for (re)installation.
-The list of recent changes were applied to the target schema:
-[563cf87e] 2026-07-21 - more use of ScriptInfo
-  Author: Andrey Lartsev
-    [2026-08-19 00:55:03 | repeatable | V002   | test1/repeatable/00_create_view_latest_t1.sql (OID: 1504cd9a)]
-[2afeb5db] 2026-07-21 - more use of script info
-  Author: Andrey Lartsev
-    [2026-08-19 00:55:03 | repeatable | V002   | test1/repeatable/01_create_view_max_t2_kk.sql (OID: 1278759c)]
-[5361d3a9] 2026-06-19 - modified deps sample
-  Author: Andrey Lartsev
-    [2026-08-19 00:55:02 | versioned  | V000   | test1/baseline/V000/01_insert_into_t1.sql (OID: 2d3fb169)]
-[7eb51752] 2026-05-28 - updated readme.md
-  Author: Andrey Lartsev
-    [2026-08-19 00:55:02 | versioned  | V000   | test1/baseline/V000/00_create_t1.sql (OID: 9bdf76b3)]
-[236b0868] 2026-05-18 - fixed running of _cleanup.sql within environment specific folders
-  Author: Andrey Lartsev
-    [2026-08-19 00:55:03 | versioned  | V002   | test1/versions/V002/dummy.sql (OID: 384d538d)]
-    [2026-08-19 00:55:03 | versioned  | V002   | test1/versions/V002/_cleanup.sql (OID: 384d538d)]
-[d606d6a9] 2026-05-16 - added environment inheritance sample
-  Author: Andrey Lartsev
-    [2026-08-19 00:55:02 | versioned  | V001   | test1/versions/V001/01_insert_into_t2.sql (OID: ff5717bd)]
-    [2026-08-19 00:55:02 | versioned  | V001   | test1/versions/V001/00_create_t2.sql (OID: a3e53fb6)]
+The baseline version to install V000.
+Apply baseline scripts...
+Running script: [common/baseline/V000/00_create_t1.sql (OID: 9bdf76b3)]...
+Committed.
+Setting the baseline version to: 'V000'.
+Committed.
+Baseline scripts applied.
+The scripts directory '/migrations/dbmigrations/samples/deps/dev1' is missing 'versions' subdirectory. Version scripts will be skipped.
+Check repeatable scripts...
+Target version matches the latest installed version: 'V000'.
+Found 9 scripts to re-run
+Apply repeatable scripts...
+Running script: [common/repeatable/fn_get_environment_name.sql (OID: ced95c6d)]...
+Committed.
+Running script: [dev1/repeatable/fn_get_environment_name.sql (OID: ae6980bb)]...
+Committed.
+Running script: [dev1/repeatable/use_get_environment_name.sql (OID: da50070f)]...
+Committed.
+Running script: [common/repeatable/insert_into_t1_00.sql (OID: 55e1736c)]...
+Committed.
+Running script: [dev1/repeatable/insert_into_t1_01.sql (OID: 2f3fd6c5)]...
+Committed.
+Running script: [dev1/repeatable/insert_into_t1_02.sql (OID: 1ef0147a)]...
+Committed.
+Running script: [dev1/repeatable/insert_into_t1_03.sql (OID: 08e408c4)]...
+Committed.
+Running script: [dev1/repeatable/insert_into_t1_04.sql (OID: fac92fec)]...
+Committed.
+Running script: [dev1/repeatable/insert_into_t1_05.sql (OID: 23240e12)]...
+Committed.
+Repeatable scripts applied.
+Updated.
 Closed db connection.
 ```
