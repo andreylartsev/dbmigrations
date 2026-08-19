@@ -27,6 +27,8 @@ COPY --from=builder /opt/venv /opt/venv
 RUN adduser -D appuser
 USER appuser
 
+RUN git config --global --add safe.directory '*'
+
 COPY . .
 
 ENTRYPOINT ["python", "/app/dbmigration.py"]
