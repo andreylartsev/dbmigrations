@@ -20,7 +20,7 @@ COPY --from=builder /opt/venv /opt/venv
 
 RUN /opt/venv/bin/python -m compileall -q /opt/venv
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git postgresql-client
 
 COPY dbmigration.py .
 COPY dbmigration.example.toml dbmigration.toml

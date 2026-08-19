@@ -4,16 +4,27 @@
 
 
 # default database environment name
-default_dbenv = "local_macbook"
+default_dbenv = "local_docker"
 
 # database environment parameter groups are useful for interactive use during development
-
-[dbenvs.local_windows]
+[dbenvs.local_docker]
 # DB connection options:
 # Full list of options could be found at the following URLs:
 # - https://www.psycopg.org/psycopg3/docs/api/connections.html
 # - https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 #
+host = "host.docker.internal"
+port = 5432
+dbname = "test1"
+user = "postgres"
+connect_timeout = 10
+# sslmode = "prefer"
+
+# extra options not compatible to Postgres but useful
+run_tests_by = "postgres"  
+no_password = true
+
+[dbenvs.local_windows]
 host = "localhost"
 port = 5432
 dbname = "test1"
@@ -43,18 +54,19 @@ file_glob_filters = ["*.sql", "*.dump"]
 file_read_encoding = "utf-8-sig"
 # what to do if unknown unicode symbol appears
 # possible options: "ignore", "replace"
-file_read_encoding_errors = "ignore"
+file_read_encoding_errors = "replace"
 # language
 language="ru"
 
 # external tools to apply baseline dumps, used if the name of tool specified by "use_tool.txt" file within baseline subdirectory  
 [tools.psql]
-# Linux
-#executable = "/usr/bin/psql"
+# Docker Linux
+executable = "/usr/bin/psql"
+args = ["-h", "${host}", "-p", "${port}", "-U", "${user}", "--set=ON_ERROR_STOP=1", "-d", "${dbname}", "-f", "${file}"]
 
 # MacBook
-executable = "/usr/bin/env"
-args = ["psql", "-f", "${file}", "${dbname}"]
+#executable = "/usr/bin/env"
+#args = ["psql", "-f", "${file}", "${dbname}"]
 
 # Windows
 #executable = "C:/Users/andrey.larcev/NoInstaller/postgresql-18.3-2-windows-x64-binaries/pgsql/bin/psql.exe"
@@ -62,11 +74,15 @@ args = ["psql", "-f", "${file}", "${dbname}"]
 success_result_code = 0
 
 [tools.pg_restore]
+# Docker Linux
+executable = "/usr/bin/pg_restore"
+args = ["-h", "${host}", "-U", "${user}", "--exit-on-error", "-p", "${port}", "-d", "${dbname}", "${file}"]
+
 # Linux 
 #executable = "/usr/bin/pg_restore"
 #args = ["--exit-on-error", "-d", "${dbname}", "${file}"]
 
 # Windows
-executable = "/opt/homebrew/bin/pg_restore"
-args = ["-h", "${host}", "-U", "${user}", "--exit-on-error", "-p", "${port}", "-d", "${dbname}", "${file}"]
+#executable = "/opt/homebrew/bin/pg_restore"
+#args = ["-h", "${host}", "-U", "${user}", "--exit-on-error", "-p", "${port}", "-d", "${dbname}", "${file}"]
 success_result_code = 0
