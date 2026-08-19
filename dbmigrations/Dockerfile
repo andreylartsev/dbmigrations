@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS builder
+FROM python:3.11-alpine AS builder
 
 WORKDIR /app
 
@@ -14,19 +14,17 @@ COPY ../requirements-docker.txt .
 COPY ../requirements-dev.txt .
 RUN pip install --no-cache-dir -r ./requirements-docker.txt
 
-FROM python:3.11-slim AS runner
+FROM python:3.11-alpine AS runner
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache git
 
 COPY --from=builder /opt/venv /opt/venv
 
-RUN useradd --create-home appuser
+RUN adduser -D appuser
 USER appuser
 
 COPY . .
