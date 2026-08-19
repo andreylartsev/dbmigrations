@@ -1,3 +1,7 @@
+
+#
+# builder step
+#
 FROM python:3.11-alpine AS builder
 
 WORKDIR /app
@@ -13,20 +17,33 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY ../requirements-docker.txt .
 RUN pip install --no-cache-dir -r ./requirements-docker.txt
 
-FROM python:3.11-alpine AS runner
-WORKDIR /app
-
-COPY --from=builder /opt/venv /opt/venv
+ENV PYTHONDONTWRITEBYTECODE=0
+ENV PYTHONUNBUFFERED=0
 
 RUN /opt/venv/bin/python -m compileall -q /opt/venv
-
-RUN apk add --no-cache git postgresql-client
 
 COPY dbmigration.py .
 COPY dbmigration.example.toml dbmigration.toml
 COPY ./translations/ru/LC_MESSAGES/ ./translations/ru/LC_MESSAGES/
 
 RUN /opt/venv/bin/python -m compileall -q /app
+
+#
+# runner step
+#
+FROM python:3.11-alpine AS runner
+WORKDIR /app
+
+#
+# copy precompiled virtual environment and app
+#
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+
+#
+# install git and psql / pg_restore tools
+#
+RUN apk add --no-cache git postgresql-client
 
 RUN adduser -D appuser
 
