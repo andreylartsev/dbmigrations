@@ -32,6 +32,9 @@ RUN adduser -D appuser
 
 USER appuser
 
+#
+# make save point for mounting git repository
+#
 RUN /usr/bin/git config --global --add safe.directory '/migrations'
 
 ENV PYTHONDONTWRITEBYTECODE=1
