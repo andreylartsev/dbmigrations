@@ -3,7 +3,6 @@ Simple database migrations tool
 """
 
 import argparse
-import builtins
 import collections
 import copy
 import getpass
@@ -20,7 +19,9 @@ import sys
 import tomllib
 import traceback
 import locale
+import functools
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
 from types import TracebackType
 from typing import NamedTuple, Self, Any, TextIO, Iterable, Type, List, Dict, Sequence, Mapping
@@ -96,6 +97,10 @@ TRANSLATIONS_SUBDIRECTORY = "translations"
 TRANSLATIONS_DOMAIN = "messages"
 LANGUAGE_ATTR_NAME = "language"
 
+# Module-level translator. Rebinding it via setup_translations() switches the UI language.
+# Without an installed catalog it behaves like identity, so the module works out of the box.
+_ = gettext.gettext
+
 def main() -> int:
     try:
         setup_translations(None)
@@ -108,23 +113,13 @@ def main() -> int:
             if lang is not None:
                 setup_translations(lang)
 
-        parser = argparse.ArgumentParser(description=_("Simple database migrations tool"))    
-        subparsers = parser.add_subparsers(dest="cmd", help=_("Available subcommands"))
+        parser = build_parser(config)
 
-        UpdateCommand(config, subparsers)
-        VerifyCommand(config, subparsers)
-        InitCommand(config, subparsers)
-        RunTestsCommand(config, subparsers)
-
-        # Parse arguments
         args = parser.parse_args()
 
-        # Call the function associated with the subcommand
-        if hasattr(args, 'call'):
-            args.call(args)
-        else:
-            # If no subcommand is given, print help (or handle as needed)
-            parser.print_help()
+        if hasattr(args, 'handler'):
+            return args.handler(args)
+        parser.print_help()
         return 0
     except CommandError as e:    
         print(_("Command error:"), e)
@@ -150,6 +145,7 @@ def read_toml_config() -> dict[str, Any]:
         return config
 
 def setup_translations(lang: str|None) -> None:
+    global _
     translations_dir = Path(__file__).resolve().parent.joinpath(TRANSLATIONS_SUBDIRECTORY)
     translator = gettext.translation(
         TRANSLATIONS_DOMAIN,
@@ -158,7 +154,7 @@ def setup_translations(lang: str|None) -> None:
         languages=[lang] if lang else None, 
         fallback=True # return NoneTranslator if nothing found
     )
-    builtins._ = translator.gettext
+    _ = translator.gettext
 
 class CommandError(Exception):
     """A critical command error terminated the command execution."""
@@ -277,6 +273,93 @@ def get_char() -> str:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)            
     return result 
 
+class DbConnection:
+    """
+    Owns the lifecycle of a psycopg connection: opening, rollback, and closing.
+
+    Used as a context manager so that the connection is released even if the
+    command raises an exception. All SQL access helpers used across commands
+    (cursor, transaction, get_single_value, ...) are exposed here, keeping
+    database plumbing out of the command classes.
+    """
+
+    def __init__(self, dbconn_settings: dict[str, Any]) -> None:
+        self.settings = dbconn_settings
+        self.conn: psycopg.Connection[Any] | None = None
+
+    def __enter__(self) -> Self:
+        try:
+            self.conn = psycopg.connect(**self.settings)
+        except psycopg.Error as pg_error:
+            error_message = str(pg_error)
+            raise CommandError(
+                _("Unable to establish connection to database server. Inner error: {error_message}")
+                .format(error_message=error_message)
+            )
+        print(
+            _("Opened db connection: '{connection_string}'").format(
+                connection_string=self.get_connection_string(self.conn)
+            )
+        )
+        self.conn.add_notice_handler(log_server_notices)
+        self.conn.autocommit = True
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        if exc_type is not None and self.conn is not None:
+            self.conn.rollback()
+            print(_("Rolled back transaction."))
+        if self.conn is not None:
+            self.conn.close()
+            print(_("Closed db connection."))
+        return False  # propagate the exception
+
+    def cursor(self) -> Cursor[TupleRow]:
+        assert self.conn is not None, _("DB connection is not initialized yet")
+        return self.conn.cursor()
+
+    def transaction(self) -> Any:
+        assert self.conn is not None, _("DB connection is not initialized yet")
+        return self.conn.transaction()
+
+    def get_single_value(
+        self,
+        sql: str | psycopg.sql.Composed,
+        params: Sequence[Any] | Mapping[str, Any],
+    ) -> Any | None:
+        with self.cursor() as cur:
+            cur.execute(sql, params)
+            try:
+                row = cur.fetchone()
+            except psycopg.ProgrammingError:  # thrown in case of DDL or anonymous PL/pgSQL block
+                return None
+            return next(iter(row), None) if row is not None else None
+
+    def exec_with_no_result_in_tran(
+        self,
+        sql: str | psycopg.sql.Composed,
+        params: Sequence[Any] | Mapping[str, Any],
+    ) -> None:
+        with self.conn:
+            with self.cursor() as cur:
+                cur.execute(sql, params)
+
+    @staticmethod
+    def get_connection_string(dbconn: psycopg.Connection[Any]) -> str:
+        info = dbconn.info
+        host_val = getattr(info, "host", None)
+        host = host_val if host_val else "[local_socket]"
+
+        port_val = getattr(info, "port", None)
+        port = f":{port_val}" if port_val else ""
+
+        return f"{info.user}@{host}{port}/{info.dbname}"
+
 class ScriptFsInfo(NamedTuple):
     script_path : Path
     relative_path : str
@@ -370,7 +453,7 @@ class CommitInfo(NamedTuple):
             oid=None,
             author=None,
             date=None,
-            message=message or L
+            message=message or _("No commit history found")
         )
 
     @property
@@ -775,6 +858,54 @@ class MigrationCheckForOlderVersionControlTables (OwnMigration):
         desc = _("Check for older version control tables")
         return desc
 
+
+# ============================================================================
+# Command options & dependencies
+# ============================================================================
+# Frozen dataclasses are the single input contract of each command. The CLI
+# layer translates argparse.Namespace into these objects; commands never see
+# argparse, so they can be instantiated and tested without a parser.
+
+@dataclass(frozen=True)
+class CommonCliOptions:
+    """Options shared by every subcommand (target schema, scripts path, DB connection overrides)."""
+    schema_name: str
+    dbenv: str
+    scripts_path: str
+    host: str | None = None
+    port: int | None = None
+    dbname: str | None = None
+    user: str | None = None
+    no_password: bool = False
+
+@dataclass(frozen=True)
+class UpdateOptions(CommonCliOptions):
+    force_reapply_latest_version: bool = False
+    force_reapply_all_repeatable: bool = False
+    force_run_cleanup: bool = False
+    skip_confirmation: bool = False
+
+@dataclass(frozen=True)
+class VerifyOptions(CommonCliOptions):
+    skip_git_checks: bool = False
+    skip_display_recent_changes: bool = False
+    build_update_script: str | None = None
+
+@dataclass(frozen=True)
+class InitOptions(CommonCliOptions):
+    force_init: bool = False
+
+@dataclass(frozen=True)
+class RunTestsOptions(CommonCliOptions):
+    skip_env_checks: bool = False
+
+@dataclass(frozen=True)
+class Deps:
+    """External dependencies shared by command classes (dependency injection)."""
+    config: dict[str, Any]
+    db_settings: dict[str, Any]
+
+
 class BaseCommand(ABC):
 
     _all_own_migrations: list[OwnMigration] = [
@@ -785,14 +916,14 @@ class BaseCommand(ABC):
         applied_count = 0
         for m in self._all_own_migrations:
             if not isinstance(m, OwnMigration):
-                raise CommandError(_T("Not a 'Migration' object found within the migrations collection"))
+                raise CommandError(_("Not a 'Migration' object found within the migrations collection"))
             sql = m.get_sql_to_check_if_need_migration()
-            formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
+            formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.opts.schema_name)
             result = self.dbconn_get_single_value(formatted_sql, [])
             if result:
                 ddl = m.get_migration_ddl()
                 desc = m.get_migration_desc()
-                formatted_ddl = self.format_sql(ddl, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
+                formatted_ddl = self.format_sql(ddl, schema_name_identity=self.get_schema_name(), schema_name_str=self.opts.schema_name)
                 print(f"Run migration: {desc}...", flush=True, end="")
                 self.dbconn_exec_with_no_result_in_tran(formatted_ddl, [])
                 print(f"Done.")
@@ -802,9 +933,9 @@ class BaseCommand(ABC):
     def check_if_all_own_migrations_are_applied(self) -> None:
         for m in self._all_own_migrations:
             if not isinstance(m, OwnMigration):
-                raise CommandError(_T("Not a 'Migration' object found within the migrations collection"))
+                raise CommandError(_("Not a 'Migration' object found within the migrations collection"))
             sql = m.get_sql_to_check_if_need_migration()
-            formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.args.schema_name)
+            formatted_sql = self.format_sql(sql, schema_name_identity=self.get_schema_name(), schema_name_str=self.opts.schema_name)
             result = self.dbconn_get_single_value(formatted_sql, [])
             if result:
                 desc = m.get_migration_desc()
@@ -814,52 +945,6 @@ class BaseCommand(ABC):
                         "The following migration need to be applied: {desc}"
                     ).format(desc=desc)
                 )
-
-    def get_default_dbenv(self, toml_config : dict[str, Any]) -> str:
-        if DEFAULT_DBENV_CONFIG_ATTRIBUTE not in toml_config:
-            raise CommandError(
-                _(
-                    "Missing required key '{default_dbenv_config_attribute}' "
-                    "in configuration file '{toml_config_file}'."
-                ).format(
-                    default_dbenv_config_attribute=DEFAULT_DBENV_CONFIG_ATTRIBUTE,
-                    toml_config_file=TOML_CONFIG_FILE,
-                )
-            )
-        default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
-        return str(default_dbenv)
-
-    def get_dbenv_config(
-            self, 
-            toml_config : dict[str, Any], 
-            dbenv_param : str
-    ) -> tuple[dict[str, Any], str | None, bool]:
-        if DBENVS_CONFIG_GROUP not in toml_config:
-            raise CommandError(
-                _(
-                    "Missing required configuration group '{dbenvs_config_group}' "
-                    "in configuration file '{toml_config_file}'."
-                ).format(
-                    dbenvs_config_group=DBENVS_CONFIG_GROUP,
-                    toml_config_file=TOML_CONFIG_FILE,
-                )
-            )
-        dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
-        if dbenv_param not in dbenvs_config:
-            raise CommandError(
-                _(
-                    "Missing configuration group '{dbenvs_config_group}.{dbenv_param}' "
-                    "in configuration file '{toml_config_file}'."
-                ).format(
-                    dbenvs_config_group=DBENVS_CONFIG_GROUP,
-                    dbenv_param=dbenv_param,
-                    toml_config_file=TOML_CONFIG_FILE,
-                )
-            )
-        config_copy = copy.deepcopy(dbenvs_config[dbenv_param])
-        run_tests_by = config_copy.pop(RUN_TESTS_BY_ATTRIBUTE, None)
-        no_password = config_copy.pop(NO_PASSWORD_ATTRIBUTE, False)
-        return config_copy, run_tests_by, no_password
 
     def get_script_dependencies(self, base_dir:Path, depth_within_base_dir:int, script_path:Path)->list[Path]:
         if not script_path.exists():
@@ -1062,10 +1147,10 @@ class BaseCommand(ABC):
         return result_str
 
     def format_sql_text(self, sql : str, **params) -> str:
-        if self.dbconn is None:
+        if self.dbconn is None or self.dbconn.conn is None:
             raise CommandError(_("DB connection is not initialized yet"))
         composed_query = psycopg.sql.SQL(sql).format(**params)
-        result_str = composed_query.as_string(self.dbconn)
+        result_str = composed_query.as_string(self.dbconn.conn)
         return result_str        
 
     def format_sql(self, sql: str, **params) -> psycopg.sql.Composed:
@@ -1077,37 +1162,22 @@ class BaseCommand(ABC):
         sql : str | psycopg.sql.Composed, 
         params : Sequence[Any] | Mapping[str, Any]
     ) -> Any | None:
-        with self.dbconn.cursor() as cur:
-            cur.execute(sql, params)
-            try:
-                row = cur.fetchone()
-            except psycopg.ProgrammingError: # thrown in case of DDL or anonymous PL/pgSQL block
-                return None
-            return next(iter(row), None) if row is not None else None
+        return self.dbconn.get_single_value(sql, params)
         
     def dbconn_exec_with_no_result_in_tran(
         self, 
         sql: str | psycopg.sql.Composed, 
         params: Sequence[Any] | Mapping[str, Any]
     ) -> None:
-        with self.dbconn:
-            with self.dbconn.cursor() as cur:
-                cur.execute(sql, params)
+        self.dbconn.exec_with_no_result_in_tran(sql, params)
 
     def dbconn_get_connection_string(self, dbconn: psycopg.Connection[Any]) -> str:
-        info = dbconn.info                
-        host_val = getattr(info, "host", None)
-        host = host_val if host_val else "[local_socket]"
-
-        port_val = getattr(info, "port", None)        
-        port = f":{port_val}" if port_val else ""
-        
-        return f"{info.user}@{host}{port}/{info.dbname}"
+        return DbConnection.get_connection_string(dbconn)
     
     def get_schema_name_arg(self) -> str:
-        schema_name = self.args.schema_name
+        schema_name = self.opts.schema_name
         if not schema_name:
-            raise CommandError(_("The attribute self.args.schema_name must not be empty"))
+            raise CommandError(_("The attribute opts.schema_name must not be empty"))
         return schema_name
 
     def get_schema_name(self) -> psycopg.sql.Identifier:
@@ -1123,10 +1193,10 @@ class BaseCommand(ABC):
         return bool(value)
 
     def get_scripts_path_arg(self) -> Path:
-        if not self.args.scripts_path:
+        if not self.opts.scripts_path:
             raise CommandError(_("The path specified by 'scripts_path' must not be an empty string"))
             
-        scripts_path = Path(self.args.scripts_path)
+        scripts_path = Path(self.opts.scripts_path)
         if not scripts_path.exists():
             raise CommandError(
                 _("The path specified by 'scripts_path' argument does not exist: {scripts_path}")
@@ -1344,7 +1414,7 @@ class BaseCommand(ABC):
         if not self.check_if_schema_exists():
             raise CommandError(
                 _("The target schema '{schema_name}' is not accessible").format(
-                    schema_name=self.args.schema_name
+                    schema_name=self.opts.schema_name
                 )
             )
         search_path = self.get_search_path_for_scripts()
@@ -1402,17 +1472,13 @@ class BaseCommand(ABC):
                     )
                 )
 
-    def __init__(
-        self, 
-        config: dict[str, Any], 
-        subparsers: Any, 
-        command_name: str, 
-        command_help: str
-    ) -> None:
-        self.config = config
-        self.default_dbenv = self.get_default_dbenv(config)
-        self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(config, self.default_dbenv)
-        self.use_run_tests_by_user = False
+    def __init__(self, opts: CommonCliOptions, deps: Deps) -> None:
+        self.opts = opts
+        self.deps = deps
+        self.config = deps.config
+        self.dbconn_settings = deps.db_settings
+        self.dbconn: DbConnection | None = None
+        self.git = None
 
         if OPTIONS_CONFIG_GROUP not in self.config:
             raise CommandError(
@@ -1421,94 +1487,21 @@ class BaseCommand(ABC):
                     "in configuration file '{config_file}'."
                 ).format(config_group=OPTIONS_CONFIG_GROUP, config_file=TOML_CONFIG_FILE)
             )
-        self.options = config[OPTIONS_CONFIG_GROUP]
-    
-        self.file_read_encoding =  self.options.get("file_read_encoding", OPTIONS_DEFAULT_FILE_READ_ENCODING)
-        self.file_read_encoding_errors =  self.options.get("file_read_encoding_errors", OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS)
-        self.file_glob_filters =  self.options.get("file_glob_filters", OPTIONS_DEFAULT_FILE_GLOB_FILTERS)
-        
-        self.parser = subparsers.add_parser(command_name, help=command_help)
-        self.parser.add_argument("schema_name", type=str, help=_("the name of target database schema"))
-        self.parser.add_argument("--dbenv", type=str, default=self.default_dbenv, help=_("db environment name within TOML config"))
-        self.parser.add_argument("--host", type=str, default=None, help=_("db server host name"))
-        self.parser.add_argument("--port", type=int, default=None, help=_("db server port"))
-        self.parser.add_argument("--dbname", type=str, default=None, help=_("database name"))
-        self.parser.add_argument("--user", type=str, default=None, help=_("user name"))
-        self.parser.add_argument("-n","--no-password",  action="store_true", default=False, help=_("don't ask user password"))
-        self.parser.set_defaults(call=self) 
+        self.options = self.config[OPTIONS_CONFIG_GROUP]
 
-    def __enter__(self) -> Self:
-        if self.args.dbenv is not None:
-            self.dbconn_settings, self.run_tests_by, self.no_password = self.get_dbenv_config(self.config, self.args.dbenv)  
-        if self.args.host is not None:
-            self.dbconn_settings["host"]=self.args.host
-        if self.args.port is not None:
-            self.dbconn_settings["port"]=self.args.port
-        
-        if self.args.user is not None:
-            self.dbconn_settings["user"]=self.args.user
-        elif self.run_tests_by is not None and self.use_run_tests_by_user:
-            self.dbconn_settings["user"]=self.run_tests_by
-        
-        if self.args.dbname is not None:
-            self.dbconn_settings["dbname"]=self.args.dbname
-            
-        if not self.args.no_password and not self.no_password:
-            password = None
-            if self.use_run_tests_by_user:
-                password = os.getenv(
-                    DBCONN_TESTER_PASSWORD_ENVVAR_NAME,
-                    os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME))
-            else:
-                password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
-            if password is None:
-                raise CommandError(
-                    _("The database user password must be specified via the environment variable '{env_var_name}'.")
-                    .format(env_var_name=DBCONN_USER_PASSWORD_ENVVAR_NAME)
-                )
-            self.dbconn_settings["password"]=password
-        else:
-            self.dbconn_settings["password"]=None
+        self.file_read_encoding = self.options.get("file_read_encoding", OPTIONS_DEFAULT_FILE_READ_ENCODING)
+        self.file_read_encoding_errors = self.options.get("file_read_encoding_errors", OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS)
+        self.file_glob_filters = self.options.get("file_glob_filters", OPTIONS_DEFAULT_FILE_GLOB_FILTERS)
 
-        try:
-            self.dbconn = psycopg.connect(**self.dbconn_settings)
-        except psycopg.Error as pg_error:
-            error_message = str(pg_error)
-            raise CommandError(
-                _("Unable to establish connection to database server. Inner error: {error_message}")
-                .format(error_message=error_message)
-            )
-        print(
-            _("Opened db connection: '{connection_string}'").format(
-                connection_string=self.dbconn_get_connection_string(self.dbconn)
-            )
-        )
-        self.dbconn.add_notice_handler(log_server_notices)
-        self.dbconn.autocommit = True 
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> bool | None:
-        if exc_type is not None:
-            self.dbconn.rollback()
-            print(_("Rolled back transaction."))
-        if self.dbconn is not None:
-            self.dbconn.close()
-            print(_("Closed db connection."))
-        return False # propagate the exception
+    def run(self, db: DbConnection) -> int:
+        """Binds the database connection and delegates to the command implementation."""
+        self.dbconn = db
+        return self._run()
 
     @abstractmethod
-    def run(self) -> None:
+    def _run(self) -> int:
+        """Main command pipeline. Returns the process exit code."""
         pass
-    
-    def __call__(self, args):
-        self.args = args
-        with self:
-            self.run()
 
 class UpdateCommand (BaseCommand):
     """Applies base, versioned, and repeatable scripts to the target database schema."""
@@ -1633,34 +1626,8 @@ class UpdateCommand (BaseCommand):
                     cur.execute(formatted_sql, (version, i.relative_path, i.oid))
         print(_("Committed."))
 
-    def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
-        super().__init__(config, subparsers, "update", _("Applies base, versioned, and repeatable scripts to the target database schema."))
-        
-        self.parser.add_argument(
-            "--force-reapply-latest-version",  
-            action="store_true", 
-            help=_("clean up the latest version within the database and reapply the included *.sql scripts.")
-        )
-        self.parser.add_argument(
-            "--force-reapply-all-repeatable",  
-            action="store_true", 
-            help=_("reapply all repeatable scripts, regardless of changes.")
-        )
-        self.parser.add_argument(
-            "--force-run-cleanup",  
-            action="store_true", 
-            help=_("run the cleanup script before executing version-specific scripts.")
-        )
-        self.parser.add_argument(
-            "--skip-confirmation",  
-            action="store_true", 
-            help=_("skip confirmation before executing updates.")
-        )
-        self.parser.add_argument(
-            "scripts_path", 
-            type=str, 
-            help=_("source scripts repository path")
-        )
+    def __init__(self, opts: UpdateOptions, deps: Deps) -> None:
+        super().__init__(opts, deps)
 
     def apply_baseline_scripts(self) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
@@ -1690,7 +1657,7 @@ class UpdateCommand (BaseCommand):
         print(_("The baseline version to install {baseline_version}.").format(baseline_version=baseline_version))      
         print(_("Apply baseline scripts..."))
         scripts_sorted = self.get_sorted_scripts_from_dir(
-            baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.args.force_run_cleanup)
+            baseline_version_subdir, BASELINE_FILES_DEPTH, force_run_cleanup = self.opts.force_run_cleanup)
         
         external_tool = ExternalTool.try_get(
             baseline_version_subdir, self.get_schema_name_arg(), self.dbconn_settings, self.config)
@@ -1747,7 +1714,7 @@ class UpdateCommand (BaseCommand):
 
     def apply_versioned_scripts(self) -> None:
         scripts_dir = self.get_resolved_scripts_dir()
-        force_run_cleanup = self.args.force_run_cleanup
+        force_run_cleanup = self.opts.force_run_cleanup
         versioned_dir = scripts_dir.joinpath(VERSIONED_DIR_NAME)
         if not versioned_dir.exists():
             print(
@@ -1911,8 +1878,8 @@ class UpdateCommand (BaseCommand):
 
         print(_("Repeatable scripts applied."))
 
-    def run(self) -> None:
-        if not self.args.skip_confirmation:
+    def _run(self) -> int:
+        if not self.opts.skip_confirmation:
             print(_("You are going to run updates. Would you like to continue? [y/N]: "), end="", flush=True)
             answer = get_char().lower()
             if answer != 'y':
@@ -1923,13 +1890,13 @@ class UpdateCommand (BaseCommand):
         applied_count = self.apply_all_own_migrations()
         if applied_count > 0:
             print(_("Version control tables updated. Please rerun the tool to update the schema using your scripts."))
-            return
+            return 0
 
         self.check_if_all_version_control_tables_exist()
         self.check_if_stored_environment_id_matches_to_scripts_dir() 
 
         scripts_dir = self.get_scripts_path_arg()        
-        if self.args.force_reapply_latest_version:
+        if self.opts.force_reapply_latest_version:
             print(
                 _("Performing reapply latest version from scripts "
                 "repository: '{scripts_dir}'")
@@ -1946,8 +1913,9 @@ class UpdateCommand (BaseCommand):
             self.check_if_max_version_of_versioned_scripts_matches_repeatable_target()
             self.apply_baseline_scripts()
             self.apply_versioned_scripts()
-            self.apply_repeatable_scripts(force_reapply=self.args.force_reapply_all_repeatable)
+            self.apply_repeatable_scripts(force_reapply=self.opts.force_reapply_all_repeatable)
             print(_("Updated."))
+        return 0
 
 class UpdateScriptBuilder:
     target_script_path: Path
@@ -2301,30 +2269,8 @@ class VerifyCommand (BaseCommand):
             self.display_recent_changes_grouped_by_git_commits(rows)
 
 
-    def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
-        super().__init__(config, subparsers, "verify", _("Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."))
-        
-        # for action="store_true" the value False is by default  
-        self.parser.add_argument(
-            "--skip-git-checks",  
-            action="store_true", 
-            help=_("skip grouping changes by git commits")
-        )
-        self.parser.add_argument(
-            "--skip-display-recent-changes",  
-            action="store_true", 
-            help=_("skip display recent changes stored within target db schema")
-        )
-        self.parser.add_argument(
-            "--build-update-script", 
-            type=str, 
-            help=_("the update script path if you want one as an additional result of the verify command")
-        )
-        self.parser.add_argument(
-            "scripts_path", 
-            type=str, 
-            help=_("source scripts repository path")
-        )        
+    def __init__(self, opts: VerifyOptions, deps: Deps) -> None:
+        super().__init__(opts, deps)
         self.latest_version_in_scripts: str | None = None
 
 
@@ -2600,7 +2546,7 @@ class VerifyCommand (BaseCommand):
         if script_builder:
             self.write_repeatable_scripts(target_version, script_infos, script_builder)
 
-    def run(self) -> None:
+    def _run(self) -> int:
         self.make_dbconn_session_readonly()
         self.do_initial_cross_checks()        
         self.check_if_all_own_migrations_are_applied()
@@ -2609,13 +2555,13 @@ class VerifyCommand (BaseCommand):
         self.check_if_max_version_of_versioned_scripts_matches_repeatable_target()
 
         self.git = None
-        if not self.args.skip_git_checks:
+        if not self.opts.skip_git_checks:
             scripts_dir = self.get_resolved_scripts_dir()
             self.git = GitChecker.try_get(self.config, scripts_dir)
 
         script_builder = None
-        script_path = self.args.build_update_script
-        if self.args.build_update_script is not None:
+        script_path = self.opts.build_update_script
+        if self.opts.build_update_script is not None:
             script_builder = UpdateScriptBuilder(script_path)
             script_builder.check() 
         try:            
@@ -2645,8 +2591,9 @@ class VerifyCommand (BaseCommand):
             if script_builder is not None:
                 script_builder.cleanup()
             raise
-        if not self.args.skip_display_recent_changes:
+        if not self.opts.skip_display_recent_changes:
             self.display_recent_changes(RECENT_CHANGES_LIMIT, RECENT_CHANGES_WINDOW_MINUTES)
+        return 0
 
 class InitCommand (BaseCommand):
     """Creates version control tables in an empty database schema."""
@@ -2725,15 +2672,10 @@ class InitCommand (BaseCommand):
                 formatted_dml = self.format_sql(dml, schema_name=schema_id)
                 cur.execute(formatted_dml, (environment_id,))
 
-    def __init__(self, config: dict[str,Any], subparsers: Any) -> None: 
-        super().__init__(
-            config, subparsers, "init", _("Creates version control tables in an empty database schema."))
-        self.parser.add_argument(
-            "scripts_path", type=str, help=_("source scripts repository path"))
-        self.parser.add_argument(
-            "--force-init",  action="store_true", default=False, help=_("Force create version control tables even on non empty schema"))
+    def __init__(self, opts: InitOptions, deps: Deps) -> None:
+        super().__init__(opts, deps)
 
-    def run(self) -> None:
+    def _run(self) -> int:
         schema_name = self.get_schema_name_arg()
         if not self.check_if_schema_exists():
             raise CommandError(
@@ -2742,7 +2684,7 @@ class InitCommand (BaseCommand):
             )
         self.set_session_search_path(schema_name)
 
-        force_init = self.args.force_init
+        force_init = self.opts.force_init
         if not self.check_if_schema_is_empty():
             if not force_init:
                 raise CommandError(
@@ -2760,6 +2702,7 @@ class InitCommand (BaseCommand):
         )
         self.create_version_tracking_tables(environment_id)
         print(_("Created."))
+        return 0
 
 class TestFailed(Exception):
     """A unit test error."""
@@ -2921,24 +2864,8 @@ class RunTestsCommand (BaseCommand):
         finally:
             cur.execute("ROLLBACK TO SAVEPOINT savepoint_test_boundary")
 
-    def __init__(self, config: dict[str, Any], subparsers: Any) -> None:       
-        super().__init__(
-            config, 
-            subparsers, 
-            "run-tests", 
-            _("Runs db unit test scripts to the target database schema."))
-        self.parser.add_argument(
-            "scripts_path", 
-            type=str, 
-            help=_("source scripts repository path"))
-        self.parser.add_argument(
-            "--skip-env-checks",  
-            action="store_true", 
-            help=_("Skip version and environment ID checks to run tests in any plain environment not made by the tool itself"))
-    
-    def __enter__(self) -> Self:
-        self.use_run_tests_by_user = True
-        return super().__enter__()
+    def __init__(self, opts: RunTestsOptions, deps: Deps) -> None:
+        super().__init__(opts, deps)
 
     def run_unit_test_scripts(self, scripts_dir: Path) -> None:
         unit_tests_dir = scripts_dir.joinpath(TESTS_DIR_NAME)
@@ -2949,7 +2876,7 @@ class RunTestsCommand (BaseCommand):
                 .format(scripts_dir=scripts_dir, tests_dir_name=TESTS_DIR_NAME)
             )
 
-        if not self.args.skip_env_checks:
+        if not self.opts.skip_env_checks:
             target_version_file_path = unit_tests_dir.joinpath(TARGET_VERSION_FILE)
             if not target_version_file_path.exists():
                 raise CommandError(
@@ -3000,9 +2927,9 @@ class RunTestsCommand (BaseCommand):
                 .format(pass_count=self.pass_count)
             )            
 
-    def run(self) -> None:
+    def _run(self) -> int:
         self.do_initial_cross_checks()
-        if not self.args.skip_env_checks:
+        if not self.opts.skip_env_checks:
             self.check_if_all_own_migrations_are_applied()
             self.check_if_all_version_control_tables_exist() 
             self.check_if_stored_environment_id_matches_to_scripts_dir()
@@ -3012,6 +2939,219 @@ class RunTestsCommand (BaseCommand):
             .format(scripts_dir=scripts_dir)
         )
         self.run_unit_test_scripts(scripts_dir)
+        return 0
+
+# ============================================================================
+# CLI layer
+# ============================================================================
+# Translates argparse.Namespace into frozen Options dataclasses and wires the
+# dependencies (config + connection settings). Command classes stay free of
+# argparse so they can be instantiated and tested directly.
+
+def get_default_dbenv(toml_config: dict[str, Any]) -> str:
+    if DEFAULT_DBENV_CONFIG_ATTRIBUTE not in toml_config:
+        raise CommandError(
+            _(
+                "Missing required key '{default_dbenv_config_attribute}' "
+                "in configuration file '{toml_config_file}'."
+            ).format(
+                default_dbenv_config_attribute=DEFAULT_DBENV_CONFIG_ATTRIBUTE,
+                toml_config_file=TOML_CONFIG_FILE,
+            )
+        )
+    default_dbenv = toml_config[DEFAULT_DBENV_CONFIG_ATTRIBUTE]
+    return str(default_dbenv)
+
+def get_dbenv_config(
+        toml_config: dict[str, Any],
+        dbenv_param: str
+) -> tuple[dict[str, Any], str | None, bool]:
+    if DBENVS_CONFIG_GROUP not in toml_config:
+        raise CommandError(
+            _(
+                "Missing required configuration group '{dbenvs_config_group}' "
+                "in configuration file '{toml_config_file}'."
+            ).format(
+                dbenvs_config_group=DBENVS_CONFIG_GROUP,
+                toml_config_file=TOML_CONFIG_FILE,
+            )
+        )
+    dbenvs_config = toml_config[DBENVS_CONFIG_GROUP]
+    if dbenv_param not in dbenvs_config:
+        raise CommandError(
+            _(
+                "Missing configuration group '{dbenvs_config_group}.{dbenv_param}' "
+                "in configuration file '{toml_config_file}'."
+            ).format(
+                dbenvs_config_group=DBENVS_CONFIG_GROUP,
+                dbenv_param=dbenv_param,
+                toml_config_file=TOML_CONFIG_FILE,
+            )
+        )
+    config_copy = copy.deepcopy(dbenvs_config[dbenv_param])
+    run_tests_by = config_copy.pop(RUN_TESTS_BY_ATTRIBUTE, None)
+    no_password = config_copy.pop(NO_PASSWORD_ATTRIBUTE, False)
+    return config_copy, run_tests_by, no_password
+
+def build_connection_settings(
+    config: dict[str, Any],
+    opts: CommonCliOptions,
+    use_run_tests_by_user: bool = False,
+) -> dict[str, Any]:
+    dbconn_settings, run_tests_by, no_password = get_dbenv_config(config, opts.dbenv)
+    if opts.host is not None:
+        dbconn_settings["host"] = opts.host
+    if opts.port is not None:
+        dbconn_settings["port"] = opts.port
+
+    if opts.user is not None:
+        dbconn_settings["user"] = opts.user
+    elif run_tests_by is not None and use_run_tests_by_user:
+        dbconn_settings["user"] = run_tests_by
+
+    if opts.dbname is not None:
+        dbconn_settings["dbname"] = opts.dbname
+
+    if not opts.no_password and not no_password:
+        password = None
+        if use_run_tests_by_user:
+            password = os.getenv(
+                DBCONN_TESTER_PASSWORD_ENVVAR_NAME,
+                os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME))
+        else:
+            password = os.getenv(DBCONN_USER_PASSWORD_ENVVAR_NAME)
+        if password is None:
+            raise CommandError(
+                _("The database user password must be specified via the environment variable '{env_var_name}'.")
+                .format(env_var_name=DBCONN_USER_PASSWORD_ENVVAR_NAME)
+            )
+        dbconn_settings["password"] = password
+    else:
+        dbconn_settings["password"] = None
+    return dbconn_settings
+
+def add_common_db_arguments(sp: Any, default_dbenv: str) -> None:
+    sp.add_argument("--dbenv", type=str, default=default_dbenv, help=_("db environment name within TOML config"))
+    sp.add_argument("--host", type=str, default=None, help=_("db server host name"))
+    sp.add_argument("--port", type=int, default=None, help=_("db server port"))
+    sp.add_argument("--dbname", type=str, default=None, help=_("database name"))
+    sp.add_argument("--user", type=str, default=None, help=_("user name"))
+    sp.add_argument("-n", "--no-password", dest="no_password", action="store_true", default=False, help=_("don't ask user password"))
+
+def run_command(
+    cmd_cls: type[BaseCommand],
+    opts: CommonCliOptions,
+    config: dict[str, Any],
+    use_run_tests_by_user: bool = False,
+) -> int:
+    deps = Deps(
+        config=config,
+        db_settings=build_connection_settings(config, opts, use_run_tests_by_user),
+    )
+    command = cmd_cls(opts, deps)
+    with DbConnection(deps.db_settings) as db:
+        return command.run(db)
+
+def _update_handler(args: Any, config: dict[str, Any]) -> int:
+    opts = UpdateOptions(
+        schema_name=args.schema_name,
+        dbenv=args.dbenv,
+        host=args.host,
+        port=args.port,
+        dbname=args.dbname,
+        user=args.user,
+        no_password=args.no_password,
+        scripts_path=args.scripts_path,
+        force_reapply_latest_version=args.force_reapply_latest_version,
+        force_reapply_all_repeatable=args.force_reapply_all_repeatable,
+        force_run_cleanup=args.force_run_cleanup,
+        skip_confirmation=args.skip_confirmation,
+    )
+    return run_command(UpdateCommand, opts, config)
+
+def _verify_handler(args: Any, config: dict[str, Any]) -> int:
+    opts = VerifyOptions(
+        schema_name=args.schema_name,
+        dbenv=args.dbenv,
+        host=args.host,
+        port=args.port,
+        dbname=args.dbname,
+        user=args.user,
+        no_password=args.no_password,
+        scripts_path=args.scripts_path,
+        skip_git_checks=args.skip_git_checks,
+        skip_display_recent_changes=args.skip_display_recent_changes,
+        build_update_script=args.build_update_script,
+    )
+    return run_command(VerifyCommand, opts, config)
+
+def _init_handler(args: Any, config: dict[str, Any]) -> int:
+    opts = InitOptions(
+        schema_name=args.schema_name,
+        dbenv=args.dbenv,
+        host=args.host,
+        port=args.port,
+        dbname=args.dbname,
+        user=args.user,
+        no_password=args.no_password,
+        scripts_path=args.scripts_path,
+        force_init=args.force_init,
+    )
+    return run_command(InitCommand, opts, config)
+
+def _run_tests_handler(args: Any, config: dict[str, Any]) -> int:
+    opts = RunTestsOptions(
+        schema_name=args.schema_name,
+        dbenv=args.dbenv,
+        host=args.host,
+        port=args.port,
+        dbname=args.dbname,
+        user=args.user,
+        no_password=args.no_password,
+        scripts_path=args.scripts_path,
+        skip_env_checks=args.skip_env_checks,
+    )
+    return run_command(RunTestsCommand, opts, config, use_run_tests_by_user=True)
+
+def build_parser(config: dict[str, Any]) -> argparse.ArgumentParser:
+    default_dbenv = get_default_dbenv(config)
+    parser = argparse.ArgumentParser(description=_("Simple database migrations tool"))
+    subparsers = parser.add_subparsers(dest="cmd", help=_("Available subcommands"))
+
+    sp = subparsers.add_parser("update", help=_("Applies base, versioned, and repeatable scripts to the target database schema."))
+    add_common_db_arguments(sp, default_dbenv)
+    sp.add_argument("schema_name", type=str, help=_("the name of target database schema"))
+    sp.add_argument("scripts_path", type=str, help=_("source scripts repository path"))
+    sp.add_argument("--force-reapply-latest-version", action="store_true", help=_("clean up the latest version within the database and reapply the included *.sql scripts."))
+    sp.add_argument("--force-reapply-all-repeatable", action="store_true", help=_("reapply all repeatable scripts, regardless of changes."))
+    sp.add_argument("--force-run-cleanup", action="store_true", help=_("run the cleanup script before executing version-specific scripts."))
+    sp.add_argument("--skip-confirmation", action="store_true", help=_("skip confirmation before executing updates."))
+    sp.set_defaults(handler=functools.partial(_update_handler, config=config))
+
+    sp = subparsers.add_parser("verify", help=_("Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."))
+    add_common_db_arguments(sp, default_dbenv)
+    sp.add_argument("schema_name", type=str, help=_("the name of target database schema"))
+    sp.add_argument("scripts_path", type=str, help=_("source scripts repository path"))
+    sp.add_argument("--skip-git-checks", action="store_true", help=_("skip grouping changes by git commits"))
+    sp.add_argument("--skip-display-recent-changes", action="store_true", help=_("skip display recent changes stored within target db schema"))
+    sp.add_argument("--build-update-script", type=str, help=_("the update script path if you want one as an additional result of the verify command"))
+    sp.set_defaults(handler=functools.partial(_verify_handler, config=config))
+
+    sp = subparsers.add_parser("init", help=_("Creates version control tables in an empty database schema."))
+    add_common_db_arguments(sp, default_dbenv)
+    sp.add_argument("schema_name", type=str, help=_("the name of target database schema"))
+    sp.add_argument("scripts_path", type=str, help=_("source scripts repository path"))
+    sp.add_argument("--force-init", action="store_true", default=False, help=_("Force create version control tables even on non empty schema"))
+    sp.set_defaults(handler=functools.partial(_init_handler, config=config))
+
+    sp = subparsers.add_parser("run-tests", help=_("Runs db unit test scripts to the target database schema."))
+    add_common_db_arguments(sp, default_dbenv)
+    sp.add_argument("schema_name", type=str, help=_("the name of target database schema"))
+    sp.add_argument("scripts_path", type=str, help=_("source scripts repository path"))
+    sp.add_argument("--skip-env-checks", action="store_true", help=_("Skip version and environment ID checks to run tests in any plain environment not made by the tool itself"))
+    sp.set_defaults(handler=functools.partial(_run_tests_handler, config=config))
+
+    return parser
 
 # main entry point
 if __name__ == "__main__":
