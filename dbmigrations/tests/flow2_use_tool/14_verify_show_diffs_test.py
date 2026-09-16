@@ -15,7 +15,8 @@ def _run_git(repo_dir: Path, *args: str) -> subprocess.CompletedProcess:
 
 
 def test_dbmigration_verify_show_script_diffs(session_cfg, tmp_path):
-    """End-to-end check: verify --show-diffs prints a real text diff for a modified repeatable script."""
+    """End-to-end check: verify --show-diffs prints real text diffs both for the
+    scripts to (re)install and for the recent changes recorded in the database."""
     target_schema = "esbdb_verify_diffs"
 
     with psycopg.connect(**session_cfg.DBCONN_CONFIG) as conn:
@@ -90,6 +91,36 @@ def test_dbmigration_verify_show_script_diffs(session_cfg, tmp_path):
         assert "repeatable/00_current_value.sql" in verify_res.stdout
         assert "-CREATE OR REPLACE VIEW v_current AS SELECT 1 AS value" in verify_res.stdout
         assert "+CREATE OR REPLACE VIEW v_current AS SELECT 42 AS value" in verify_res.stdout
+
+        # ---------------------------------------------------------------
+        # Apply the modified repeatable script so the database history keeps
+        # two applications, then verify recent changes are shown as diffs
+        # ---------------------------------------------------------------
+        update2_res = subprocess.run(
+            [py, tool, "update", target_schema, str(repo_dir), *dbenv, "--skip-confirmation"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+        assert update2_res.returncode == 0, (
+            f"second update failed:\n{update2_res.stdout}\n{update2_res.stderr}"
+        )
+
+        verify2_res = subprocess.run(
+            [py, tool, "verify", target_schema, str(repo_dir), *dbenv, "--show-diffs"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+
+        print("\n=== VERIFY2 STDOUT ===")
+        print(verify2_res.stdout or "EMPTY")
+        print("=== VERIFY2 STDERR ===")
+        print(verify2_res.stderr or "EMPTY")
+
+        assert verify2_res.returncode == 0, (
+            f"second verify failed:\n{verify2_res.stdout}\n{verify2_res.stderr}"
+        )
+        assert "Recent changes text differences" in verify2_res.stdout
+        assert "repeatable/00_current_value.sql" in verify2_res.stdout
+        assert "-CREATE OR REPLACE VIEW v_current AS SELECT 1 AS value" in verify2_res.stdout
+        assert "+CREATE OR REPLACE VIEW v_current AS SELECT 42 AS value" in verify2_res.stdout
     finally:
         with psycopg.connect(**session_cfg.DBCONN_CONFIG) as conn:
             conn.autocommit = True

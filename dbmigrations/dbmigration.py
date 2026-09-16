@@ -2322,6 +2322,34 @@ class VerifyCommand (BaseCommand):
         formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
         return self.dbconn_get_single_value(formatted_sql, (relative_path, version_id))
 
+    def get_previous_db_oid_for_repeatable_script(
+        self, relative_path: str, version_id: str, before_applied_at: Any
+    ) -> str | None:
+        """Returns the git blob OID previously applied for a repeatable script before the given time, if any."""
+        sql = """
+            SELECT git_blob_sha1
+            FROM {schema_name}.dbmigration_repeatable_scripts
+            WHERE relative_path = %s AND version_id = %s AND created_at < %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
+        return self.dbconn_get_single_value(formatted_sql, (relative_path, version_id, before_applied_at))
+
+    def get_previous_db_oid_for_versioned_script(
+        self, relative_path: str, version_id: str
+    ) -> str | None:
+        """Returns the git blob OID previously applied for a versioned script in earlier versions, if any."""
+        sql = """
+            SELECT git_blob_sha1
+            FROM {schema_name}.dbmigration_version_scripts
+            WHERE relative_path = %s AND version_id < %s
+            ORDER BY version_id DESC
+            LIMIT 1
+        """
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
+        return self.dbconn_get_single_value(formatted_sql, (relative_path, version_id))
+
     def display_required_changes(
         self,
         script_infos: list[ScriptFsInfo],
@@ -2424,6 +2452,57 @@ class VerifyCommand (BaseCommand):
             for s in scripts:
                 print(f"  {s!r}")
 
+    def display_recent_changes_diffs(self, rows: list[TupleRow]) -> None:
+        """
+        Displays unified text diffs (previously applied vs applied) for the recent
+        changes recorded in the target schema.
+        """
+        assert self.git is not None
+
+        if not rows:
+            return
+
+        print(_("Recent changes text differences (previously applied vs applied):"))
+
+        for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
+            cur_oid = git_blob_sha1.strip()
+            if script_type == "repeatable":
+                prev_oid = self.get_previous_db_oid_for_repeatable_script(
+                    relative_path, version_id, applied_at
+                )
+            else:
+                prev_oid = self.get_previous_db_oid_for_versioned_script(relative_path, version_id)
+
+            old_text = ""
+            old_oid = None
+            if prev_oid is not None:
+                old_text = self.git.get_blob_content_by_oid(prev_oid)
+                if old_text is None:
+                    print(
+                        _(
+                            "Unable to display diff for '{relative_path}' because the applied "
+                            "content (git OID: {stored_oid}) was not found in the local repository."
+                        ).format(relative_path=relative_path, stored_oid=prev_oid)
+                    )
+                    continue
+                old_oid = prev_oid
+
+            new_text = self.git.get_blob_content_by_oid(cur_oid)
+            if new_text is None:
+                print(
+                    _(
+                        "Unable to display diff for '{relative_path}' because the applied "
+                        "content (git OID: {stored_oid}) was not found in the local repository."
+                    ).format(relative_path=relative_path, stored_oid=cur_oid)
+                )
+                continue
+
+            if old_text == new_text:
+                continue
+
+            diff_text = render_script_diff_text(old_text, new_text, relative_path, old_oid, cur_oid)
+            print(diff_text)
+
     def display_recent_changes(self, limit:int = 10, window_minutes:int = 30) -> None:
         
         rows = self.get_recent_changes_from_db(limit, window_minutes)
@@ -2442,6 +2521,8 @@ class VerifyCommand (BaseCommand):
                 print(f"  {script_info!r}")
         else:
             self.display_recent_changes_grouped_by_git_commits(rows)
+            if getattr(self.args, "show_diffs", False):
+                self.display_recent_changes_diffs(rows)
 
 
     def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
