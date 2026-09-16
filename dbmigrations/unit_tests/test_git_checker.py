@@ -222,3 +222,54 @@ def test_get_commit_by_file_oid_empty_argument_raises_value_error():
         checker.get_commit_by_file_oid("   ")
 
     assert "must not be empty" in str(exc_info.value)
+
+
+# =========================================================================
+# TESTS FOR BLOB CONTENT LOOKUP (get_blob_content_by_oid)
+# =========================================================================
+
+def test_get_blob_content_by_oid_happy_path():
+    """
+    Verifies that get_blob_content_by_oid invokes 'git cat-file blob' correctly
+    and returns the raw blob content as a string.
+    """
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+    target_oid = "abcdef12345"
+
+    mock_result = subprocess.CompletedProcess(
+        args=[], returncode=0, stdout="CREATE TABLE t (id int);\n"
+    )
+    with patch("subprocess.run", return_value=mock_result) as mock_run:
+        result = checker.get_blob_content_by_oid(target_oid)
+
+        assert result == "CREATE TABLE t (id int);\n"
+        mock_run.assert_called_once_with(
+            ["git", "-C", "/repo", "cat-file", "blob", target_oid],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+
+
+def test_get_blob_content_by_oid_missing_blob_returns_none():
+    """
+    Checks that a non-zero exit code from 'git cat-file' (i.e. the blob is not
+    present in the local repository) is mapped to a None return value.
+    """
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+
+    mock_result = subprocess.CompletedProcess(
+        args=[], returncode=128, stdout="", stderr="fatal: Not a valid object name"
+    )
+    with patch("subprocess.run", return_value=mock_result):
+        assert checker.get_blob_content_by_oid("zombie") is None
+
+
+def test_get_blob_content_by_oid_empty_oid_returns_none():
+    """
+    Ensures that an empty or whitespace-only OID short-circuits to None
+    without launching any Git subprocess.
+    """
+    checker = GitChecker(git_cmd=Path("git"), repo_root=Path("/repo"))
+
+    with patch("subprocess.run") as mock_run:
+        assert checker.get_blob_content_by_oid("   ") is None
+        mock_run.assert_not_called()

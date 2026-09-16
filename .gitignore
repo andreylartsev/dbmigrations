@@ -1,6 +1,7 @@
 **/.DS_Store
 **/.venv
 **/.wsl-venv
+**/.menv
 
 __pycache__/
 *.py[cod]

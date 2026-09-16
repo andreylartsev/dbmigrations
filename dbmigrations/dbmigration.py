@@ -6,6 +6,7 @@ import argparse
 import builtins
 import collections
 import copy
+import difflib
 import getpass
 import gettext
 import hashlib
@@ -202,6 +203,31 @@ def get_script_path_for_log(scripts_dir: str|Path, script_path: str|Path) -> str
     else:
         result = target_file.as_posix()
     return result
+
+def render_script_diff_text(
+    old_text: str,
+    new_text: str,
+    relative_path: str,
+    old_oid: str | None,
+    new_oid: str,
+) -> str:
+    """Renders a unified text diff between the applied (DB) and the repo versions of a script."""
+    old_oid_label = old_oid if old_oid else _("new script")
+    from_label = _("a/{relative_path} (DB OID: {old_oid})").format(
+        relative_path=relative_path, old_oid=old_oid_label
+    )
+    to_label = _("b/{relative_path} (REPO OID: {new_oid})").format(
+        relative_path=relative_path, new_oid=new_oid
+    )
+    diff_lines = difflib.unified_diff(
+        old_text.splitlines(),
+        new_text.splitlines(),
+        fromfile=from_label,
+        tofile=to_label,
+        lineterm="",
+        n=3,
+    )
+    return "\n".join(diff_lines)
 
 def read_as_trimmed_string(file_path : str|Path) -> str:
     with open(file_path, 'rb') as f:
@@ -473,6 +499,26 @@ class GitChecker:
         res = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if res.returncode != 0:
             return ""
+        return res.stdout
+
+    def get_blob_content_by_oid(self, file_oid: str) -> str | None:
+        """
+        Fetches the raw blob content stored in the repository for a given blob OID.
+        Returns None if the OID is empty or the blob is not found in the local repository.
+        """
+        clean_oid = str(file_oid).strip()
+        if not clean_oid:
+            return None
+
+        res = subprocess.run(
+            [str(self.git_cmd), "-C", str(self.repo_root), "cat-file", "blob", clean_oid],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if res.returncode != 0:
+            return None
         return res.stdout
 
     def get_latest_commit(self, relative_file_path: Path) -> CommitInfo:
@@ -2196,20 +2242,117 @@ class VerifyCommand (BaseCommand):
             for s in scripts:
                 print(f"    {s!r}")                
 
-    def display_required_changes(self, script_infos: list[ScriptFsInfo]) -> None:
-        if self.git is None:
-            for i in script_infos:
-                print(f"  {i!r}")
-        else:
-            self.display_required_changes_by_commits(script_infos)
+    def display_script_diffs(
+        self,
+        script_infos: list[ScriptFsInfo],
+        version: str | None = None,
+        scripts_table: str = "versioned",
+    ) -> None:
+        """
+        Displays unified text diffs between the script versions applied in the database
+        (identified by the stored git blob OIDs) and the current script files in the repository.
+        """
+        assert self.git is not None
 
-    def display_required_changes_by_path(self, scripts_dir: Path, scripts_sorted: list[Path]) -> None:
-        script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts_sorted] 
+        if not script_infos:
+            return
+
+        print(_("Script text differences (applied in DB vs. current in repository):"))
+
+        for i in script_infos:
+            if scripts_table == "repeatable" and version is not None:
+                stored_oid = self.get_db_oid_for_repeatable_script(i.relative_path, version)
+            else:
+                stored_oid = self.get_db_oid_for_versioned_script(i.relative_path, version)
+
+            if stored_oid is not None:
+                old_text = self.git.get_blob_content_by_oid(stored_oid)
+                if old_text is None:
+                    print(
+                        _(
+                            "Unable to display diff for '{relative_path}' because the applied "
+                            "content (git OID: {stored_oid}) was not found in the local repository."
+                        ).format(relative_path=i.relative_path, stored_oid=stored_oid)
+                    )
+                    continue
+            else:
+                old_text = ""
+                stored_oid = None
+
+            if old_text == i.text:
+                continue
+
+            diff_text = render_script_diff_text(old_text, i.text, i.relative_path, stored_oid, i.oid)
+            print(diff_text)
+
+    def get_db_oid_for_versioned_script(
+        self, relative_path: str, version_id: str | None = None
+    ) -> str | None:
+        """Returns the git blob OID applied to the database for a versioned script, if any."""
+        if version_id is not None:
+            sql = """
+                SELECT git_blob_sha1
+                FROM {schema_name}.dbmigration_version_scripts
+                WHERE relative_path = %s AND version_id = %s
+                ORDER BY version_id DESC
+                LIMIT 1
+            """
+            params = (relative_path, version_id)
+        else:
+            sql = """
+                SELECT git_blob_sha1
+                FROM {schema_name}.dbmigration_version_scripts
+                WHERE relative_path = %s
+                ORDER BY version_id DESC
+                LIMIT 1
+            """
+            params = (relative_path,)
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
+        return self.dbconn_get_single_value(formatted_sql, params)
+
+    def get_db_oid_for_repeatable_script(self, relative_path: str, version_id: str) -> str | None:
+        """Returns the latest git blob OID applied to the database for a repeatable script, if any."""
+        sql = """
+            SELECT git_blob_sha1
+            FROM {schema_name}.dbmigration_repeatable_scripts
+            WHERE relative_path = %s AND version_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """
+        formatted_sql = self.format_sql(sql, schema_name=self.get_schema_name())
+        return self.dbconn_get_single_value(formatted_sql, (relative_path, version_id))
+
+    def display_required_changes(
+        self,
+        script_infos: list[ScriptFsInfo],
+        version: str | None = None,
+        scripts_table: str = "versioned",
+    ) -> None:
         if self.git is None:
             for i in script_infos:
                 print(f"  {i!r}")
         else:
             self.display_required_changes_by_commits(script_infos)
+            if getattr(self.args, "show_diffs", False):
+                self.display_script_diffs(script_infos, version=version, scripts_table=scripts_table)
+
+    def display_required_changes_by_path(
+        self,
+        scripts_dir: Path,
+        scripts_sorted: list[Path],
+        version: str | None = None,
+        scripts_table: str = "versioned",
+    ) -> None:
+        if getattr(self.args, "show_diffs", False) and self.git is not None:
+            script_infos = [
+                ScriptFsInfo.get_info_with_text(
+                    scripts_dir, s, encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors
+                )
+                for s in scripts_sorted
+            ]
+        else:
+            script_infos = [ScriptFsInfo.get_info(scripts_dir, s) for s in scripts_sorted]
+        self.display_required_changes(script_infos, version=version, scripts_table=scripts_table)
 
     def get_recent_changes_from_db(self, limit:int, window_minutes:int) -> list[TupleRow]:
         sql = """
@@ -2316,6 +2459,12 @@ class VerifyCommand (BaseCommand):
             help=_("skip display recent changes stored within target db schema")
         )
         self.parser.add_argument(
+            "--show-diffs",  
+            action="store_true", 
+            help=_("show unified text diffs between scripts applied in the database "
+                   "(by git OID) and the current script files in the repository")
+        )
+        self.parser.add_argument(
             "--build-update-script", 
             type=str, 
             help=_("the update script path if you want one as an additional result of the verify command")
@@ -2404,7 +2553,9 @@ class VerifyCommand (BaseCommand):
 
         scripts_sorted = self.get_sorted_scripts_from_dir(baseline_version_subdir, BASELINE_FILES_DEPTH)
         print(_("Baseline scripts to install: "))
-        self.display_required_changes_by_path(scripts_dir, scripts_sorted)
+        self.display_required_changes_by_path(
+            scripts_dir, scripts_sorted, version=baseline_version, scripts_table="versioned"
+        )
 
         if script_builder:
             self.write_baseline_scripts(baseline_version, scripts_dir, scripts_sorted, script_builder)
@@ -2505,9 +2656,11 @@ class VerifyCommand (BaseCommand):
                     "any '{filters_str}' scripts.")
                     .format(version_dir=version_dir, filters_str=filters_str)
                 )
-            self.display_required_changes_by_path(scripts_dir, scripts_sorted)
+            version_id = version_dir.name
+            self.display_required_changes_by_path(
+                scripts_dir, scripts_sorted, version=version_id, scripts_table="versioned"
+            )
             if script_builder:
-                version_id = version_dir.name
                 self.write_versioned_scripts(version_id, scripts_dir, scripts_sorted, script_builder)
 
     def write_repeatable_scripts(self, target_version: str, script_info_with_text_list: list[ScriptFsInfo], script_builder: UpdateScriptBuilder) -> None:
@@ -2595,7 +2748,9 @@ class VerifyCommand (BaseCommand):
             for s in scripts_to_repeat
         ]
         print(_("Repeatable scripts to (re)install: "))
-        self.display_required_changes(script_infos)
+        self.display_required_changes(
+            script_infos, version=target_version, scripts_table="repeatable"
+        )
 
         if script_builder:
             self.write_repeatable_scripts(target_version, script_infos, script_builder)
@@ -2612,6 +2767,11 @@ class VerifyCommand (BaseCommand):
         if not self.args.skip_git_checks:
             scripts_dir = self.get_resolved_scripts_dir()
             self.git = GitChecker.try_get(self.config, scripts_dir)
+        if getattr(self.args, "show_diffs", False) and self.git is None:
+            print(
+                _("Warning: '--show-diffs' requires a Git repository and the Git command line. "
+                  "Diff display is disabled.")
+            )
 
         script_builder = None
         script_path = self.args.build_update_script
