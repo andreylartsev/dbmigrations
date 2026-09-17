@@ -196,14 +196,33 @@ class TestDisplayRecentChangesDiffs:
         captured = capsys.readouterr()
         assert captured.out == ""
 
+    def test_only_most_recent_application_per_file_is_diffed(self, capsys):
+        cmd = MagicMock()
+        cmd.git = MagicMock()
+        cmd.git.get_blob_content_by_oid.side_effect = ["SELECT 1;\n", "SELECT 42;\n"]
+        cmd.get_previous_db_oid_for_repeatable_script.return_value = "prevoid"
+
+        rows = [
+            ("2026-01-01 12:02:00", "repeatable", "V000", "dir/r.sql", "v2oid"),
+            ("2026-01-01 12:01:00", "repeatable", "V000", "dir/r.sql", "v1oid"),
+        ]
+
+        VerifyCommand.display_recent_changes_diffs.__get__(cmd)(rows)
+
+        cmd.get_previous_db_oid_for_repeatable_script.assert_called_once()
+        captured = capsys.readouterr()
+        assert "-SELECT 1;" in captured.out
+        assert "+SELECT 42;" in captured.out
+
 
 class TestDisplayRecentChanges:
     """Unit tests for VerifyCommand.display_recent_changes wiring."""
 
-    def _make_cmd(self, show_diffs: bool) -> MagicMock:
+    def _make_cmd(self, show_diffs: bool, pending_changes=None) -> MagicMock:
         cmd = MagicMock()
         cmd.git = MagicMock()
         cmd.args = SimpleNamespace(show_diffs=show_diffs)
+        cmd.pending_changes = [] if pending_changes is None else pending_changes
         rows = [("2026-01-01 12:00:00", "versioned", "V001", "dir/v.sql", "curoid")]
         cmd.get_recent_changes_from_db.return_value = rows
         return cmd
@@ -223,6 +242,30 @@ class TestDisplayRecentChanges:
 
         cmd.display_recent_changes_grouped_by_git_commits.assert_called_once()
         cmd.display_recent_changes_diffs.assert_not_called()
+
+    def test_pending_changes_skip_recent_changes_diffs(self, capsys):
+        cmd = self._make_cmd(show_diffs=True, pending_changes=["repeatable/00_current_value.sql"])
+
+        VerifyCommand.display_recent_changes.__get__(cmd)(limit=10, window_minutes=30)
+
+        cmd.display_recent_changes_grouped_by_git_commits.assert_called_once()
+        cmd.display_recent_changes_diffs.assert_not_called()
+
+
+class TestDisplayRequiredChanges:
+    """Unit tests for the pending changes recording in VerifyCommand.display_required_changes."""
+
+    def test_records_pending_changes(self, tmp_path):
+        cmd = MagicMock()
+        cmd.git = None
+        cmd.pending_changes = []
+
+        script_infos = [make_script_info(tmp_path, "SELECT 1;\n", name="a.sql")]
+        script_infos.append(make_script_info(tmp_path, "SELECT 2;\n", name="b.sql"))
+
+        VerifyCommand.display_required_changes.__get__(cmd)(script_infos)
+
+        assert [i.relative_path for i in script_infos] == cmd.pending_changes
 
 
 class TestGetPreviousDbOid:

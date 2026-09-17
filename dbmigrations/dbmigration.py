@@ -2356,6 +2356,7 @@ class VerifyCommand (BaseCommand):
         version: str | None = None,
         scripts_table: str = "versioned",
     ) -> None:
+        self.pending_changes.extend(i.relative_path for i in script_infos)
         if self.git is None:
             for i in script_infos:
                 print(f"  {i!r}")
@@ -2464,7 +2465,12 @@ class VerifyCommand (BaseCommand):
 
         print(_("Recent changes text differences (previously applied vs applied):"))
 
+        seen_paths: set[str] = set()
         for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
+            if relative_path in seen_paths:
+                continue
+            seen_paths.add(relative_path)
+
             cur_oid = git_blob_sha1.strip()
             if script_type == "repeatable":
                 prev_oid = self.get_previous_db_oid_for_repeatable_script(
@@ -2521,7 +2527,7 @@ class VerifyCommand (BaseCommand):
                 print(f"  {script_info!r}")
         else:
             self.display_recent_changes_grouped_by_git_commits(rows)
-            if getattr(self.args, "show_diffs", False):
+            if getattr(self.args, "show_diffs", False) and not self.pending_changes:
                 self.display_recent_changes_diffs(rows)
 
 
@@ -2556,6 +2562,7 @@ class VerifyCommand (BaseCommand):
             help=_("source scripts repository path")
         )        
         self.latest_version_in_scripts: str | None = None
+        self.pending_changes: list[str] = []
 
 
     def write_search_path(self, search_path: str, builder: UpdateScriptBuilder) -> None:

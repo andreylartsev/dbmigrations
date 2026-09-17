@@ -52,6 +52,7 @@
     "cSpell.language": "en,ru",
     "python.analysis.diagnosticSeverityOverrides": {
         "reportUndefinedVariable": "none"
-    }
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 
 }
