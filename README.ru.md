@@ -35,7 +35,7 @@
 ```powershell
 python3.exe -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python3.exe -m pip install -r requirements.txt
+python3.exe -m pip install -r requirements-dev.txt
 ```
 
 > ⚠️ **Важное замечание по безопасности**: Пароль пользователя **обязан** передаваться через переменную окружения `USER_PASSWORD`.
@@ -67,7 +67,7 @@ python3 .\dbmigrations\dbmigration.py update test2 .\dbmigrations\samples\test1\
 ```
 
 ### 3. Проверка изменений (`verify`)
-Проверяет согласованность и выводит список скриптов. Генерирует один общий скрипт обновления для ревью администраторами БД. Показывает историю последних изменений в схеме БД сгруппированную по Git-коммитам. 
+Проверяет согласованность и выводит список скриптов. По умолчанию под каждой записью печатается unified diff (применённая в БД версия по git OID vs. текущий файл в репозитории); флаг `--skip-diffs` оставляет только список скриптов. Генерирует один общий скрипт обновления для ревью администраторами БД. Показывает историю последних изменений в схеме БД сгруппированную по Git-коммитам.
 ```bash
 python3 .\dbmigrations\dbmigration.py verify test2 .\dbmigrations\samples\test1\ --build-update-script review_patch.sql
 ```
@@ -86,8 +86,10 @@ python3 .\dbmigrations\dbmigration.py run-tests test2 .\dbmigrations\samples\tes
 
 **Ключевые флаги:**
 * `init`: `--force-init`
-* `verify`: `--skip-git-checks`, `--build-update-script`
+* `verify`: `--skip-git-checks`, `--skip-diffs`, `--build-update-script`
 * `update`: `--force-reapply-latest-version`, `--force-reapply-all-repeatable`, `--skip-confirmation`
+
+`verify` по умолчанию выводит unified diff-ы: под каждой записью скрипта показываются различия между версией, применённой в БД (по git OID), и текущим содержимым в репозитории. Флаг `--skip-diffs` отключает вывод diff-ов, оставляя только список скриптов. Новые (ещё не применённые) скрипты сворачиваются в строку `+ Новый файл: будет применён целиком.` Для отображения diff-ов требуется Git-репозиторий и доступная команда `git`.
 
 ## ❓ Как собирать и использовать Docker image
 

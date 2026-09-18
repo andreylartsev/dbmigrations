@@ -896,10 +896,6 @@ msgid ""
 "version '{latest_version_in_scripts}'."
 msgstr ""
 
-#: dbmigration.py:2260
-msgid "Script text differences (applied in DB vs. current in repository):"
-msgstr ""
-
 #: dbmigration.py:2273 dbmigration.py:2483 dbmigration.py:2494
 #, python-brace-format
 msgid ""
@@ -907,8 +903,8 @@ msgid ""
 "(git OID: {stored_oid}) was not found in the local repository."
 msgstr ""
 
-#: dbmigration.py:2465
-msgid "Recent changes text differences (previously applied vs applied):"
+#: dbmigration.py:2260
+msgid "+ New file, will be applied in full."
 msgstr ""
 
 #: dbmigration.py:2511
@@ -931,7 +927,7 @@ msgstr ""
 
 #: dbmigration.py:2545
 msgid ""
-"show unified text diffs between scripts applied in the database (by git "
+"skip unified text diffs between scripts applied in the database (by git "
 "OID) and the current script files in the repository"
 msgstr ""
 
@@ -1013,8 +1009,8 @@ msgstr ""
 
 #: dbmigration.py:2853
 msgid ""
-"Warning: '--show-diffs' requires a Git repository and the Git command "
-"line. Diff display is disabled."
+"Warning: Diff display requires a Git repository and the Git command line. "
+"Diff display is disabled."
 msgstr ""
 
 #: dbmigration.py:2875

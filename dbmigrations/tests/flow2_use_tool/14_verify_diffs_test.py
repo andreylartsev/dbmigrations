@@ -14,9 +14,10 @@ def _run_git(repo_dir: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def test_dbmigration_verify_show_script_diffs(session_cfg, tmp_path):
-    """End-to-end check: verify --show-diffs prints real text diffs both for the
-    scripts to (re)install and for the recent changes recorded in the database."""
+def test_dbmigration_verify_prints_inline_diffs_by_default(session_cfg, tmp_path):
+    """End-to-end check: verify prints text diffs inline (by default) both for the
+    scripts to (re)install and for the recent changes recorded in the database,
+    and --skip-diffs suppresses them."""
     target_schema = "esbdb_verify_diffs"
 
     with psycopg.connect(**session_cfg.DBCONN_CONFIG) as conn:
@@ -73,10 +74,10 @@ def test_dbmigration_verify_show_script_diffs(session_cfg, tmp_path):
         _run_git(repo_dir, *git_cfg, "commit", "-q", "-m", "update repeatable value")
 
         # ---------------------------------------------------------------
-        # Run verify with --show-diffs and validate the rendered diff
+        # Run verify without flags: diffs must be shown inline by default
         # ---------------------------------------------------------------
         verify_res = subprocess.run(
-            [py, tool, "verify", target_schema, str(repo_dir), *dbenv, "--show-diffs"],
+            [py, tool, "verify", target_schema, str(repo_dir), *dbenv],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
 
@@ -87,14 +88,32 @@ def test_dbmigration_verify_show_script_diffs(session_cfg, tmp_path):
 
         assert verify_res.returncode == 0, f"verify failed:\n{verify_res.stdout}\n{verify_res.stderr}"
         assert "Repeatable scripts to (re)install:" in verify_res.stdout
-        assert "Script text differences" in verify_res.stdout
+        assert "Script text differences" not in verify_res.stdout
         assert "repeatable/00_current_value.sql" in verify_res.stdout
         assert "-CREATE OR REPLACE VIEW v_current AS SELECT 1 AS value" in verify_res.stdout
         assert "+CREATE OR REPLACE VIEW v_current AS SELECT 42 AS value" in verify_res.stdout
 
         # ---------------------------------------------------------------
+        # Run verify with --skip-diffs: entry stays, diffs are suppressed
+        # ---------------------------------------------------------------
+        skip_diffs_res = subprocess.run(
+            [py, tool, "verify", target_schema, str(repo_dir), *dbenv, "--skip-diffs"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+
+        print("\n=== VERIFY --skip-diffs STDOUT ===")
+        print(skip_diffs_res.stdout or "EMPTY")
+
+        assert skip_diffs_res.returncode == 0, (
+            f"verify --skip-diffs failed:\n{skip_diffs_res.stdout}\n{skip_diffs_res.stderr}"
+        )
+        assert "repeatable/00_current_value.sql" in skip_diffs_res.stdout
+        assert "-CREATE OR REPLACE VIEW v_current AS SELECT 1 AS value" not in skip_diffs_res.stdout
+        assert "+CREATE OR REPLACE VIEW v_current AS SELECT 42 AS value" not in skip_diffs_res.stdout
+
+        # ---------------------------------------------------------------
         # Apply the modified repeatable script so the database history keeps
-        # two applications, then verify recent changes are shown as diffs
+        # two applications, then verify recent changes are shown as inline diffs
         # ---------------------------------------------------------------
         update2_res = subprocess.run(
             [py, tool, "update", target_schema, str(repo_dir), *dbenv, "--skip-confirmation"],
@@ -105,7 +124,7 @@ def test_dbmigration_verify_show_script_diffs(session_cfg, tmp_path):
         )
 
         verify2_res = subprocess.run(
-            [py, tool, "verify", target_schema, str(repo_dir), *dbenv, "--show-diffs"],
+            [py, tool, "verify", target_schema, str(repo_dir), *dbenv],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
 
@@ -117,7 +136,8 @@ def test_dbmigration_verify_show_script_diffs(session_cfg, tmp_path):
         assert verify2_res.returncode == 0, (
             f"second verify failed:\n{verify2_res.stdout}\n{verify2_res.stderr}"
         )
-        assert "Recent changes text differences" in verify2_res.stdout
+        assert "Recent changes text differences" not in verify2_res.stdout
+        assert "The list of recent changes were applied to the target schema:" in verify2_res.stdout
         assert "repeatable/00_current_value.sql" in verify2_res.stdout
         assert "-CREATE OR REPLACE VIEW v_current AS SELECT 1 AS value" in verify2_res.stdout
         assert "+CREATE OR REPLACE VIEW v_current AS SELECT 42 AS value" in verify2_res.stdout

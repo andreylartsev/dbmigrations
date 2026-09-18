@@ -934,7 +934,7 @@ class UpdateOptions(CommonCliOptions):
 @dataclass(frozen=True)
 class VerifyOptions(CommonCliOptions):
     skip_git_checks: bool = False
-    show_diffs: bool = False
+    skip_diffs: bool = False
     skip_display_recent_changes: bool = False
     build_update_script: str | None = None
 
@@ -2192,7 +2192,82 @@ class VerifyCommand (BaseCommand):
                     )
                 )
     
-    def display_required_changes_by_commits(self, script_infos: list[ScriptFsInfo]) -> None:
+    def get_stored_oid_for_script(
+        self,
+        i: ScriptFsInfo,
+        version: str | None = None,
+        scripts_table: str = "versioned",
+    ) -> str | None:
+        """Returns the git blob OID applied to the database for a script, if any."""
+        if scripts_table == "repeatable" and version is not None:
+            return self.get_db_oid_for_repeatable_script(i.relative_path, version)
+        return self.get_db_oid_for_versioned_script(i.relative_path, version)
+
+    def build_script_diff_text(
+        self,
+        i: ScriptFsInfo,
+        version: str | None = None,
+        scripts_table: str = "versioned",
+    ) -> str | None:
+        """
+        Builds the unified text diff between the script version applied in the database
+        (identified by the stored git blob OID) and the current script file in the repository.
+        Returns an empty string when the texts are identical, a short marker when the
+        script is new (not applied yet), None when the applied content is missing
+        (a notice was already printed), or the unified diff text otherwise.
+        """
+        assert self.git is not None
+
+        stored_oid = self.get_stored_oid_for_script(i, version, scripts_table)
+        if stored_oid is not None:
+            old_text = self.git.get_blob_content_by_oid(stored_oid)
+            if old_text is None:
+                print(
+                    _(
+                        "Unable to display diff for '{relative_path}' because the applied "
+                        "content (git OID: {stored_oid}) was not found in the local repository."
+                    ).format(relative_path=i.relative_path, stored_oid=stored_oid)
+                )
+                return None
+        else:
+            old_text = ""
+            stored_oid = None
+
+        if old_text == i.text:
+            return ""
+
+        if stored_oid is None:
+            return _("+ New file, will be applied in full.")
+
+        return render_script_diff_text(old_text, i.text, i.relative_path, stored_oid, i.oid)
+
+    def _print_diff(self, diff_text: str | None, indent: str) -> None:
+        """Prints indented diff lines (an empty diff or a missing blob is printed as nothing)."""
+        if diff_text is None or diff_text == "":
+            return
+        for line in diff_text.splitlines():
+            print(f"{indent}{line}")
+
+    def display_script_entry(
+        self,
+        i: ScriptFsInfo,
+        version: str | None = None,
+        scripts_table: str = "versioned",
+        indent: str = "    ",
+    ) -> None:
+        """Prints a script entry followed inline by its text diff (unless skipped)."""
+        print(f"{indent}{i!r}")
+        if self.opts.skip_diffs or self.git is None:
+            return
+        diff_text = self.build_script_diff_text(i, version, scripts_table)
+        self._print_diff(diff_text, indent)
+
+    def display_required_changes_by_commits(
+        self,
+        script_infos: list[ScriptFsInfo],
+        version: str | None = None,
+        scripts_table: str = "versioned",
+    ) -> None:
         assert self.git is not None
 
         commits_group = collections.defaultdict(list)        
@@ -2209,50 +2284,7 @@ class VerifyCommand (BaseCommand):
         for commit, scripts in sorted_commits:
             print(f"{commit!r}")
             for s in scripts:
-                print(f"    {s!r}")                
-
-    def display_script_diffs(
-        self,
-        script_infos: list[ScriptFsInfo],
-        version: str | None = None,
-        scripts_table: str = "versioned",
-    ) -> None:
-        """
-        Displays unified text diffs between the script versions applied in the database
-        (identified by the stored git blob OIDs) and the current script files in the repository.
-        """
-        assert self.git is not None
-
-        if not script_infos:
-            return
-
-        print(_("Script text differences (applied in DB vs. current in repository):"))
-
-        for i in script_infos:
-            if scripts_table == "repeatable" and version is not None:
-                stored_oid = self.get_db_oid_for_repeatable_script(i.relative_path, version)
-            else:
-                stored_oid = self.get_db_oid_for_versioned_script(i.relative_path, version)
-
-            if stored_oid is not None:
-                old_text = self.git.get_blob_content_by_oid(stored_oid)
-                if old_text is None:
-                    print(
-                        _(
-                            "Unable to display diff for '{relative_path}' because the applied "
-                            "content (git OID: {stored_oid}) was not found in the local repository."
-                        ).format(relative_path=i.relative_path, stored_oid=stored_oid)
-                    )
-                    continue
-            else:
-                old_text = ""
-                stored_oid = None
-
-            if old_text == i.text:
-                continue
-
-            diff_text = render_script_diff_text(old_text, i.text, i.relative_path, stored_oid, i.oid)
-            print(diff_text)
+                self.display_script_entry(s, version=version, scripts_table=scripts_table)
 
     def get_db_oid_for_versioned_script(
         self, relative_path: str, version_id: str | None = None
@@ -2328,11 +2360,9 @@ class VerifyCommand (BaseCommand):
         self.pending_changes.extend(i.relative_path for i in script_infos)
         if self.git is None:
             for i in script_infos:
-                print(f"  {i!r}")
+                self.display_script_entry(i, version=version, scripts_table=scripts_table, indent="  ")
         else:
-            self.display_required_changes_by_commits(script_infos)
-            if self.opts.show_diffs:
-                self.display_script_diffs(script_infos, version=version, scripts_table=scripts_table)
+            self.display_required_changes_by_commits(script_infos, version=version, scripts_table=scripts_table)
 
     def display_required_changes_by_path(
         self,
@@ -2341,7 +2371,7 @@ class VerifyCommand (BaseCommand):
         version: str | None = None,
         scripts_table: str = "versioned",
     ) -> None:
-        if self.opts.show_diffs and self.git is not None:
+        if self.git is not None and not self.opts.skip_diffs:
             script_infos = [
                 ScriptFsInfo.get_info_with_text(
                     scripts_dir, s, encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors
@@ -2396,7 +2426,11 @@ class VerifyCommand (BaseCommand):
             rows = cursor.fetchall()
         return rows
 
-    def display_recent_changes_grouped_by_git_commits(self, rows: list[TupleRow]) -> None:
+    def display_recent_changes_grouped_by_git_commits(
+        self,
+        rows: list[TupleRow],
+        diff_map: dict[str, str | None] | None = None,
+    ) -> None:
         assert self.git is not None
 
         commits_group = collections.defaultdict(list)
@@ -2417,28 +2451,34 @@ class VerifyCommand (BaseCommand):
             key=lambda i: i[0].sort_key(),
             reverse=True
         )
+        seen_paths: set[str] = set()
         for commit, scripts in sorted_commits:
             print(f"{commit!r}")
             for s in scripts:
                 print(f"  {s!r}")
+                if diff_map is None or s.relative_path in seen_paths:
+                    continue
+                seen_paths.add(s.relative_path)
+                self._print_diff(diff_map.get(s.relative_path), "    ")
 
-    def display_recent_changes_diffs(self, rows: list[TupleRow]) -> None:
+    def build_recent_changes_diff_map(self, rows: list[TupleRow]) -> dict[str, str | None]:
         """
-        Displays unified text diffs (previously applied vs applied) for the recent
-        changes recorded in the target schema.
+        Builds {relative_path: diff_text} for the most recent application per file.
+        diff_text is an empty string for identical texts, None when a notice about a
+        missing blob was already printed, a short marker for brand-new scripts, or the
+        unified diff text (previously applied vs applied) otherwise.
         """
         assert self.git is not None
 
-        if not rows:
-            return
-
-        print(_("Recent changes text differences (previously applied vs applied):"))
-
+        diff_map: dict[str, str | None] = {}
         seen_paths: set[str] = set()
         for applied_at, script_type, version_id, relative_path, git_blob_sha1 in rows:
             if relative_path in seen_paths:
                 continue
             seen_paths.add(relative_path)
+            # Diff for this file was already shown in the required changes lists.
+            if relative_path in self.pending_changes:
+                continue
 
             cur_oid = git_blob_sha1.strip()
             if script_type == "repeatable":
@@ -2459,6 +2499,7 @@ class VerifyCommand (BaseCommand):
                             "content (git OID: {stored_oid}) was not found in the local repository."
                         ).format(relative_path=relative_path, stored_oid=prev_oid)
                     )
+                    diff_map[relative_path] = None
                     continue
                 old_oid = prev_oid
 
@@ -2470,13 +2511,19 @@ class VerifyCommand (BaseCommand):
                         "content (git OID: {stored_oid}) was not found in the local repository."
                     ).format(relative_path=relative_path, stored_oid=cur_oid)
                 )
+                diff_map[relative_path] = None
                 continue
 
             if old_text == new_text:
+                diff_map[relative_path] = ""
                 continue
 
-            diff_text = render_script_diff_text(old_text, new_text, relative_path, old_oid, cur_oid)
-            print(diff_text)
+            if old_oid is None:
+                diff_map[relative_path] = _("+ New file, will be applied in full.")
+                continue
+
+            diff_map[relative_path] = render_script_diff_text(old_text, new_text, relative_path, old_oid, cur_oid)
+        return diff_map
 
     def display_recent_changes(self, limit:int = 10, window_minutes:int = 30) -> None:
         
@@ -2495,9 +2542,8 @@ class VerifyCommand (BaseCommand):
                     git_blob_sha1=git_blob_sha1)
                 print(f"  {script_info!r}")
         else:
-            self.display_recent_changes_grouped_by_git_commits(rows)
-            if self.opts.show_diffs and not self.pending_changes:
-                self.display_recent_changes_diffs(rows)
+            diff_map = None if self.opts.skip_diffs else self.build_recent_changes_diff_map(rows)
+            self.display_recent_changes_grouped_by_git_commits(rows, diff_map=diff_map)
 
     def __init__(self, opts: VerifyOptions, deps: Deps) -> None:
         super().__init__(opts, deps)
@@ -2794,9 +2840,9 @@ class VerifyCommand (BaseCommand):
         if not self.opts.skip_git_checks:
             scripts_dir = self.get_resolved_scripts_dir()
             self.git = GitChecker.try_get(self.config, scripts_dir)
-        if self.opts.show_diffs and self.git is None:
+        if not self.opts.skip_diffs and self.git is None:
             print(
-                _("Warning: '--show-diffs' requires a Git repository and the Git command line. "
+                _("Warning: Diff display requires a Git repository and the Git command line. "
                   "Diff display is disabled.")
             )
 
@@ -3321,7 +3367,7 @@ def _verify_handler(args: Any, config: dict[str, Any]) -> int:
         no_password=args.no_password,
         scripts_path=args.scripts_path,
         skip_git_checks=args.skip_git_checks,
-        show_diffs=args.show_diffs,
+        skip_diffs=args.skip_diffs,
         skip_display_recent_changes=args.skip_display_recent_changes,
         build_update_script=args.build_update_script,
     )
@@ -3376,10 +3422,10 @@ def build_parser(config: dict[str, Any]) -> argparse.ArgumentParser:
     sp.add_argument("scripts_path", type=str, help=_("source scripts repository path"))
     sp.add_argument("--skip-git-checks", action="store_true", help=_("skip grouping changes by git commits"))
     sp.add_argument(
-        "--show-diffs",
+        "--skip-diffs",
         action="store_true",
-        help=_("show unified text diffs between scripts applied in the database "
-                "(by git OID) and the current script files in the repository")
+        help=_("skip unified text diffs between scripts applied in the database "
+               "(by git OID) and the current script files in the repository")
     )
     sp.add_argument("--skip-display-recent-changes", action="store_true", help=_("skip display recent changes stored within target db schema"))
     sp.add_argument("--build-update-script", type=str, help=_("the update script path if you want one as an additional result of the verify command"))

@@ -1045,10 +1045,6 @@ msgstr ""
 "Целевая версия '{target_version}' не совпадает с последней версией в "
 "скриптах '{latest_version_in_scripts}'."
 
-#: dbmigration.py:2260
-msgid "Script text differences (applied in DB vs. current in repository):"
-msgstr "Текстовые различия скриптов (применённые в БД и текущие в репозитории):"
-
 #: dbmigration.py:2273 dbmigration.py:2483 dbmigration.py:2494
 #, python-brace-format
 msgid ""
@@ -1058,9 +1054,9 @@ msgstr ""
 "Невозможно отобразить различия для '{relative_path}', так как применённое"
 " содержимое (git OID: {stored_oid}) не найдено в локальном репозитории."
 
-#: dbmigration.py:2465
-msgid "Recent changes text differences (previously applied vs applied):"
-msgstr "Текстовые различия недавних изменений (ранее применённое vs применённое):"
+#: dbmigration.py:2260
+msgid "+ New file, will be applied in full."
+msgstr "+ Новый файл: будет применён целиком."
 
 #: dbmigration.py:2511
 msgid "The list of recent changes were applied to the target schema:"
@@ -1085,10 +1081,10 @@ msgstr "пропустить отображение недавних измен�
 
 #: dbmigration.py:2545
 msgid ""
-"show unified text diffs between scripts applied in the database (by git "
+"skip unified text diffs between scripts applied in the database (by git "
 "OID) and the current script files in the repository"
 msgstr ""
-"показать текстовые различия между скриптами, применёнными в БД (по git "
+"пропустить текстовые различия между скриптами, применёнными в БД (по git "
 "OID), и текущими файлами скриптов в репозитории"
 
 #: dbmigration.py:2551
@@ -1183,10 +1179,10 @@ msgstr "Повторяемые скрипты для (повторной) уст
 
 #: dbmigration.py:2853
 msgid ""
-"Warning: '--show-diffs' requires a Git repository and the Git command "
-"line. Diff display is disabled."
+"Warning: Diff display requires a Git repository and the Git command line. "
+"Diff display is disabled."
 msgstr ""
-"Предупреждение: флаг '--show-diffs' требует Git-репозиторий и доступную "
+"Предупреждение: отображение различий требует Git-репозиторий и доступную "
 "команду git. Отображение различий отключено."
 
 #: dbmigration.py:2875

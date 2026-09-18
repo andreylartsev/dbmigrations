@@ -67,7 +67,7 @@ python3 .\dbmigrations\dbmigration.py update test2 .\dbmigrations\samples\test1\
 ```
 
 ### 3. Verify Changes (`verify`)
-Validates repository consistency and previews changes. Build update script for code review by DB admins. Show recent changes applied to database schema grouped by Git commits.
+Validates repository consistency and previews changes. By default it prints unified text diffs inline under each listed script (the version applied in the DB by git OID vs. the current file in the repository); use `--skip-diffs` to show the list only. Build update script for code review by DB admins. Show recent changes applied to database schema grouped by Git commits.
 ```bash
 python3 .\dbmigrations\dbmigration.py verify test2 .\dbmigrations\samples\test1\ --build-update-script review_patch.sql
 ```
@@ -86,8 +86,10 @@ Run `python3 .\dbmigration.py -h` to see global choices.
 
 **Key Flags:**
 * `init`: `--force-init`
-* `verify`: `--skip-git-checks`, `--build-update-script`
+* `verify`: `--skip-git-checks`, `--skip-diffs`, `--build-update-script`
 * `update`: `--force-reapply-latest-version`, `--force-reapply-all-repeatable`, `--skip-confirmation`
+
+`verify` shows unified text diffs by default: each listed script is followed inline by the diff of the version applied in the DB (by git OID) vs. the current file in the repository. `--skip-diffs` suppresses the diffs and prints the script list only. Brand-new scripts (never applied) are shown collapsed as `+ New file, will be applied in full.` Diff display requires a Git repository and the `git` command line.
 
 ## ❓ How to build & use Docker image
 
