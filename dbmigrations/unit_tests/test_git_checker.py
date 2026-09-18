@@ -244,7 +244,7 @@ def test_get_blob_content_by_oid_happy_path():
 
         assert result == "CREATE TABLE t (id int);\n"
         mock_run.assert_called_once_with(
-            ["git", "-C", "/repo", "cat-file", "blob", target_oid],
+            ["git", "-C", str(checker.repo_root), "cat-file", "blob", target_oid],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
 
