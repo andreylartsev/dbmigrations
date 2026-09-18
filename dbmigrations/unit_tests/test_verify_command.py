@@ -221,7 +221,7 @@ class TestDisplayRecentChanges:
     def _make_cmd(self, show_diffs: bool, pending_changes=None) -> MagicMock:
         cmd = MagicMock()
         cmd.git = MagicMock()
-        cmd.args = SimpleNamespace(show_diffs=show_diffs)
+        cmd.opts = SimpleNamespace(show_diffs=show_diffs)
         cmd.pending_changes = [] if pending_changes is None else pending_changes
         rows = [("2026-01-01 12:00:00", "versioned", "V001", "dir/v.sql", "curoid")]
         cmd.get_recent_changes_from_db.return_value = rows

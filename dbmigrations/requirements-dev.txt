@@ -1,5 +1,5 @@
 ﻿# Database Drivers (Psycopg 3)
-psycopg-binary==3.3.3
+psycopg[binary]==3.3.3
 psycopg-pool==3.3.0
 
 # Utilities & Types

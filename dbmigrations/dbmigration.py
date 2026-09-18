@@ -934,6 +934,7 @@ class UpdateOptions(CommonCliOptions):
 @dataclass(frozen=True)
 class VerifyOptions(CommonCliOptions):
     skip_git_checks: bool = False
+    show_diffs: bool = False
     skip_display_recent_changes: bool = False
     build_update_script: str | None = None
 
@@ -2330,7 +2331,7 @@ class VerifyCommand (BaseCommand):
                 print(f"  {i!r}")
         else:
             self.display_required_changes_by_commits(script_infos)
-            if getattr(self.args, "show_diffs", False):
+            if self.opts.show_diffs:
                 self.display_script_diffs(script_infos, version=version, scripts_table=scripts_table)
 
     def display_required_changes_by_path(
@@ -2340,7 +2341,7 @@ class VerifyCommand (BaseCommand):
         version: str | None = None,
         scripts_table: str = "versioned",
     ) -> None:
-        if getattr(self.args, "show_diffs", False) and self.git is not None:
+        if self.opts.show_diffs and self.git is not None:
             script_infos = [
                 ScriptFsInfo.get_info_with_text(
                     scripts_dir, s, encoding=self.file_read_encoding, encoding_errors=self.file_read_encoding_errors
@@ -2495,43 +2496,13 @@ class VerifyCommand (BaseCommand):
                 print(f"  {script_info!r}")
         else:
             self.display_recent_changes_grouped_by_git_commits(rows)
-            if getattr(self.args, "show_diffs", False) and not self.pending_changes:
+            if self.opts.show_diffs and not self.pending_changes:
                 self.display_recent_changes_diffs(rows)
 
-
-    def __init__(self, config: dict[str, Any], subparsers: Any) -> None: 
-        super().__init__(config, subparsers, "verify", _("Validates the target schema and lists versioned and reproducible scripts to apply if the 'update' command is executed."))
-        
-        # for action="store_true" the value False is by default  
-        self.parser.add_argument(
-            "--skip-git-checks",  
-            action="store_true", 
-            help=_("skip grouping changes by git commits")
-        )
-        self.parser.add_argument(
-            "--skip-display-recent-changes",  
-            action="store_true", 
-            help=_("skip display recent changes stored within target db schema")
-        )
-        self.parser.add_argument(
-            "--show-diffs",  
-            action="store_true", 
-            help=_("show unified text diffs between scripts applied in the database "
-                   "(by git OID) and the current script files in the repository")
-        )
-        self.parser.add_argument(
-            "--build-update-script", 
-            type=str, 
-            help=_("the update script path if you want one as an additional result of the verify command")
-        )
-        self.parser.add_argument(
-            "scripts_path", 
-            type=str, 
-            help=_("source scripts repository path")
-        )        
+    def __init__(self, opts: VerifyOptions, deps: Deps) -> None:
+        super().__init__(opts, deps)
         self.latest_version_in_scripts: str | None = None
         self.pending_changes: list[str] = []
-
 
     def write_search_path(self, search_path: str, builder: UpdateScriptBuilder) -> None:
         with builder:
@@ -2823,7 +2794,7 @@ class VerifyCommand (BaseCommand):
         if not self.opts.skip_git_checks:
             scripts_dir = self.get_resolved_scripts_dir()
             self.git = GitChecker.try_get(self.config, scripts_dir)
-        if getattr(self.args, "show_diffs", False) and self.git is None:
+        if self.opts.show_diffs and self.git is None:
             print(
                 _("Warning: '--show-diffs' requires a Git repository and the Git command line. "
                   "Diff display is disabled.")
@@ -3350,6 +3321,7 @@ def _verify_handler(args: Any, config: dict[str, Any]) -> int:
         no_password=args.no_password,
         scripts_path=args.scripts_path,
         skip_git_checks=args.skip_git_checks,
+        show_diffs=args.show_diffs,
         skip_display_recent_changes=args.skip_display_recent_changes,
         build_update_script=args.build_update_script,
     )
@@ -3403,6 +3375,12 @@ def build_parser(config: dict[str, Any]) -> argparse.ArgumentParser:
     sp.add_argument("schema_name", type=str, help=_("the name of target database schema"))
     sp.add_argument("scripts_path", type=str, help=_("source scripts repository path"))
     sp.add_argument("--skip-git-checks", action="store_true", help=_("skip grouping changes by git commits"))
+    sp.add_argument(
+        "--show-diffs",
+        action="store_true",
+        help=_("show unified text diffs between scripts applied in the database "
+                "(by git OID) and the current script files in the repository")
+    )
     sp.add_argument("--skip-display-recent-changes", action="store_true", help=_("skip display recent changes stored within target db schema"))
     sp.add_argument("--build-update-script", type=str, help=_("the update script path if you want one as an additional result of the verify command"))
     sp.set_defaults(handler=functools.partial(_verify_handler, config=config))
