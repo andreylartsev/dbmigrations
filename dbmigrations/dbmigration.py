@@ -212,12 +212,12 @@ def render_script_diff_text(
     new_oid: str,
 ) -> str:
     """Renders a unified text diff between the applied (DB) and the repo versions of a script."""
-    old_oid_label = old_oid if old_oid else _("new script")
+    old_oid_label = old_oid[:8] if old_oid else _("new script")
     from_label = _("a/{relative_path} (DB OID: {old_oid})").format(
         relative_path=relative_path, old_oid=old_oid_label
     )
     to_label = _("b/{relative_path} (REPO OID: {new_oid})").format(
-        relative_path=relative_path, new_oid=new_oid
+        relative_path=relative_path, new_oid=new_oid[:8]
     )
     diff_lines = difflib.unified_diff(
         old_text.splitlines(),

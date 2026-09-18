@@ -48,3 +48,19 @@ def test_diff_handles_crlf_line_endings():
     diff = render_script_diff_text("SELECT 1;\r\n", "SELECT 2;\r\n", "p/r.sql", "o1", "o2")
     assert "-SELECT 1;" in diff
     assert "+SELECT 2;" in diff
+
+
+def test_full_oid_labels_are_shortened_to_eight_chars():
+    """
+    Long git blob OIDs must be abbreviated to their short 8-char prefix in the
+    diff labels, matching the rest of the CLI output.
+    """
+    old_oid = "2d03ba9d47a60d9ddc48f4f4f843227971910641"
+    new_oid = "2f3fd6c54a24340f89d81155344f832325ffbc4a"
+
+    diff = render_script_diff_text("old;\n", "new;\n", "path/r.sql", old_oid, new_oid)
+
+    assert "a/path/r.sql (DB OID: 2d03ba9d)" in diff
+    assert old_oid not in diff
+    assert "b/path/r.sql (REPO OID: 2f3fd6c5)" in diff
+    assert new_oid not in diff
