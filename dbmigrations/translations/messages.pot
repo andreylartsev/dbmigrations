@@ -907,6 +907,10 @@ msgstr ""
 msgid "+ New file, will be applied in full."
 msgstr ""
 
+#: dbmigration.py:2518
+msgid "+ New file (first application)."
+msgstr ""
+
 #: dbmigration.py:2511
 msgid "The list of recent changes were applied to the target schema:"
 msgstr ""

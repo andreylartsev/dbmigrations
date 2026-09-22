@@ -2357,7 +2357,6 @@ class VerifyCommand (BaseCommand):
         version: str | None = None,
         scripts_table: str = "versioned",
     ) -> None:
-        self.pending_changes.extend(i.relative_path for i in script_infos)
         if self.git is None:
             for i in script_infos:
                 self.display_script_entry(i, version=version, scripts_table=scripts_table, indent="  ")
@@ -2476,9 +2475,6 @@ class VerifyCommand (BaseCommand):
             if relative_path in seen_paths:
                 continue
             seen_paths.add(relative_path)
-            # Diff for this file was already shown in the required changes lists.
-            if relative_path in self.pending_changes:
-                continue
 
             cur_oid = git_blob_sha1.strip()
             if script_type == "repeatable":
@@ -2519,7 +2515,7 @@ class VerifyCommand (BaseCommand):
                 continue
 
             if old_oid is None:
-                diff_map[relative_path] = _("+ New file, will be applied in full.")
+                diff_map[relative_path] = _("+ New file (first application).")
                 continue
 
             diff_map[relative_path] = render_script_diff_text(old_text, new_text, relative_path, old_oid, cur_oid)
@@ -2548,7 +2544,6 @@ class VerifyCommand (BaseCommand):
     def __init__(self, opts: VerifyOptions, deps: Deps) -> None:
         super().__init__(opts, deps)
         self.latest_version_in_scripts: str | None = None
-        self.pending_changes: list[str] = []
 
     def write_search_path(self, search_path: str, builder: UpdateScriptBuilder) -> None:
         with builder:
