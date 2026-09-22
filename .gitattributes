@@ -1,2 +1,4 @@
 *.txt text eol=crlf
 *.sql text eol=crlf
+*.sh text eol=lf
+
