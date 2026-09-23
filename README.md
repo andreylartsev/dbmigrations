@@ -61,7 +61,7 @@ The execution order within a folder is defined by the `script_list.txt` file whe
 
 ## 💻 Command Line Interface & Usage
 
-The tool has 4 subcommands: `init`, `update`, `verify`, `run-tests`.
+The tool has 5 subcommands: `init`, `update`, `verify`, `run-tests`, `tui`.
 
 ### 1. Initialize (`init`)
 Creates the version control tables in an empty database schema.
@@ -87,6 +87,27 @@ Executes database-level tests within transactions.
 ```bash
 python3 .\dbmigrations\dbmigration.py run-tests test2 .\dbmigrations\samples\test1\
 ```
+
+### 5. Text User Interface (`tui`)
+Opens an interactive TUI (built on [Textual](https://textual.io)) with a live central log, a right-hand panel of available commands and a status line:
+```bash
+python3 .\dbmigrations\dbmigration.py tui test2 .\dbmigrations\samples\test1\
+```
+
+On open, the central area immediately runs the full `verify` and streams its output line by line. If the schema is not initialized yet, a hint runs `init` instead. The right panel lists the commands available for the current schema/repository state (`init`, `update`, `verify`, `run-tests`), each with its option checkboxes. `update` without `--skip-confirmation` asks for confirmation in a modal dialog. The status line shows `idle / running <current script> / cancel requested` plus the final exit code, and the currently running script is highlighted in the log.
+
+| Shortcut | Action |
+|----------|--------|
+| `ctrl+r` | Run the `verify` check against the current schema/repository |
+| `ctrl+c` | Cancel the running command (graceful) |
+| `ctrl+shift+c` | Copy the whole log to the clipboard (fallback: `alt+c`) |
+| `ctrl+shift+x` | Copy the visible part of the log to the clipboard |
+| `r`      | Re-probe the schema/repository state (Refresh) |
+| `q`      | Quit |
+
+You can also select a range of log lines with the mouse and release the button to copy that range. Selected lines are highlighted while dragging.
+
+The TUI needs an interactive terminal; plain CLI subcommands keep working without it.
 
 Run `python3 .\dbmigration.py -h` to see global choices, or see the complete [CLI Argument Reference](#cli-argument-reference) below.
 
@@ -410,12 +431,12 @@ Connection settings for a group can be overridden on the command line via `--hos
 Global choices:
 
 ```
-usage: dbmigration.py [-h] {update,verify,init,run-tests} ...
+usage: dbmigration.py [-h] {update,verify,init,run-tests,tui} ...
 
 Simple database migrations tool
 
 positional arguments:
-  {update,verify,init,run-tests}
+  {update,verify,init,run-tests,tui}
                         Available subcommands
     update              Applies base, versioned, and repeatable scripts to the
                         target database schema.
@@ -426,6 +447,7 @@ positional arguments:
                         schema.
     run-tests           Runs db unit test scripts to the target database
                         schema.
+    tui                 Open the interactive Textual user interface
 
 options:
   -h, --help            show this help message and exit
@@ -547,6 +569,29 @@ options:
   --skip-env-checks  Skip version and environment ID checks to run tests in
                      any plain environment not made by the tool itself
 ```
+
+### `tui`
+
+```
+usage: dbmigration.py tui [-h] [--dbenv DBENV] [--host HOST] [--port PORT]
+                          [--dbname DBNAME] [--user USER] [-n]
+                          schema_name scripts_path
+
+positional arguments:
+  schema_name        the name of target database schema
+  scripts_path       source scripts repository path
+
+options:
+  -h, --help         show this help message and exit
+  --dbenv DBENV      db environment name within TOML config
+  --host HOST        db server host name
+  --port PORT        db server port
+  --dbname DBNAME    database name
+  --user USER        user name
+  -n, --no-password  don't ask user password
+```
+
+Runs the interactive Textual UI (see [Text User Interface](#5-text-user-interface-tui)); requires an interactive terminal.
 
 ## ❓ How to build & use Docker image
 

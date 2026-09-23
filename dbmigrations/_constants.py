@@ -1,0 +1,72 @@
+# Constants shared across the tool modules. Keep free of imports.
+
+TOML_CONFIG_FILE = 'dbmigration.toml'
+OPTIONS_CONFIG_GROUP = "options"
+
+GIT_CMD_CONFIG_ATTRIBUTE = "git_cmd_path"
+
+DBENVS_CONFIG_GROUP = "dbenvs"
+DEFAULT_DBENV_CONFIG_ATTRIBUTE = "default_dbenv"
+
+RUN_TESTS_BY_ATTRIBUTE = "run_tests_by"
+DBCONN_CONFIG_USER_ATTRIBUTE = "user"
+NO_PASSWORD_ATTRIBUTE = "no_password"
+
+OPTIONS_DEFAULT_FILE_GLOB_FILTERS = ["*.sql", "*.dump"]
+OPTIONS_DEFAULT_FILE_READ_ENCODING = "utf-8"
+OPTIONS_DEFAULT_FILE_READ_ENCODING_ERRORS = "ignore"
+
+DBCONN_USER_PASSWORD_ENVVAR_NAME = "USER_PASSWORD"
+DBCONN_TESTER_PASSWORD_ENVVAR_NAME = "TESTER_PASSWORD"
+
+BASELINE_DIR_NAME = "baseline"
+VERSIONED_DIR_NAME = "versions"
+REPEATABLE_DIR_NAME = "repeatable"
+TESTS_DIR_NAME = "tests"
+TARGET_VERSION_FILE = "target_version.txt"
+SCRIPT_LIST_FILE_NAME = "script_list.txt"
+
+TOOLS_CONFIG_GROUP = "tools"
+TOOL_EXEC_ATTRIBUTE = "executable"
+TOOL_ARGS_ATTRIBUTE = "args"
+TOOL_SUCCESS_RESULT_CODE_ATTRIBUTE = "success_result_code"
+USE_TOOL_NAME_FILE_NAME = "use_tool.txt"
+
+VERSION_CLEANUP_FILE_NAME = "_cleanup.sql"
+
+SEARCH_PATH_FILE_NAME = "set_search_path.txt"
+DEFAULT_SEARCH_PATH = ":default"
+
+TARGET_ENVIRONMENT_ID_FILE_NAME = "target_environment_id.txt"
+
+VERSION_CONTROL_TABLE_NAMES = [
+    "dbmigration_environment_id",
+    "dbmigration_versions",
+    "dbmigration_version_scripts",
+    "dbmigration_repeatable_scripts",
+]
+
+BASELINE_FILES_DEPTH = 2
+VERSIONED_FILES_DEPTH = 2
+REPEATABLE_FILES_DEPTH = 1
+TESTS_FILES_DEPTH = 1
+
+NAME_LENGTH_LIMIT=64
+
+DEPENDS_ON_PATTERN = r'(?<=@depends_on)\s*(\S+)'
+
+IS_TRUE_THAT_TEST_PREFIX = "is_true_that_"
+DETECT_MISSING_TEST_PREFIX = "detect_missing_"
+ASSURE_THAT_TEST_PREFIX = "assure_that_"
+
+SETUP_TESTS_FILE_NAME = "_setup.sql"
+
+RECENT_CHANGES_WINDOW_MINUTES = 30
+RECENT_CHANGES_LIMIT = 1000
+
+UNCOMMITTED_SHA_LABEL = "UNCOMMITTED"
+UNCOMMITTED_DATE_LABEL = "-------"
+
+TRANSLATIONS_SUBDIRECTORY = "translations"
+TRANSLATIONS_DOMAIN = "messages"
+LANGUAGE_ATTR_NAME = "language"

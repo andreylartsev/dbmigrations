@@ -61,7 +61,7 @@ python3.exe -m pip install -r requirements-dev.txt
 
 ## 💻 Интерфейс командной строки и использование
 
-У инструмента 4 подкоманды: `init`, `update`, `verify`, `run-tests`.
+У инструмента 5 подкоманд: `init`, `update`, `verify`, `run-tests`, `tui`.
 
 ### 1. Инициализация (`init`)
 Создает служебные таблицы в пустой схеме.
@@ -87,6 +87,27 @@ python3 .\dbmigrations\dbmigration.py verify test2 .\dbmigrations\samples\test1\
 ```bash
 python3 .\dbmigrations\dbmigration.py run-tests test2 .\dbmigrations\samples\test1\
 ```
+
+### 5. Текстовый интерфейс (`tui`)
+Открывает интерактивный TUI (на базе [Textual](https://textual.io)) с живым центральным логом, правой панелью доступных команд и строкой состояния:
+```bash
+python3 .\dbmigrations\dbmigration.py tui test2 .\dbmigrations\samples\test1\
+```
+
+При открытии окна в центральной части сразу выполняется полная команда `verify`, результат выводится построчно. Если схема ещё не инициализирована — вместо ошибки предлагается выполнить `init`. Правая панель перечисляет команды, доступные при текущем состоянии схемы/репозитория (`init`, `update`, `verify`, `run-tests`), каждая со своими чекбоксами опций. `update` без `--skip-confirmation` запрашивает подтверждение в модальном окне. Строка состояния показывает `idle / running <текущий скрипт> / cancel requested` и итоговый код возврата; имя выполняющегося скрипта подсвечивается в логе.
+
+| Клавиша | Действие |
+|---------|----------|
+| `ctrl+r` | Запустить проверку `verify` для текущей схемы/репозитория |
+| `ctrl+c` | Отменить выполняемую команду (мягко) |
+| `ctrl+shift+c` | Скопировать весь лог в буфер обмена (запасной вариант: `alt+c`) |
+| `ctrl+shift+x` | Скопировать видимую часть лога в буфер обмена |
+| `r`      | Пере-опрос состояния схемы/репозитория (Refresh) |
+| `q`      | Выход |
+
+Также можно выделить мышью диапазон строк лога и отпустить кнопку — выбранный диапазон будет скопирован в буфер обмена (строки подсвечиваются во время выделения).
+
+TUI требует интерактивного терминала; обычные подкоманды работают без него.
 
 Выполните `python3 .\dbmigration.py -h` для просмотра глобальной справки или см. полный [справочник флагов](#справочник-по-флагам-командной-строки) ниже.
 
@@ -410,12 +431,12 @@ Command error: Tests failed: 1, passed: 8.
 Глобальная справка:
 
 ```
-usage: dbmigration.py [-h] {update,verify,init,run-tests} ...
+usage: dbmigration.py [-h] {update,verify,init,run-tests,tui} ...
 
 Simple database migrations tool
 
 positional arguments:
-  {update,verify,init,run-tests}
+  {update,verify,init,run-tests,tui}
                         Available subcommands
     update              Applies base, versioned, and repeatable scripts to the
                         target database schema.
@@ -426,6 +447,7 @@ positional arguments:
                         schema.
     run-tests           Runs db unit test scripts to the target database
                         schema.
+    tui                 Open the interactive Textual user interface
 
 options:
   -h, --help            show this help message and exit
@@ -547,6 +569,29 @@ options:
   --skip-env-checks  Skip version and environment ID checks to run tests in
                      any plain environment not made by the tool itself
 ```
+
+### `tui`
+
+```
+usage: dbmigration.py tui [-h] [--dbenv DBENV] [--host HOST] [--port PORT]
+                          [--dbname DBNAME] [--user USER] [-n]
+                          schema_name scripts_path
+
+positional arguments:
+  schema_name        the name of target database schema
+  scripts_path       source scripts repository path
+
+options:
+  -h, --help         show this help message and exit
+  --dbenv DBENV      db environment name within TOML config
+  --host HOST        db server host name
+  --port PORT        db server port
+  --dbname DBNAME    database name
+  --user USER        user name
+  -n, --no-password  don't ask user password
+```
+
+Запускает интерактивный TUI (см. [Текстовый интерфейс](#5-текстовый-интерфейс-tui)); требуется интерактивный терминал.
 
 ## ❓ Как собирать и использовать Docker image
 

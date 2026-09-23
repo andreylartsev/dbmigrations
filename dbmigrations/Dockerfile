@@ -23,6 +23,11 @@ ENV PYTHONUNBUFFERED=0
 RUN /opt/venv/bin/python -m compileall -q /opt/venv
 
 COPY dbmigration.py .
+COPY _constants.py _config.py _confirmation.py _db.py _errors.py _git.py \
+     _i18n.py _launch.py _migrations.py _options.py _output.py _scripts.py \
+     _state.py _tool.py .
+COPY commands/ commands/
+COPY tui/ tui/
 COPY dbmigration.example.toml dbmigration.toml
 COPY ./translations/ru/LC_MESSAGES/ ./translations/ru/LC_MESSAGES/
 

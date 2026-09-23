@@ -11,3 +11,6 @@ pytest>=8.0.0
 
 # Babel
 Babel
+
+# TUI
+textual

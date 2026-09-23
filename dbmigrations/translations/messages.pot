@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-16 15:46+0000\n"
+"POT-Creation-Date: 2026-09-23 07:00+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,208 +17,170 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: dbmigration.py:112
-msgid "Simple database migrations tool"
-msgstr ""
-
-#: dbmigration.py:113
-msgid "Available subcommands"
-msgstr ""
-
-#: dbmigration.py:131
-msgid "Command error:"
-msgstr ""
-
-#: dbmigration.py:134
-msgid "Server error:"
-msgstr ""
-
-#: dbmigration.py:138
-#, python-brace-format
-msgid "Error: {error_type_name}:"
-msgstr ""
-
-#: dbmigration.py:146
+#: _config.py:33
 #, python-brace-format
 msgid ""
 "The configuration file '{TOML_CONFIG_FILE}' is not found at path "
 "'{target_path}'"
 msgstr ""
 
-#: dbmigration.py:148
+#: _config.py:35
 #, python-brace-format
 msgid "The configuration file '{target_path}' is not a regular file"
 msgstr ""
 
-#: dbmigration.py:215
-msgid "new script"
-msgstr ""
-
-#: dbmigration.py:216
-#, python-brace-format
-msgid "a/{relative_path} (DB OID: {old_oid})"
-msgstr ""
-
-#: dbmigration.py:219
-#, python-brace-format
-msgid "b/{relative_path} (REPO OID: {new_oid})"
-msgstr ""
-
-#: dbmigration.py:239
-#, python-brace-format
-msgid "The file '{file_path}' contains no valid text data"
-msgstr ""
-
-#: dbmigration.py:244
+#: _config.py:44
 #, python-brace-format
 msgid ""
-"The relative environment path must start with @ symbol, but '{path_str}' "
-"was found"
+"Missing required key '{default_dbenv_config_attribute}' in configuration "
+"file '{toml_config_file}'."
 msgstr ""
 
-#: dbmigration.py:255
+#: _config.py:61
 #, python-brace-format
 msgid ""
-"No path separator found after environment name in path '{path_str}' "
-"specified in file '{script_list_file_path}'."
+"Missing required configuration group '{dbenvs_config_group}' in "
+"configuration file '{toml_config_file}'."
 msgstr ""
 
-#: dbmigration.py:277
+#: _config.py:72
+#, python-brace-format
+msgid ""
+"Missing configuration group '{dbenvs_config_group}.{dbenv_param}' in "
+"configuration file '{toml_config_file}'."
+msgstr ""
+
+#: _config.py:114
+#, python-brace-format
+msgid ""
+"The database user password must be specified via the environment variable"
+" '{env_var_name}'."
+msgstr ""
+
+#: _config.py:123
+msgid "db environment name within TOML config"
+msgstr ""
+
+#: _config.py:124
+msgid "db server host name"
+msgstr ""
+
+#: _config.py:125
+msgid "db server port"
+msgstr ""
+
+#: _config.py:126
+msgid "database name"
+msgstr ""
+
+#: _config.py:127
+msgid "user name"
+msgstr ""
+
+#: _config.py:128
+msgid "don't ask user password"
+msgstr ""
+
+#: _db.py:17
 #, python-brace-format
 msgid "Server: {severity} - {message_primary}"
 msgstr ""
 
-#: dbmigration.py:390 dbmigration.py:409
+#: _db.py:48
+#, python-brace-format
+msgid ""
+"Unable to establish connection to database server. Inner error: "
+"{error_message}"
+msgstr ""
+
+#: _db.py:53
+#, python-brace-format
+msgid "Opened db connection: '{connection_string}'"
+msgstr ""
+
+#: _db.py:70
+msgid "Rolled back transaction."
+msgstr ""
+
+#: _db.py:73
+msgid "Closed db connection."
+msgstr ""
+
+#: _db.py:82 _db.py:86 commands/base.py:284
+msgid "DB connection is not initialized yet"
+msgstr ""
+
+#: _git.py:37 _git.py:56
 msgid "Uncommitted changes"
 msgstr ""
 
-#: dbmigration.py:410
+#: _git.py:46
+msgid "No commit history found"
+msgstr ""
+
+#: _git.py:57
 msgid "Unknown author"
 msgstr ""
 
-#: dbmigration.py:412
+#: _git.py:59
 #, python-brace-format
 msgid ""
 "[{oid_label}] {date_label} - {message_label}\n"
 "  Author: {author_label}"
 msgstr ""
 
-#: dbmigration.py:459
+#: _git.py:107
 #, python-brace-format
 msgid ""
 "The git cmd specified in {git_cmd_config_attribute} of TOML config does "
 "not exist!"
 msgstr ""
 
-#: dbmigration.py:466
+#: _git.py:114
 msgid ""
 "Warning: Git executable was not found in system PATH. Git features are "
 "disabled."
 msgstr ""
 
-#: dbmigration.py:476
+#: _git.py:124
 #, python-brace-format
 msgid "The specified path '{scripts_dir}' is invalid or not a directory!"
 msgstr ""
 
-#: dbmigration.py:490
+#: _git.py:138
 #, python-brace-format
 msgid ""
 "Warning: A valid Git repository root was not found for '{scripts_dir}'. "
 "Git features are disabled."
 msgstr ""
 
-#: dbmigration.py:540
+#: _git.py:188
 msgid "File is untracked by Git"
 msgstr ""
 
-#: dbmigration.py:543
+#: _git.py:191
 #, python-brace-format
 msgid "File is modified ({status_code})"
 msgstr ""
 
-#: dbmigration.py:567
+#: _git.py:215
 msgid "No commit history found in this branch"
 msgstr ""
 
-#: dbmigration.py:576
+#: _git.py:224
 msgid "Argument 'file_oid' must not be empty"
 msgstr ""
 
-#: dbmigration.py:587
+#: _git.py:235
 msgid "Content hash (OID) is completely untracked or modified locally"
 msgstr ""
 
-#: dbmigration.py:592
+#: _git.py:240
 #, python-brace-format
 msgid "Unexpected git log output format for OID '{clean_oid}': {log_output}"
 msgstr ""
 
-#: dbmigration.py:627
-#, python-brace-format
-msgid ""
-"Missing required attribute '{tool_exec_attribute}' in tool configuration "
-"'{tool_name}'."
-msgstr ""
-
-#: dbmigration.py:636
-#, python-brace-format
-msgid ""
-"The path '{exec_path}' specified by attribute '{tool_exec_attribute}' in "
-"the tool configuration '{tool_name}' does not exists."
-msgstr ""
-
-#: dbmigration.py:647
-#, python-brace-format
-msgid ""
-"The path '{exec_path}' specified by attribute '{tool_exec_attribute}' in "
-"the tool configuration '{tool_name}' is not a file."
-msgstr ""
-
-#: dbmigration.py:660
-#, python-brace-format
-msgid ""
-"There is no attribute '{tool_args_attribute}' in the tool configuration "
-"'{tool_name}'."
-msgstr ""
-
-#: dbmigration.py:669
-#, python-brace-format
-msgid ""
-"There is no attribute '{tool_success_result_code_attribute}' in the tool "
-"configuration '{tool_name}'."
-msgstr ""
-
-#: dbmigration.py:693
-#, python-brace-format
-msgid ""
-"Missing configuration group '{tools_config_group}' in configuration file "
-"'{toml_config_file}'."
-msgstr ""
-
-#: dbmigration.py:704
-#, python-brace-format
-msgid ""
-"Unable find the specified external tool name '{tool_name}' in "
-"configuration group '{tools_config_group}'."
-msgstr ""
-
-#: dbmigration.py:720
-#, python-brace-format
-msgid "The folder '{dir}' does not exists"
-msgstr ""
-
-#: dbmigration.py:724
-#, python-brace-format
-msgid "The path '{dir}' is not a directory"
-msgstr ""
-
-#: dbmigration.py:779
-#, python-brace-format
-msgid "The tool '{tool_name}' returned unsuccessful result code {result_code}!"
-msgstr ""
-
-#: dbmigration.py:812
+#: _migrations.py:36
 msgid ""
 "This version of dbmigration tools is incompatible with this schema.\n"
 "Please use the previous version available by tag 0.9.x or upgrade the "
@@ -229,153 +191,332 @@ msgid ""
 "cleanup"
 msgstr ""
 
-#: dbmigration.py:821
+#: _migrations.py:45
 msgid "Check for older version control tables"
 msgstr ""
 
-#: dbmigration.py:859
+#: _scripts.py:64
+msgid "new script"
+msgstr ""
+
+#: _scripts.py:65
+#, python-brace-format
+msgid "a/{relative_path} (DB OID: {old_oid})"
+msgstr ""
+
+#: _scripts.py:68
+#, python-brace-format
+msgid "b/{relative_path} (REPO OID: {new_oid})"
+msgstr ""
+
+#: _scripts.py:88
+#, python-brace-format
+msgid "The file '{file_path}' contains no valid text data"
+msgstr ""
+
+#: _scripts.py:93
+#, python-brace-format
+msgid ""
+"The relative environment path must start with @ symbol, but '{path_str}' "
+"was found"
+msgstr ""
+
+#: _scripts.py:104
+#, python-brace-format
+msgid ""
+"No path separator found after environment name in path '{path_str}' "
+"specified in file '{script_list_file_path}'."
+msgstr ""
+
+#: _tool.py:39
+#, python-brace-format
+msgid ""
+"Missing required attribute '{tool_exec_attribute}' in tool configuration "
+"'{tool_name}'."
+msgstr ""
+
+#: _tool.py:48
+#, python-brace-format
+msgid ""
+"The path '{exec_path}' specified by attribute '{tool_exec_attribute}' in "
+"the tool configuration '{tool_name}' does not exists."
+msgstr ""
+
+#: _tool.py:59
+#, python-brace-format
+msgid ""
+"The path '{exec_path}' specified by attribute '{tool_exec_attribute}' in "
+"the tool configuration '{tool_name}' is not a file."
+msgstr ""
+
+#: _tool.py:72
+#, python-brace-format
+msgid ""
+"There is no attribute '{tool_args_attribute}' in the tool configuration "
+"'{tool_name}'."
+msgstr ""
+
+#: _tool.py:81
+#, python-brace-format
+msgid ""
+"There is no attribute '{tool_success_result_code_attribute}' in the tool "
+"configuration '{tool_name}'."
+msgstr ""
+
+#: _tool.py:105
+#, python-brace-format
+msgid ""
+"Missing configuration group '{tools_config_group}' in configuration file "
+"'{toml_config_file}'."
+msgstr ""
+
+#: _tool.py:116
+#, python-brace-format
+msgid ""
+"Unable find the specified external tool name '{tool_name}' in "
+"configuration group '{tools_config_group}'."
+msgstr ""
+
+#: _tool.py:132
+#, python-brace-format
+msgid "The folder '{dir}' does not exists"
+msgstr ""
+
+#: _tool.py:136
+#, python-brace-format
+msgid "The path '{dir}' is not a directory"
+msgstr ""
+
+#: _tool.py:191
+#, python-brace-format
+msgid "The tool '{tool_name}' returned unsuccessful result code {result_code}!"
+msgstr ""
+
+#: dbmigration.py:107
+msgid "Command error:"
+msgstr ""
+
+#: dbmigration.py:110
+msgid "Server error:"
+msgstr ""
+
+#: dbmigration.py:114
+#, python-brace-format
+msgid "Error: {error_type_name}:"
+msgstr ""
+
+#: dbmigration.py:198
+msgid "Simple database migrations tool"
+msgstr ""
+
+#: dbmigration.py:199
+msgid "Available subcommands"
+msgstr ""
+
+#: dbmigration.py:201
+msgid ""
+"Applies base, versioned, and repeatable scripts to the target database "
+"schema."
+msgstr ""
+
+#: dbmigration.py:203 dbmigration.py:213 dbmigration.py:228 dbmigration.py:235
+#: dbmigration.py:242
+msgid "the name of target database schema"
+msgstr ""
+
+#: dbmigration.py:204 dbmigration.py:214 dbmigration.py:229 dbmigration.py:236
+#: dbmigration.py:243
+msgid "source scripts repository path"
+msgstr ""
+
+#: dbmigration.py:205
+msgid ""
+"clean up the latest version within the database and reapply the included "
+"*.sql scripts."
+msgstr ""
+
+#: dbmigration.py:206
+msgid "reapply all repeatable scripts, regardless of changes."
+msgstr ""
+
+#: dbmigration.py:207
+msgid "run the cleanup script before executing version-specific scripts."
+msgstr ""
+
+#: dbmigration.py:208
+msgid "skip confirmation before executing updates."
+msgstr ""
+
+#: dbmigration.py:211
+msgid ""
+"Validates the target schema and lists versioned and reproducible scripts "
+"to apply if the 'update' command is executed."
+msgstr ""
+
+#: dbmigration.py:215
+msgid "skip grouping changes by git commits"
+msgstr ""
+
+#: dbmigration.py:219
+msgid ""
+"skip unified text diffs between scripts applied in the database (by git "
+"OID) and the current script files in the repository"
+msgstr ""
+
+#: dbmigration.py:222
+msgid "skip display recent changes stored within target db schema"
+msgstr ""
+
+#: dbmigration.py:223
+msgid ""
+"the update script path if you want one as an additional result of the "
+"verify command"
+msgstr ""
+
+#: dbmigration.py:226
+msgid "Creates version control tables in an empty database schema."
+msgstr ""
+
+#: dbmigration.py:230
+msgid "Force create version control tables even on non empty schema"
+msgstr ""
+
+#: dbmigration.py:233
+msgid "Runs db unit test scripts to the target database schema."
+msgstr ""
+
+#: dbmigration.py:237
+msgid ""
+"Skip version and environment ID checks to run tests in any plain "
+"environment not made by the tool itself"
+msgstr ""
+
+#: dbmigration.py:240
+msgid "Open the interactive Textual user interface"
+msgstr ""
+
+#: commands/base.py:52 commands/base.py:69
+msgid "Not a 'Migration' object found within the migrations collection"
+msgstr ""
+
+#: commands/base.py:77
 #, python-brace-format
 msgid ""
 "Run 'update' subcommand to update version control tables within the "
 "schema. The following migration need to be applied: {desc}"
 msgstr ""
 
-#: dbmigration.py:868
-#, python-brace-format
-msgid ""
-"Missing required key '{default_dbenv_config_attribute}' in configuration "
-"file '{toml_config_file}'."
-msgstr ""
-
-#: dbmigration.py:886
-#, python-brace-format
-msgid ""
-"Missing required configuration group '{dbenvs_config_group}' in "
-"configuration file '{toml_config_file}'."
-msgstr ""
-
-#: dbmigration.py:897
-#, python-brace-format
-msgid ""
-"Missing configuration group '{dbenvs_config_group}.{dbenv_param}' in "
-"configuration file '{toml_config_file}'."
-msgstr ""
-
-#: dbmigration.py:913
+#: commands/base.py:85
 #, python-brace-format
 msgid "The path {script_path} does not exists."
 msgstr ""
 
-#: dbmigration.py:917
+#: commands/base.py:89
 #, python-brace-format
 msgid "The path {script_path} is not a file."
 msgstr ""
 
-#: dbmigration.py:942
+#: commands/base.py:114
 #, python-brace-format
 msgid "Circular dependency detected! Path loop: {cycle_path}"
 msgstr ""
 
-#: dbmigration.py:969
+#: commands/base.py:141
 #, python-brace-format
 msgid ""
 "The script '{dependency}' specified in '{script_path}' as a dependency "
 "does not exist."
 msgstr ""
 
-#: dbmigration.py:976
+#: commands/base.py:148
 #, python-brace-format
 msgid ""
 "The script '{dependency}' specified in '{script_path}' as a dependency is"
 " not a valid file."
 msgstr ""
 
-#: dbmigration.py:983
+#: commands/base.py:155
 #, python-brace-format
 msgid ""
 "The script '{dependency}' (specified in '{script_path}') was not found in"
 " '{script_list_file_name}' or in the origin scripts folder."
 msgstr ""
 
-#: dbmigration.py:1007
+#: commands/base.py:179
 #, python-brace-format
 msgid ""
 "Maximum recursion depth ({recursion_depth}) exceeded at '{base_dir}' due "
 "to circular path references."
 msgstr ""
 
-#: dbmigration.py:1014
+#: commands/base.py:186
 #, python-brace-format
 msgid "The folder '{base_dir}' does not exists"
 msgstr ""
 
-#: dbmigration.py:1018
+#: commands/base.py:190
 #, python-brace-format
 msgid "The path '{base_dir}' is not a directory"
 msgstr ""
 
-#: dbmigration.py:1046
+#: commands/base.py:218
 #, python-brace-format
 msgid ""
 "The list of scripts '{script_list_file_path}' must start with "
 "'{version_cleanup_file_name}', but '{script_name}' was given."
 msgstr ""
 
-#: dbmigration.py:1060
+#: commands/base.py:232
 #, python-brace-format
 msgid ""
 "The file '{trimmed_str}' specified in script list file "
 "'{script_list_file_path}' does not exists"
 msgstr ""
 
-#: dbmigration.py:1067
+#: commands/base.py:239
 #, python-brace-format
 msgid ""
 "The file '{trimmed_str}' specified in script list file "
 "'{script_list_file_path}' is not a file"
 msgstr ""
 
-#: dbmigration.py:1089
+#: commands/base.py:261
 #, python-brace-format
 msgid "The file '{cleanup_file_path}' does not exists"
 msgstr ""
 
-#: dbmigration.py:1093
+#: commands/base.py:265
 #, python-brace-format
 msgid "The path '{cleanup_file_path}' is not a file"
 msgstr ""
 
-#: dbmigration.py:1112
-msgid "DB connection is not initialized yet"
+#: commands/base.py:313
+msgid "The attribute opts.schema_name must not be empty"
 msgstr ""
 
-#: dbmigration.py:1156
-msgid "The attribute self.args.schema_name must not be empty"
-msgstr ""
-
-#: dbmigration.py:1173
+#: commands/base.py:330
 msgid "The path specified by 'scripts_path' must not be an empty string"
 msgstr ""
 
-#: dbmigration.py:1178
+#: commands/base.py:335
 #, python-brace-format
 msgid ""
 "The path specified by 'scripts_path' argument does not exist: "
 "{scripts_path}"
 msgstr ""
 
-#: dbmigration.py:1183
+#: commands/base.py:340
 #, python-brace-format
 msgid ""
 "The path specified by 'scripts_path' argument is not a valid directory: "
 "{scripts_path}"
 msgstr ""
 
-#: dbmigration.py:1199 dbmigration.py:1214
+#: commands/base.py:356 commands/base.py:371
 msgid "The environment ID must not be an empty string"
 msgstr ""
 
-#: dbmigration.py:1203
+#: commands/base.py:360
 #, python-brace-format
 msgid ""
 "The length of the environment ID taken from "
@@ -383,54 +524,54 @@ msgid ""
 "{name_length_limit}"
 msgstr ""
 
-#: dbmigration.py:1218
+#: commands/base.py:375
 #, python-brace-format
 msgid ""
 "The length of the directory name specified by 'scripts_path' argument "
 "exceeds the limit: {name_length_limit}"
 msgstr ""
 
-#: dbmigration.py:1232
+#: commands/base.py:389
 msgid ""
 "Schema consistency check failed: environment ID not found in table "
 "'dbmigration_environment_id'."
 msgstr ""
 
-#: dbmigration.py:1243
+#: commands/base.py:400
 #, python-brace-format
 msgid ""
 "The search path file '{search_path_file_name}' within scripts directory "
 "'{scripts_path}' is not a valid file"
 msgstr ""
 
-#: dbmigration.py:1251
+#: commands/base.py:408
 #, python-brace-format
 msgid "Set session search path to: '{search_path}'."
 msgstr ""
 
-#: dbmigration.py:1257
+#: commands/base.py:414
 #, python-brace-format
 msgid "Unexpected value '{result}' returned on attempt to set the search path"
 msgstr ""
 
-#: dbmigration.py:1294
+#: commands/base.py:451
 msgid "Unable to get latest installed version"
 msgstr ""
 
-#: dbmigration.py:1319
+#: commands/base.py:476
 msgid ""
 "Performing a cross-check for consistency between the target version's "
 "repeatable scripts and the versioned scripts..."
 msgstr ""
 
-#: dbmigration.py:1328
+#: commands/base.py:485
 #, python-brace-format
 msgid ""
 "The baseline directory must include exactly one subdirectory with version"
 " scripts, but {baseline_subdirs_len} present."
 msgstr ""
 
-#: dbmigration.py:1342
+#: commands/base.py:499
 #, python-brace-format
 msgid ""
 "The latest version of the subdirectory with the versions "
@@ -438,19 +579,19 @@ msgid ""
 "baseline scripts '{latest_version_in_baseline}'."
 msgstr ""
 
-#: dbmigration.py:1355
+#: commands/base.py:512
 #, python-brace-format
 msgid ""
 "No baseline or versioned scripts found in scripts directory: "
 "'{scripts_dir}'"
 msgstr ""
 
-#: dbmigration.py:1370
+#: commands/base.py:527
 #, python-brace-format
 msgid "No repeatable scripts found in scripts directory: '{scripts_dir}'"
 msgstr ""
 
-#: dbmigration.py:1379
+#: commands/base.py:536
 #, python-brace-format
 msgid ""
 "The target version for repeatable scripts "
@@ -458,20 +599,20 @@ msgid ""
 "versioned scripts '{latest_version_in_scripts}'"
 msgstr ""
 
-#: dbmigration.py:1387
+#: commands/base.py:544
 msgid "Completed."
 msgstr ""
 
-#: dbmigration.py:1392 dbmigration.py:2981
+#: commands/base.py:549 commands/init_command.py:102
 #, python-brace-format
 msgid "The target schema '{schema_name}' is not accessible"
 msgstr ""
 
-#: dbmigration.py:1400
+#: commands/base.py:557
 msgid "Use the default users search path"
 msgstr ""
 
-#: dbmigration.py:1409
+#: commands/base.py:566
 #, python-brace-format
 msgid ""
 "The stored environment ID '{stored_environment_id}' in the target schema "
@@ -479,588 +620,60 @@ msgid ""
 "'{scripts_path}'"
 msgstr ""
 
-#: dbmigration.py:1417
+#: commands/base.py:574
 #, python-brace-format
 msgid ""
 "Target schema environment ID matches the scripts directory ID: "
 "{stored_environment_id}"
 msgstr ""
 
-#: dbmigration.py:1434
+#: commands/base.py:586
 #, python-brace-format
 msgid ""
 "The schema '{schema_name}' is missing the version control table "
 "'{table_name}'"
 msgstr ""
 
-#: dbmigration.py:1445
+#: commands/base.py:597
 #, python-brace-format
 msgid ""
 "The schema '{schema_name}' already contains the version control table "
 "'{table_name}'"
 msgstr ""
 
-#: dbmigration.py:1466
+#: commands/base.py:622
 #, python-brace-format
 msgid ""
 "Missing configuration group '{config_group}' in configuration file "
 "'{config_file}'."
 msgstr ""
 
-#: dbmigration.py:1477
-msgid "the name of target database schema"
-msgstr ""
-
-#: dbmigration.py:1478
-msgid "db environment name within TOML config"
-msgstr ""
-
-#: dbmigration.py:1479
-msgid "db server host name"
-msgstr ""
-
-#: dbmigration.py:1480
-msgid "db server port"
-msgstr ""
-
-#: dbmigration.py:1481
-msgid "database name"
-msgstr ""
-
-#: dbmigration.py:1482
-msgid "user name"
-msgstr ""
-
-#: dbmigration.py:1483
-msgid "don't ask user password"
-msgstr ""
-
-#: dbmigration.py:1512
-#, python-brace-format
-msgid ""
-"The database user password must be specified via the environment variable"
-" '{env_var_name}'."
-msgstr ""
-
-#: dbmigration.py:1524
-#, python-brace-format
-msgid ""
-"Unable to establish connection to database server. Inner error: "
-"{error_message}"
-msgstr ""
-
-#: dbmigration.py:1528
-#, python-brace-format
-msgid "Opened db connection: '{connection_string}'"
-msgstr ""
-
-#: dbmigration.py:1544
-msgid "Rolled back transaction."
-msgstr ""
-
-#: dbmigration.py:1547
-msgid "Closed db connection."
-msgstr ""
-
-#: dbmigration.py:1570
-#, python-brace-format
-msgid "Running baseline scripts with external tool '{tool_path}'"
-msgstr ""
-
-#: dbmigration.py:1576 dbmigration.py:1603 dbmigration.py:1646
-#: dbmigration.py:1671 dbmigration.py:1951
-#, python-brace-format
-msgid "Running script: {script_info}..."
-msgstr ""
-
-#: dbmigration.py:1593 dbmigration.py:1607 dbmigration.py:1624
-#: dbmigration.py:1655 dbmigration.py:1680 dbmigration.py:1956
-msgid "Committed."
-msgstr ""
-
-#: dbmigration.py:1609
-#, python-brace-format
-msgid "Setting the baseline version to: '{version}'."
-msgstr ""
-
-#: dbmigration.py:1632
-#, python-brace-format
-msgid "Reapply version {version}..."
-msgstr ""
-
-#: dbmigration.py:1666
-#, python-brace-format
-msgid "Apply version {version}..."
-msgstr ""
-
-#: dbmigration.py:1683
-msgid ""
-"Applies base, versioned, and repeatable scripts to the target database "
-"schema."
-msgstr ""
-
-#: dbmigration.py:1688
-msgid ""
-"clean up the latest version within the database and reapply the included "
-"*.sql scripts."
-msgstr ""
-
-#: dbmigration.py:1693
-msgid "reapply all repeatable scripts, regardless of changes."
-msgstr ""
-
-#: dbmigration.py:1698
-msgid "run the cleanup script before executing version-specific scripts."
-msgstr ""
-
-#: dbmigration.py:1703
-msgid "skip confirmation before executing updates."
-msgstr ""
-
-#: dbmigration.py:1708 dbmigration.py:2556 dbmigration.py:2973
-#: dbmigration.py:3174
-msgid "source scripts repository path"
-msgstr ""
-
-#: dbmigration.py:1717 dbmigration.py:2604
-#, python-brace-format
-msgid ""
-"The scripts directory '{scripts_dir}' is missing '{baseline_dir_name}' "
-"subdirectory. Baseline scripts will be skipped."
-msgstr ""
-
-#: dbmigration.py:1723
-msgid ""
-"The target schema already has the baseline version installed. Baseline "
-"scripts will be skipped."
-msgstr ""
-
-#: dbmigration.py:1730 dbmigration.py:2625
-#, python-brace-format
-msgid ""
-"The baseline path {baseline_dir} must have single subdirectory with the "
-"baseline scripts but {baseline_subdirs_len} was found"
-msgstr ""
-
-#: dbmigration.py:1736
-#, python-brace-format
-msgid "The baseline version to install {baseline_version}."
-msgstr ""
-
-#: dbmigration.py:1737
-msgid "Apply baseline scripts..."
-msgstr ""
-
-#: dbmigration.py:1750
-msgid "Baseline scripts applied."
-msgstr ""
-
-#: dbmigration.py:1757
-#, python-brace-format
-msgid ""
-"The scripts directory '{scripts_dir}' is missing the required "
-"'{versioned_dir_name}' subdirectory."
-msgstr ""
-
-#: dbmigration.py:1767 dbmigration.py:1825
-#, python-brace-format
-msgid "The latest installed version is {latest_installed}."
-msgstr ""
-
-#: dbmigration.py:1774
-#, python-brace-format
-msgid ""
-"There is no subdirectory with scripts that matched to the latest "
-"installed version '{latest_installed}'"
-msgstr ""
-
-#: dbmigration.py:1784
-#, python-brace-format
-msgid ""
-"The scripts subdirectory '{latest_version_dir}' does not contain any "
-"'{filters_str}' scripts"
-msgstr ""
-
-#: dbmigration.py:1800 dbmigration.py:2681
-#, python-brace-format
-msgid ""
-"The scripts directory '{scripts_dir}' is missing '{versioned_dir_name}' "
-"subdirectory. Version scripts will be skipped."
-msgstr ""
-
-#: dbmigration.py:1812
-msgid "The baseline version must be installed before running versioned scripts"
-msgstr ""
-
-#: dbmigration.py:1818
-#, python-brace-format
-msgid ""
-"The versioned scripts path {versioned_dir} must have at least one "
-"subdirectory but nothing was found"
-msgstr ""
-
-#: dbmigration.py:1831
-msgid "No newer versions found for installation."
-msgstr ""
-
-#: dbmigration.py:1835
-#, python-brace-format
-msgid "Found {new_versions_count} new versions for installation."
-msgstr ""
-
-#: dbmigration.py:1838
-msgid "Apply versioned scripts..."
-msgstr ""
-
-#: dbmigration.py:1851
-#, python-brace-format
-msgid ""
-"The scripts subdirectory '{version_dir}' does not contain any "
-"'{filters_str}' scripts"
-msgstr ""
-
-#: dbmigration.py:1861
-msgid "Versioned scripts applied."
-msgstr ""
-
-#: dbmigration.py:1868
-#, python-brace-format
-msgid ""
-"The scripts directory '{scripts_dir}' is missing the required "
-"'{repeatable_dir_name}' subdirectory."
-msgstr ""
-
-#: dbmigration.py:1877
-msgid "Check repeatable scripts..."
-msgstr ""
-
-#: dbmigration.py:1881
-#, python-brace-format
-msgid ""
-"The file with target version '{target_version_file}' does not exist in "
-"repeatable scripts subdirectory '{repeatable_dir}'."
-msgstr ""
-
-#: dbmigration.py:1893
-#, python-brace-format
-msgid ""
-"The target version {target_version} for repeatable scripts does not match"
-" the latest installed version '{latest_installed_version}'."
-msgstr ""
-
-#: dbmigration.py:1903
-#, python-brace-format
-msgid "Target version matches the latest installed version: '{target_version}'."
-msgstr ""
-
-#: dbmigration.py:1924 dbmigration.py:2818
-msgid "No modified repeatable scripts found for (re)installation."
-msgstr ""
-
-#: dbmigration.py:1939
-#, python-brace-format
-msgid "Found {scripts_count} scripts to re-run"
-msgstr ""
-
-#: dbmigration.py:1942
-msgid "Apply repeatable scripts..."
-msgstr ""
-
-#: dbmigration.py:1958
-msgid "Repeatable scripts applied."
-msgstr ""
-
-#: dbmigration.py:1962
-msgid "You are going to run updates. Would you like to continue? [y/N]: "
-msgstr ""
-
-#: dbmigration.py:1965
-msgid "Cancelled by user"
-msgstr ""
-
-#: dbmigration.py:1971
-msgid ""
-"Version control tables updated. Please rerun the tool to update the "
-"schema using your scripts."
-msgstr ""
-
-#: dbmigration.py:1980
-#, python-brace-format
-msgid "Performing reapply latest version from scripts repository: '{scripts_dir}'"
-msgstr ""
-
-#: dbmigration.py:1986
-msgid "Reapplied."
-msgstr ""
-
-#: dbmigration.py:1989
-#, python-brace-format
-msgid "Performing updates from scripts repository: '{scripts_dir}'"
-msgstr ""
-
-#: dbmigration.py:1996
-msgid "Updated."
-msgstr ""
-
-#: dbmigration.py:2011
-msgid "self.target_script_path must be initialized"
-msgstr ""
-
-#: dbmigration.py:2012
-msgid "self.target_script_path must be a pathlib.Path"
-msgstr ""
-
-#: dbmigration.py:2016
-#, python-brace-format
-msgid "The parent directory '{parent_dir}' does not exist"
-msgstr ""
-
-#: dbmigration.py:2023
-#, python-brace-format
-msgid "The specified script file '{target_script_path}' already exists"
-msgstr ""
-
-#: dbmigration.py:2028
-#, python-brace-format
-msgid ""
-"The specified script file '{target_script_path}' is not accessible for "
-"write"
-msgstr ""
-
-#: dbmigration.py:2034
-#, python-brace-format
-msgid "System error while verifying path '{target_script_path}': {error}"
-msgstr ""
-
-#: dbmigration.py:2044
-#, python-brace-format
-msgid "Unable to write to temporary target script file '{temp_script_path}'"
-msgstr ""
-
-#: dbmigration.py:2052
-msgid "self.temp_script_path must be initialized"
-msgstr ""
-
-#: dbmigration.py:2053
-msgid "self.temp_script_path must be a pathlib.Path"
-msgstr ""
-
-#: dbmigration.py:2107
-#, python-brace-format
-msgid ""
-"Warning: Unable cleanup temporary file '{temp_script_path}'. Inner error:"
-" {error}"
-msgstr ""
-
-#: dbmigration.py:2116
-msgid "Warning: The temporary script path is not initialized"
-msgstr ""
-
-#: dbmigration.py:2125
-#, python-brace-format
-msgid ""
-"Warning: Unable cleanup target file '{target_script_path}'. Inner error: "
-"{error}"
-msgstr ""
-
-#: dbmigration.py:2134
-msgid "Warning: The target script path is not initialized"
-msgstr ""
-
-#: dbmigration.py:2151
-#, python-brace-format
-msgid ""
-"Unable to rename temporary file '{temp_script_path}' to the target script"
-" file {target_script_path}. Inner error: {error}"
-msgstr ""
-
-#: dbmigration.py:2180
-#, python-brace-format
-msgid ""
-"Failed to check target version '{target_version}' because no version is "
-"installed and no versioned scripts were provided in the scripts "
-"directory."
-msgstr ""
-
-#: dbmigration.py:2188 dbmigration.py:2218
-#, python-brace-format
-msgid ""
-"The target version '{target_version}' does not match the latest installed"
-" version '{latest_installed_version}'."
-msgstr ""
-
-#: dbmigration.py:2198 dbmigration.py:2208
-#, python-brace-format
-msgid ""
-"The target version '{target_version}' does not match the latest scripts "
-"version '{latest_version_in_scripts}'."
-msgstr ""
-
-#: dbmigration.py:2273 dbmigration.py:2483 dbmigration.py:2494
-#, python-brace-format
-msgid ""
-"Unable to display diff for '{relative_path}' because the applied content "
-"(git OID: {stored_oid}) was not found in the local repository."
-msgstr ""
-
-#: dbmigration.py:2260
-msgid "+ New file, will be applied in full."
-msgstr ""
-
-#: dbmigration.py:2518
-msgid "+ New file (first application)."
-msgstr ""
-
-#: dbmigration.py:2511
-msgid "The list of recent changes were applied to the target schema:"
-msgstr ""
-
-#: dbmigration.py:2529
-msgid ""
-"Validates the target schema and lists versioned and reproducible scripts "
-"to apply if the 'update' command is executed."
-msgstr ""
-
-#: dbmigration.py:2535
-msgid "skip grouping changes by git commits"
-msgstr ""
-
-#: dbmigration.py:2540
-msgid "skip display recent changes stored within target db schema"
-msgstr ""
-
-#: dbmigration.py:2545
-msgid ""
-"skip unified text diffs between scripts applied in the database (by git "
-"OID) and the current script files in the repository"
-msgstr ""
-
-#: dbmigration.py:2551
-msgid ""
-"the update script path if you want one as an additional result of the "
-"verify command"
-msgstr ""
-
-#: dbmigration.py:2617
-#, python-brace-format
-msgid ""
-"The target schema has the baseline version installed: "
-"{installed_baseline_version}"
-msgstr ""
-
-#: dbmigration.py:2636
-msgid "Baseline scripts to install: "
-msgstr ""
-
-#: dbmigration.py:2694
-#, python-brace-format
-msgid ""
-"Versioned scripts path {versioned_dir} must contain at least one "
-"subdirectory, but none were found"
-msgstr ""
-
-#: dbmigration.py:2707
-#, python-brace-format
-msgid ""
-"The latest installed version is {latest_installed_version}. No newer "
-"scripts found for installation."
-msgstr ""
-
-#: dbmigration.py:2720
-#, python-brace-format
-msgid ""
-"The latest script version '{latest_version}' must be greater than the "
-"baseline script version '{baseline_version_in_scripts}'."
-msgstr ""
-
-#: dbmigration.py:2730
-msgid "Versioned scripts to install: "
-msgstr ""
-
-#: dbmigration.py:2736
-#, python-brace-format
-msgid ""
-"The scripts subdirectory '{version_dir}' does not contain any "
-"'{filters_str}' scripts."
-msgstr ""
-
-#: dbmigration.py:2772
-#, python-brace-format
-msgid ""
-"The scripts directory '{scripts_dir}' is missing '{repeatable_dir_name}' "
-"subdirectory. Repeatable scrips will be skipped."
-msgstr ""
-
-#: dbmigration.py:2785
-#, python-brace-format
-msgid ""
-"The target version file '{target_version_file}' does not exist in the "
-"repeatable scripts subdirectory '{repeatable_dir}'."
-msgstr ""
-
-#: dbmigration.py:2797
-msgid "No versions are installed in the database schema."
-msgstr ""
-
-#: dbmigration.py:2802
-#, python-brace-format
-msgid "Target version for repeatable scripts: '{target_version}'."
-msgstr ""
-
-#: dbmigration.py:2831
-msgid "Repeatable scripts to (re)install: "
-msgstr ""
-
-#: dbmigration.py:2853
-msgid ""
-"Warning: Diff display requires a Git repository and the Git command line. "
-"Diff display is disabled."
-msgstr ""
-
-#: dbmigration.py:2875
-#, python-brace-format
-msgid "Update script is written to '{script_path}'."
-msgstr ""
-
-#: dbmigration.py:2881
-#, python-brace-format
-msgid "No updates to write for script '{script_path}'. Temp file cleaned up"
-msgstr ""
-
-#: dbmigration.py:2971
-msgid "Creates version control tables in an empty database schema."
-msgstr ""
-
-#: dbmigration.py:2975
-msgid "Force create version control tables even on non empty schema"
-msgstr ""
-
-#: dbmigration.py:2990
+#: commands/init_command.py:111
 #, python-brace-format
 msgid "The target schema '{schema_name}' must be empty"
 msgstr ""
 
-#: dbmigration.py:2994
+#: commands/init_command.py:115
 msgid "WARNING: Schema is not empty!"
 msgstr ""
 
-#: dbmigration.py:2999
+#: commands/init_command.py:120
 #, python-brace-format
 msgid ""
 "Creating the version control tables with environment ID: "
 "'{environment_id}'"
 msgstr ""
 
-#: dbmigration.py:3003
+#: commands/init_command.py:124
 msgid "Created."
 msgstr ""
 
-#: dbmigration.py:3013
+#: commands/run_tests_command.py:34
 #, python-brace-format
 msgid "Running test: '{relative_script_path}'..."
 msgstr ""
 
-#: dbmigration.py:3030
+#: commands/run_tests_command.py:51
 #, python-brace-format
 msgid ""
 "Unable to detect test type from script name '{file_name}'. It should "
@@ -1068,98 +681,640 @@ msgid ""
 "'{is_true_prefix}','{detect_missing_prefix}','{assure_that_prefix}'"
 msgstr ""
 
-#: dbmigration.py:3041
+#: commands/run_tests_command.py:62
 msgid "PASS"
 msgstr ""
 
-#: dbmigration.py:3053
+#: commands/run_tests_command.py:74
 #, python-brace-format
 msgid "({result_number}) Expected true, got {value}!"
 msgstr ""
 
-#: dbmigration.py:3067
+#: commands/run_tests_command.py:88
 #, python-brace-format
 msgid "FAIL. ({result_number}) Missing records:"
 msgstr ""
 
-#: dbmigration.py:3079
+#: commands/run_tests_command.py:100
 msgid "Expected no results!"
 msgstr ""
 
-#: dbmigration.py:3124
+#: commands/run_tests_command.py:145
 msgid "Rolled back to savepoint."
 msgstr ""
 
-#: dbmigration.py:3132
+#: commands/run_tests_command.py:153
 msgid "Make savepoint..."
 msgstr ""
 
-#: dbmigration.py:3138
+#: commands/run_tests_command.py:159
 #, python-brace-format
 msgid "Running setup: '{relative_script_path}'..."
 msgstr ""
 
-#: dbmigration.py:3144
+#: commands/run_tests_command.py:165
 msgid "DONE"
 msgstr ""
 
-#: dbmigration.py:3154
+#: commands/run_tests_command.py:175
 msgid "FAIL."
 msgstr ""
 
-#: dbmigration.py:3159
+#: commands/run_tests_command.py:180
 #, python-brace-format
 msgid "FAIL. {error_type_name}:"
 msgstr ""
 
-#: dbmigration.py:3170
-msgid "Runs db unit test scripts to the target database schema."
-msgstr ""
-
-#: dbmigration.py:3178
-msgid ""
-"Skip version and environment ID checks to run tests in any plain "
-"environment not made by the tool itself"
-msgstr ""
-
-#: dbmigration.py:3188
+#: commands/run_tests_command.py:199
 #, python-brace-format
 msgid ""
 "The scripts directory '{scripts_dir}' is missing the required "
 "'{tests_dir_name}' subdirectory."
 msgstr ""
 
-#: dbmigration.py:3197
+#: commands/run_tests_command.py:208
 #, python-brace-format
 msgid ""
 "The file with target version '{target_version_file}' does not exists in "
 "unit tests scripts subdirectory '{unit_tests_dir}'."
 msgstr ""
 
-#: dbmigration.py:3208
+#: commands/run_tests_command.py:219
 #, python-brace-format
 msgid ""
 "The target version {target_version} for unit test scripts does not match "
 "the latest installed version {latest_installed_version}."
 msgstr ""
 
-#: dbmigration.py:3217
+#: commands/run_tests_command.py:228
 #, python-brace-format
 msgid "Target version matches the latest installed version: '{target_version}'"
 msgstr ""
 
-#: dbmigration.py:3232
+#: commands/run_tests_command.py:243
 #, python-brace-format
 msgid "Tests failed: {fail_count}, passed: {pass_count}."
 msgstr ""
 
-#: dbmigration.py:3240
+#: commands/run_tests_command.py:251
 #, python-brace-format
 msgid "All {pass_count} tests passed."
 msgstr ""
 
-#: dbmigration.py:3252
+#: commands/run_tests_command.py:263
 #, python-brace-format
 msgid "Running unit tests on scripts repository: '{scripts_dir}'"
+msgstr ""
+
+#: commands/update_command.py:36
+#, python-brace-format
+msgid "Running baseline scripts with external tool '{tool_path}'"
+msgstr ""
+
+#: commands/update_command.py:42 commands/update_command.py:69
+#: commands/update_command.py:112 commands/update_command.py:137
+#: commands/update_command.py:397
+#, python-brace-format
+msgid "Running script: {script_info}..."
+msgstr ""
+
+#: commands/update_command.py:59 commands/update_command.py:73
+#: commands/update_command.py:90 commands/update_command.py:121
+#: commands/update_command.py:146 commands/update_command.py:402
+msgid "Committed."
+msgstr ""
+
+#: commands/update_command.py:75
+#, python-brace-format
+msgid "Setting the baseline version to: '{version}'."
+msgstr ""
+
+#: commands/update_command.py:98
+#, python-brace-format
+msgid "Reapply version {version}..."
+msgstr ""
+
+#: commands/update_command.py:132
+#, python-brace-format
+msgid "Apply version {version}..."
+msgstr ""
+
+#: commands/update_command.py:163 commands/verify_command.py:667
+#, python-brace-format
+msgid ""
+"The scripts directory '{scripts_dir}' is missing '{baseline_dir_name}' "
+"subdirectory. Baseline scripts will be skipped."
+msgstr ""
+
+#: commands/update_command.py:169
+msgid ""
+"The target schema already has the baseline version installed. Baseline "
+"scripts will be skipped."
+msgstr ""
+
+#: commands/update_command.py:176 commands/verify_command.py:688
+#, python-brace-format
+msgid ""
+"The baseline path {baseline_dir} must have single subdirectory with the "
+"baseline scripts but {baseline_subdirs_len} was found"
+msgstr ""
+
+#: commands/update_command.py:182
+#, python-brace-format
+msgid "The baseline version to install {baseline_version}."
+msgstr ""
+
+#: commands/update_command.py:183
+msgid "Apply baseline scripts..."
+msgstr ""
+
+#: commands/update_command.py:196
+msgid "Baseline scripts applied."
+msgstr ""
+
+#: commands/update_command.py:203
+#, python-brace-format
+msgid ""
+"The scripts directory '{scripts_dir}' is missing the required "
+"'{versioned_dir_name}' subdirectory."
+msgstr ""
+
+#: commands/update_command.py:213 commands/update_command.py:271
+#, python-brace-format
+msgid "The latest installed version is {latest_installed}."
+msgstr ""
+
+#: commands/update_command.py:220
+#, python-brace-format
+msgid ""
+"There is no subdirectory with scripts that matched to the latest "
+"installed version '{latest_installed}'"
+msgstr ""
+
+#: commands/update_command.py:230
+#, python-brace-format
+msgid ""
+"The scripts subdirectory '{latest_version_dir}' does not contain any "
+"'{filters_str}' scripts"
+msgstr ""
+
+#: commands/update_command.py:246 commands/verify_command.py:744
+#, python-brace-format
+msgid ""
+"The scripts directory '{scripts_dir}' is missing '{versioned_dir_name}' "
+"subdirectory. Version scripts will be skipped."
+msgstr ""
+
+#: commands/update_command.py:258
+msgid "The baseline version must be installed before running versioned scripts"
+msgstr ""
+
+#: commands/update_command.py:264
+#, python-brace-format
+msgid ""
+"The versioned scripts path {versioned_dir} must have at least one "
+"subdirectory but nothing was found"
+msgstr ""
+
+#: commands/update_command.py:277
+msgid "No newer versions found for installation."
+msgstr ""
+
+#: commands/update_command.py:281
+#, python-brace-format
+msgid "Found {new_versions_count} new versions for installation."
+msgstr ""
+
+#: commands/update_command.py:284
+msgid "Apply versioned scripts..."
+msgstr ""
+
+#: commands/update_command.py:297
+#, python-brace-format
+msgid ""
+"The scripts subdirectory '{version_dir}' does not contain any "
+"'{filters_str}' scripts"
+msgstr ""
+
+#: commands/update_command.py:307
+msgid "Versioned scripts applied."
+msgstr ""
+
+#: commands/update_command.py:314
+#, python-brace-format
+msgid ""
+"The scripts directory '{scripts_dir}' is missing the required "
+"'{repeatable_dir_name}' subdirectory."
+msgstr ""
+
+#: commands/update_command.py:323
+msgid "Check repeatable scripts..."
+msgstr ""
+
+#: commands/update_command.py:327
+#, python-brace-format
+msgid ""
+"The file with target version '{target_version_file}' does not exist in "
+"repeatable scripts subdirectory '{repeatable_dir}'."
+msgstr ""
+
+#: commands/update_command.py:339
+#, python-brace-format
+msgid ""
+"The target version {target_version} for repeatable scripts does not match"
+" the latest installed version '{latest_installed_version}'."
+msgstr ""
+
+#: commands/update_command.py:349
+#, python-brace-format
+msgid "Target version matches the latest installed version: '{target_version}'."
+msgstr ""
+
+#: commands/update_command.py:370 commands/verify_command.py:881
+msgid "No modified repeatable scripts found for (re)installation."
+msgstr ""
+
+#: commands/update_command.py:385
+#, python-brace-format
+msgid "Found {scripts_count} scripts to re-run"
+msgstr ""
+
+#: commands/update_command.py:388
+msgid "Apply repeatable scripts..."
+msgstr ""
+
+#: commands/update_command.py:404
+msgid "Repeatable scripts applied."
+msgstr ""
+
+#: commands/update_command.py:408
+msgid "You are going to run updates. Would you like to continue? [y/N]: "
+msgstr ""
+
+#: commands/update_command.py:409
+msgid "Cancelled by user"
+msgstr ""
+
+#: commands/update_command.py:415
+msgid ""
+"Version control tables updated. Please rerun the tool to update the "
+"schema using your scripts."
+msgstr ""
+
+#: commands/update_command.py:424
+#, python-brace-format
+msgid "Performing reapply latest version from scripts repository: '{scripts_dir}'"
+msgstr ""
+
+#: commands/update_command.py:430
+msgid "Reapplied."
+msgstr ""
+
+#: commands/update_command.py:433
+#, python-brace-format
+msgid "Performing updates from scripts repository: '{scripts_dir}'"
+msgstr ""
+
+#: commands/update_command.py:440
+msgid "Updated."
+msgstr ""
+
+#: commands/verify_command.py:51
+msgid "self.target_script_path must be initialized"
+msgstr ""
+
+#: commands/verify_command.py:52
+msgid "self.target_script_path must be a pathlib.Path"
+msgstr ""
+
+#: commands/verify_command.py:56
+#, python-brace-format
+msgid "The parent directory '{parent_dir}' does not exist"
+msgstr ""
+
+#: commands/verify_command.py:63
+#, python-brace-format
+msgid "The specified script file '{target_script_path}' already exists"
+msgstr ""
+
+#: commands/verify_command.py:68
+#, python-brace-format
+msgid ""
+"The specified script file '{target_script_path}' is not accessible for "
+"write"
+msgstr ""
+
+#: commands/verify_command.py:74
+#, python-brace-format
+msgid "System error while verifying path '{target_script_path}': {error}"
+msgstr ""
+
+#: commands/verify_command.py:84
+#, python-brace-format
+msgid "Unable to write to temporary target script file '{temp_script_path}'"
+msgstr ""
+
+#: commands/verify_command.py:92
+msgid "self.temp_script_path must be initialized"
+msgstr ""
+
+#: commands/verify_command.py:93
+msgid "self.temp_script_path must be a pathlib.Path"
+msgstr ""
+
+#: commands/verify_command.py:147
+#, python-brace-format
+msgid ""
+"Warning: Unable cleanup temporary file '{temp_script_path}'. Inner error:"
+" {error}"
+msgstr ""
+
+#: commands/verify_command.py:156
+msgid "Warning: The temporary script path is not initialized"
+msgstr ""
+
+#: commands/verify_command.py:165
+#, python-brace-format
+msgid ""
+"Warning: Unable cleanup target file '{target_script_path}'. Inner error: "
+"{error}"
+msgstr ""
+
+#: commands/verify_command.py:174
+msgid "Warning: The target script path is not initialized"
+msgstr ""
+
+#: commands/verify_command.py:191
+#, python-brace-format
+msgid ""
+"Unable to rename temporary file '{temp_script_path}' to the target script"
+" file {target_script_path}. Inner error: {error}"
+msgstr ""
+
+#: commands/verify_command.py:219
+#, python-brace-format
+msgid ""
+"Failed to check target version '{target_version}' because no version is "
+"installed and no versioned scripts were provided in the scripts "
+"directory."
+msgstr ""
+
+#: commands/verify_command.py:227 commands/verify_command.py:257
+#, python-brace-format
+msgid ""
+"The target version '{target_version}' does not match the latest installed"
+" version '{latest_installed_version}'."
+msgstr ""
+
+#: commands/verify_command.py:237 commands/verify_command.py:247
+#, python-brace-format
+msgid ""
+"The target version '{target_version}' does not match the latest scripts "
+"version '{latest_version_in_scripts}'."
+msgstr ""
+
+#: commands/verify_command.py:297 commands/verify_command.py:564
+#: commands/verify_command.py:576
+#, python-brace-format
+msgid ""
+"Unable to display diff for '{relative_path}' because the applied content "
+"(git OID: {stored_oid}) was not found in the local repository."
+msgstr ""
+
+#: commands/verify_command.py:310
+msgid "+ New file, will be applied in full."
+msgstr ""
+
+#: commands/verify_command.py:588
+msgid "+ New file (first application)."
+msgstr ""
+
+#: commands/verify_command.py:599
+msgid "The list of recent changes were applied to the target schema:"
+msgstr ""
+
+#: commands/verify_command.py:680
+#, python-brace-format
+msgid ""
+"The target schema has the baseline version installed: "
+"{installed_baseline_version}"
+msgstr ""
+
+#: commands/verify_command.py:699
+msgid "Baseline scripts to install: "
+msgstr ""
+
+#: commands/verify_command.py:757
+#, python-brace-format
+msgid ""
+"Versioned scripts path {versioned_dir} must contain at least one "
+"subdirectory, but none were found"
+msgstr ""
+
+#: commands/verify_command.py:770
+#, python-brace-format
+msgid ""
+"The latest installed version is {latest_installed_version}. No newer "
+"scripts found for installation."
+msgstr ""
+
+#: commands/verify_command.py:783
+#, python-brace-format
+msgid ""
+"The latest script version '{latest_version}' must be greater than the "
+"baseline script version '{baseline_version_in_scripts}'."
+msgstr ""
+
+#: commands/verify_command.py:793
+msgid "Versioned scripts to install: "
+msgstr ""
+
+#: commands/verify_command.py:799
+#, python-brace-format
+msgid ""
+"The scripts subdirectory '{version_dir}' does not contain any "
+"'{filters_str}' scripts."
+msgstr ""
+
+#: commands/verify_command.py:835
+#, python-brace-format
+msgid ""
+"The scripts directory '{scripts_dir}' is missing '{repeatable_dir_name}' "
+"subdirectory. Repeatable scrips will be skipped."
+msgstr ""
+
+#: commands/verify_command.py:848
+#, python-brace-format
+msgid ""
+"The target version file '{target_version_file}' does not exist in the "
+"repeatable scripts subdirectory '{repeatable_dir}'."
+msgstr ""
+
+#: commands/verify_command.py:860
+msgid "No versions are installed in the database schema."
+msgstr ""
+
+#: commands/verify_command.py:865
+#, python-brace-format
+msgid "Target version for repeatable scripts: '{target_version}'."
+msgstr ""
+
+#: commands/verify_command.py:894
+msgid "Repeatable scripts to (re)install: "
+msgstr ""
+
+#: commands/verify_command.py:916
+msgid ""
+"Warning: Diff display requires a Git repository and the Git command line."
+" Diff display is disabled."
+msgstr ""
+
+#: commands/verify_command.py:938
+#, python-brace-format
+msgid "Update script is written to '{script_path}'."
+msgstr ""
+
+#: commands/verify_command.py:944
+#, python-brace-format
+msgid "No updates to write for script '{script_path}'. Temp file cleaned up"
+msgstr ""
+
+#: tui/app.py:44
+msgid "Run"
+msgstr ""
+
+#: tui/app.py:45
+msgid "Cancel"
+msgstr ""
+
+#: tui/app.py:46 tui/app.py:47
+msgid "Copy log"
+msgstr ""
+
+#: tui/app.py:48
+msgid "Copy view"
+msgstr ""
+
+#: tui/app.py:49
+msgid "Refresh"
+msgstr ""
+
+#: tui/app.py:50
+msgid "Quit"
+msgstr ""
+
+#: tui/app.py:151
+#, python-brace-format
+msgid "Command finished with exit code: {exit_code}"
+msgstr ""
+
+#: tui/app.py:156
+msgid "Refreshing state..."
+msgstr ""
+
+#: tui/app.py:171
+#, python-brace-format
+msgid "Unable to probe the database: {error}"
+msgstr ""
+
+#: tui/app.py:194 tui/app.py:202
+msgid "Nothing to copy"
+msgstr ""
+
+#: tui/app.py:197 tui/app.py:206 tui/widgets/log_panel.py:138
+#, python-brace-format
+msgid "Copied {n} lines to clipboard"
+msgstr ""
+
+#: tui/screens/confirm_screen.py:17 tui/screens/confirm_screen.py:20
+#: tui/screens/confirm_screen.py:31
+msgid "Yes"
+msgstr ""
+
+#: tui/screens/confirm_screen.py:18 tui/screens/confirm_screen.py:19
+#: tui/screens/confirm_screen.py:32
+msgid "No"
+msgstr ""
+
+#: tui/widgets/command_panel.py:78
+msgid "force init on non-empty schema"
+msgstr ""
+
+#: tui/widgets/command_panel.py:81
+msgid "re-apply latest version"
+msgstr ""
+
+#: tui/widgets/command_panel.py:82
+msgid "re-apply all repeatable"
+msgstr ""
+
+#: tui/widgets/command_panel.py:83
+msgid "run cleanup"
+msgstr ""
+
+#: tui/widgets/command_panel.py:84
+msgid "skip confirmation"
+msgstr ""
+
+#: tui/widgets/command_panel.py:87
+msgid "skip diffs"
+msgstr ""
+
+#: tui/widgets/command_panel.py:88
+msgid "skip recent changes"
+msgstr ""
+
+#: tui/widgets/command_panel.py:94
+msgid "Init"
+msgstr ""
+
+#: tui/widgets/command_panel.py:102
+msgid "Update"
+msgstr ""
+
+#: tui/widgets/command_panel.py:110
+msgid "Verify"
+msgstr ""
+
+#: tui/widgets/command_panel.py:118
+msgid "Run Tests"
+msgstr ""
+
+#: tui/widgets/command_panel.py:138
+msgid "Commands"
+msgstr ""
+
+#: tui/widgets/command_panel.py:149 tui/widgets/command_panel.py:165
+msgid "unavailable"
+msgstr ""
+
+#: tui/widgets/command_panel.py:179
+#, python-brace-format
+msgid "Run {title}"
+msgstr ""
+
+#: tui/widgets/status_bar.py:63
+msgid "cancel requested"
+msgstr ""
+
+#: tui/widgets/status_bar.py:64
+msgid "finishing current script"
+msgstr ""
+
+#: tui/widgets/status_bar.py:65
+msgid "..."
+msgstr ""
+
+#: tui/widgets/status_bar.py:66
+msgid "running"
+msgstr ""
+
+#: tui/widgets/status_bar.py:68
+#, python-brace-format
+msgid "exit code: {code}"
+msgstr ""
+
+#: tui/widgets/status_bar.py:69
+msgid "idle"
 msgstr ""
 
