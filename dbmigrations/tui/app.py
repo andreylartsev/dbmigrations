@@ -14,6 +14,11 @@ from textual.widgets import Footer, Header, ProgressBar
 
 from _config import build_connection_settings
 from _confirmation import TuiConfirm
+from _constants import (
+    LOG_MAX_LINES_ATTR_NAME,
+    OPTIONS_CONFIG_GROUP,
+    OPTIONS_DEFAULT_LOG_MAX_LINES,
+)
 from _errors import CommandError
 from _git import GitChecker
 from _i18n import _
@@ -87,9 +92,22 @@ class MainApp(App[bool]):
         self.runner: CommandRunner | None = None
         self.git_checker: GitChecker | None = None
         self.exit_code: int | None = None
+        self.log_max_lines: int = self._read_log_max_lines()
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._confirm = TuiConfirm(self)
         self._auto_verify_started = False
+
+    def _read_log_max_lines(self) -> int:
+        options = (
+            self.config.get(OPTIONS_CONFIG_GROUP, {})
+            if isinstance(self.config, dict)
+            else {}
+        )
+        try:
+            value = int(options.get(LOG_MAX_LINES_ATTR_NAME, OPTIONS_DEFAULT_LOG_MAX_LINES))
+        except (TypeError, ValueError):
+            return OPTIONS_DEFAULT_LOG_MAX_LINES
+        return value if value >= 1 else OPTIONS_DEFAULT_LOG_MAX_LINES
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -101,7 +119,7 @@ class MainApp(App[bool]):
                     show_percentage=False,
                     id="log_progress",
                 )
-                yield LogPanel(id="log_panel")
+                yield LogPanel(id="log_panel", max_lines=self.log_max_lines)
             yield CommandPanel(state=self.state, id="command_panel")
         yield StatusBar(id="status_bar")
         yield Footer()
@@ -207,7 +225,6 @@ class MainApp(App[bool]):
     def start_command(self, cmd_cls: type, opts: CommonCliOptions) -> None:
         if self.runner is None or self.runner.running:
             return
-        self.log_panel.clear()
         assert self.runner is not None
         self.runner.start(cmd_cls, opts, self._confirm)
         self.log_progress.display = True

@@ -43,13 +43,14 @@ class LogPanel(RichLog):
     }
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, max_lines: int | None = None, **kwargs) -> None:
         super().__init__(
             *args,
             highlight=True,
             markup=False,
             wrap=True,
             auto_scroll=True,
+            max_lines=max_lines,
             **kwargs,
         )
 

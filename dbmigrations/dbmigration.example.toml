@@ -55,6 +55,8 @@ file_read_encoding = "utf-8-sig"
 # what to do if unknown unicode symbol appears
 # possible options: "ignore", "replace"
 file_read_encoding_errors = "replace"
+# max number of lines kept in the TUI log history (oldest lines are trimmed beyond it)
+log_max_lines = 1500
 # language
 language="ru"
 

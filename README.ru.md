@@ -419,7 +419,7 @@ Command error: Tests failed: 1, passed: 8.
 
 * `default_dbenv` — имя группы окружения базы данных, используемой, когда не передан `--dbenv`;
 * `[dbenvs.<name>]` — группы окружений базы данных. Каждая группа может содержать любые опции подключения libpq/psycopg (`host`, `port`, `dbname`, `user`, `connect_timeout`, ...) плюс специфичные опции инструмента, например `no_password` или `run_tests_by`;
-* `[options]` — маски файлов скриптов (`file_glob_filters`), кодировка скриптов (`file_read_encoding`, `file_read_encoding_errors`) и язык интерфейса (`language`, например `"ru"`); если `language` не задан, применяются стандартные переменные окружения `LANG`/`LC_MESSAGES`, а переменная `DBMIGRATION_LANGUAGE` переопределяет и конфиг, и окружение;
+* `[options]` — маски файлов скриптов (`file_glob_filters`), кодировка скриптов (`file_read_encoding`, `file_read_encoding_errors`), максимальное количество строк, хранимых в истории лога TUI (`log_max_lines`, при превышении обрезаются самые старые строки), и язык интерфейса (`language`, например `"ru"`); если `language` не задан, применяются стандартные переменные окружения `LANG`/`LC_MESSAGES`, а переменная `DBMIGRATION_LANGUAGE` переопределяет и конфиг, и окружение;
 * `[tools.<name>]` — внешние инструменты для применения дампов baseline (`psql`, `pg_restore`), используемые, когда в подпапке baseline есть файл `use_tool.txt`.
 
 Параметры подключения можно переопределить из командной строки: `--host`, `--port`, `--dbname`, `--user`, `-n/--no-password`. Пароль пользователя читается из переменной окружения `USER_PASSWORD` и не должен храниться в файле конфигурации.

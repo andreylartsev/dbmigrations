@@ -419,7 +419,7 @@ The tool reads its settings from `dbmigration.toml` located next to `dbmigration
 
 * `default_dbenv` — name of the database environment group to use when no `--dbenv` option is passed;
 * `[dbenvs.<name>]` — database environment groups. Each group may contain any of the libpq/psycopg connection options (`host`, `port`, `dbname`, `user`, `connect_timeout`, ...) plus tool-specific options such as `no_password` or `run_tests_by`;
-* `[options]` — script file masks (`file_glob_filters`), scripts encoding (`file_read_encoding`, `file_read_encoding_errors`), and the interface language (`language`, e.g. `"ru"`); when `language` is not set, the standard `LANG`/`LC_MESSAGES` environment variables apply, and the `DBMIGRATION_LANGUAGE` environment variable overrides both;
+* `[options]` — script file masks (`file_glob_filters`), scripts encoding (`file_read_encoding`, `file_read_encoding_errors`), the max number of lines kept in the TUI log history (`log_max_lines`, oldest lines are trimmed beyond it), and the interface language (`language`, e.g. `"ru"`); when `language` is not set, the standard `LANG`/`LC_MESSAGES` environment variables apply, and the `DBMIGRATION_LANGUAGE` environment variable overrides both;
 * `[tools.<name>]` — external tools used to apply baseline dumps (`psql`, `pg_restore`) when a baseline subfolder contains a `use_tool.txt` file.
 
 Connection settings for a group can be overridden on the command line via `--host`, `--port`, `--dbname`, `--user`, `-n/--no-password`. The user password is read from the `USER_PASSWORD` environment variable and must not be stored in the configuration file.
