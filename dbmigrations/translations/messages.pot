@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-24 05:23+0000\n"
+"POT-Creation-Date: 2026-09-24 06:17+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1207,43 +1207,38 @@ msgstr ""
 msgid "Git repository is not available"
 msgstr ""
 
-#: tui/app.py:117
-#, python-brace-format
-msgid "Blob content for OID {oid} was not found in the local repository."
-msgstr ""
-
-#: tui/app.py:187
+#: tui/app.py:179
 #, python-brace-format
 msgid "Command finished with exit code: {exit_code}"
 msgstr ""
 
-#: tui/app.py:192
+#: tui/app.py:184
 msgid "Refreshing state..."
 msgstr ""
 
-#: tui/app.py:207
+#: tui/app.py:199
 #, python-brace-format
 msgid "Unable to probe the database: {error}"
 msgstr ""
 
-#: tui/app.py:224
+#: tui/app.py:216
 msgid "yes"
 msgstr ""
 
-#: tui/app.py:224
+#: tui/app.py:216
 msgid "no"
 msgstr ""
 
-#: tui/app.py:226
+#: tui/app.py:218
 #, python-brace-format
 msgid "State refreshed: {n} commands available, git repository: {repo}"
 msgstr ""
 
-#: tui/app.py:238 tui/app.py:246
+#: tui/app.py:230 tui/app.py:238
 msgid "Nothing to copy"
 msgstr ""
 
-#: tui/app.py:241 tui/app.py:250 tui/widgets/log_panel.py:202
+#: tui/app.py:233 tui/app.py:242
 #, python-brace-format
 msgid "Copied {n} lines to clipboard"
 msgstr ""
@@ -1258,9 +1253,23 @@ msgstr ""
 msgid "No"
 msgstr ""
 
-#: tui/screens/file_viewer.py:17 tui/screens/file_viewer.py:18
-#: tui/screens/file_viewer.py:19
+#: tui/screens/file_viewer.py:27 tui/screens/file_viewer.py:28
+#: tui/screens/file_viewer.py:29
 msgid "Close"
+msgstr ""
+
+#: tui/screens/file_viewer.py:91
+msgid "Loading script content..."
+msgstr ""
+
+#: tui/screens/file_viewer.py:119
+#, python-brace-format
+msgid "Failed to load blob content: {error}"
+msgstr ""
+
+#: tui/screens/file_viewer.py:127
+#, python-brace-format
+msgid "Blob content for OID {oid} was not found in the local repository."
 msgstr ""
 
 #: tui/widgets/command_panel.py:78

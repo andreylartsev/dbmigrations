@@ -473,96 +473,6 @@ def test_log_panel_error_renders_red_not_markup() -> None:
     asyncio.run(scenario())
 
 
-def test_log_panel_mouse_drag_copies_range(fake_launch, monkeypatch) -> None:
-    import asyncio
-
-    from textual import events
-
-    state = make_state(control_tables_exist=True)
-    app = _make_app(state, fake_launch, monkeypatch)
-
-    async def scenario() -> None:
-        async with app.run_test(size=(140, 60)) as pilot:
-            await pilot.pause(0.2)
-            await pilot.click("#run_verify")
-            await pilot.pause(0.2)
-            while getattr(app.runner, "_task", None) is not None:
-                await pilot.pause(0.02)
-            await pilot.pause(0.05)
-            panel = app.log_panel
-            first_row = panel.content_region.y
-            await pilot.mouse_down("#log_panel", offset=(10, first_row + 1))
-            await pilot.pause(0.02)
-            panel.on_mouse_move(
-                events.MouseMove(
-                    x=10, y=first_row + 3, delta_x=0, delta_y=0, button=1,
-                    widget=panel, shift=False, meta=False, ctrl=False,
-                )
-            )
-            await pilot.mouse_up("#log_panel", offset=(10, first_row + 3))
-            await pilot.pause(0.05)
-
-    asyncio.run(scenario())
-    clipboard = app._clipboard or ""
-    assert "Running script" in clipboard
-    assert "done" in clipboard
-    assert "First line" not in clipboard
-
-
-def test_log_panel_click_without_drag_does_not_copy(fake_launch, monkeypatch) -> None:
-    import asyncio
-
-    state = make_state(control_tables_exist=True)
-    app = _make_app(state, fake_launch, monkeypatch)
-
-    async def scenario() -> None:
-        async with app.run_test(size=(140, 60)) as pilot:
-            await pilot.pause(0.2)
-            await pilot.click("#run_verify")
-            await pilot.pause(0.2)
-            while getattr(app.runner, "_task", None) is not None:
-                await pilot.pause(0.02)
-            await pilot.pause(0.05)
-            panel = app.log_panel
-            first_row = panel.content_region.y
-            await pilot.mouse_down("#log_panel", offset=(10, first_row + 1))
-            await pilot.mouse_up("#log_panel", offset=(10, first_row + 1))
-            await pilot.pause(0.05)
-
-    asyncio.run(scenario())
-    assert not (app._clipboard or "")
-
-
-def test_log_panel_shift_click_copies_range(fake_launch, monkeypatch) -> None:
-    import asyncio
-
-    state = make_state(control_tables_exist=True)
-    app = _make_app(state, fake_launch, monkeypatch)
-
-    async def scenario() -> None:
-        async with app.run_test(size=(140, 60)) as pilot:
-            await pilot.pause(0.2)
-            await pilot.click("#run_verify")
-            await pilot.pause(0.2)
-            while getattr(app.runner, "_task", None) is not None:
-                await pilot.pause(0.02)
-            await pilot.pause(0.05)
-            panel = app.log_panel
-            first_row = panel.content_region.y
-            await pilot.mouse_down("#log_panel", offset=(10, first_row + 1))
-            await pilot.pause(0.02)
-            await pilot.mouse_down(
-                "#log_panel", offset=(10, first_row + 3), shift=True
-            )
-            await pilot.pause(0.05)
-
-    asyncio.run(scenario())
-    clipboard = app._clipboard or ""
-    assert "Running script" in clipboard
-    assert "done" in clipboard
-    assert "First line" not in clipboard
-
-
 OID_LINE = (
     "  [2026-09-23 09:57:36 | repeatable | V000 | "
     "common/repeatable/fn_get_environment_name.sql (OID: ced95c6d)]"
@@ -579,6 +489,47 @@ def test_log_panel_extract_oid_and_path_from_recent_line() -> None:
     )
     assert LogPanel.extract_oid("no oid here") == ""
     assert LogPanel.extract_path("no oid here") == ""
+
+
+def test_log_panel_oid_found_across_wrapped_rows(fake_launch, monkeypatch) -> None:
+    import asyncio
+
+    from tui import app as ta
+    from tui.widgets.log_panel import LogPanel
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+    seen: list[Any] = []
+    monkeypatch.setattr(
+        ta.MainApp,
+        "on_log_panel_oid_activated",
+        lambda self, message: seen.append(message),
+    )
+
+    wrapped = (
+        "  [2025-06-01 | update | V002 | "
+        "test1/versions/V002/00_create_something_not_too_long_ok.sql "
+        "(OID: 384d538d)]"
+    )
+
+    async def scenario() -> None:
+        async with app.run_test(size=(70, 16)) as pilot:
+            await pilot.pause(0.2)
+            panel = app.log_panel
+            panel.append_line("First line")
+            panel.append_line(wrapped)
+            await pilot.pause(0.05)
+            assert len(panel.lines) > 2  # wrapped onto several rows
+            first_row = panel.content_region.y
+            await pilot.click(
+                "#log_panel", offset=(10, first_row + 1)
+            )
+            await pilot.pause(0.05)
+
+    asyncio.run(scenario())
+    assert len(seen) == 1
+    assert seen[0].oid == "384d538d"
+    assert seen[0].path == "test1/versions/V002/00_create_something_not_too_long_ok.sql"
 
 
 def test_log_panel_click_on_oid_line_activates_message(fake_launch, monkeypatch) -> None:
@@ -681,6 +632,80 @@ def test_main_app_oid_activated_opens_file_viewer(fake_launch, monkeypatch) -> N
             )
             await pilot.press("escape")
             await pilot.pause(0.05)
+            assert not isinstance(app.screen, FileViewerScreen)
+
+    asyncio.run(scenario())
+
+
+def test_main_app_oid_viewer_shows_progress_then_content(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    import threading
+
+    from tui.screens.file_viewer import FileViewerScreen
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    release = threading.Event()
+
+    def slow_loader() -> str:
+        release.wait(timeout=5)
+        return "SELECT 2;  -- loaded later\n"
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            app.push_screen(
+                FileViewerScreen("p.sql (ced95c6d)", slow_loader, oid="ced95c6d")
+            )
+            await pilot.pause(0.2)
+            assert isinstance(app.screen, FileViewerScreen)
+            assert app.screen.query_one("#file_progress_bar").visible
+            assert app.screen.query_one("#file_content").lines == []
+            release.set()
+            for _ in range(100):
+                await pilot.pause(0.05)
+                if not app.screen.query("#file_progress"):
+                    break
+            assert not app.screen.query("#file_progress")
+            text = "\n".join(
+                strip.text
+                for strip in app.screen.query_one("#file_content").lines
+            )
+            assert "SELECT 2;" in text
+            await pilot.press("escape")
+
+    asyncio.run(scenario())
+
+
+def test_main_app_oid_viewer_footer_shows_close(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    from textual.widgets import Footer
+
+    from tui.screens.file_viewer import FileViewerScreen
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            app.push_screen(
+                FileViewerScreen("p.sql (ced95c6d)", lambda: "SELECT 1;\n",
+                                 oid="ced95c6d")
+            )
+            await pilot.pause(0.2)
+            assert app.screen.query_one(Footer)
+            labels = [b.key for b in app.screen.BINDINGS]
+            assert "escape" in labels
+            await pilot.press("escape")
+            await pilot.pause(0.1)
             assert not isinstance(app.screen, FileViewerScreen)
 
     asyncio.run(scenario())

@@ -94,7 +94,7 @@ Opens an interactive TUI (built on [Textual](https://textual.io)) with a live ce
 python3 .\dbmigrations\dbmigration.py tui test2 .\dbmigrations\samples\test1\
 ```
 
-On open, the central area immediately runs the full `verify` and streams its output line by line. If the schema is not initialized yet, a hint runs `init` instead. The right panel lists the commands available for the current schema/repository state (`init`, `update`, `verify`, `run-tests`), each with its option checkboxes. `update` without `--skip-confirmation` asks for confirmation in a modal dialog (styled like the file viewer): the question is shown in a scrollable area with `Yes`/`No` buttons; press `y`/`enter` to confirm, `n`/`escape` to abort. The status line shows `idle / running <current script> / cancel requested` plus the final exit code, and the currently running script is highlighted in the log.
+On open, the central area immediately runs the full `verify` and streams its output line by line. If the schema is not initialized yet, a hint runs `init` instead. The right panel lists the commands available for the current schema/repository state (`init`, `update`, `verify`, `run-tests`), each with its option checkboxes. `update` without `--skip-confirmation` asks for confirmation in a modal dialog. The status line shows `idle / running <current script> / cancel requested` plus the final exit code, and the currently running script is highlighted in the log.
 
 | Shortcut | Action |
 |----------|--------|
@@ -105,9 +105,7 @@ On open, the central area immediately runs the full `verify` and streams its out
 | `r`      | Re-probe the schema/repository state (Refresh); the log then shows a summary of what changed (available commands, git repository) |
 | `q`      | Quit |
 
-You can also select a range of log lines with the mouse and release the button to copy that range. Selected lines are highlighted while dragging.
-
-Lines that carry a git `(OID: …)` reference (e.g. in `verify` recent-changes and diffs) act as links: a plain click opens a modal viewer with the file contents read straight from the git repository (`git cat-file`), and `escape`/`q`/`enter` closes it. If git is unavailable, a notification explains why.
+Lines that carry a git `(OID: …)` reference act as links: a click opens a viewer with the script file contents.
 
 The TUI needs an interactive terminal; plain CLI subcommands keep working without it.
 

@@ -154,3 +154,30 @@ $VENV/bin/pybabel compile -d translations -l ru
 - TUI-strings must go through `_()` from `_i18n`; do not hardcode user-facing labels
   in `tui/`. `setup_translations()` runs in `main()` before the `tui` handler imports
   the package.
+- Keep README user-facing descriptions terse: modal-window behavior should be self-evident
+  from the UI (buttons, hints like `Esc`); do not document "how the modal works" in detail.
+
+## TUI modal windows (internal notes)
+
+- `tui/screens/confirm_screen.py` — `ConfirmScreen`, modal `update` confirmation.
+  Compact, auto-sized to the question text (`width: auto; height: auto; max-width: 80%`),
+  no window title, no scroll area: a `Static` with the question + `Yes`/`No` buttons.
+  Key bindings: `y`/`enter` confirm, `n`/`escape` abort; the trailing `[y/N]: ` part of
+  the question text comes from `UpdateCommand` and is stripped before display.
+- `tui/screens/file_viewer.py` — `FileViewerScreen(title, loader, *, oid="")`, `ModalScreen`
+  opened (from `LogPanel.OidActivated`) to view a git blob. It shows an indeterminate
+  `ProgressBar` + "Loading script content..." until the content arrives; `_load()`
+  fetches via `asyncio.to_thread(loader)`, then removes `#file_progress` and writes the
+  text into the central `#file_content` RichLog (`markup=False`); load failures / missing
+  blob are written in red. A `Footer` at the bottom shows the bindings the same way as the
+  main window; `escape` (plus hidden `q`/`enter`) maps to `action_close` (dismiss).
+  Bindings: `escape`/`q`/`enter` → `action_close` (dismiss).
+- `tui/widgets/log_panel.py` — `LogPanel` (RichLog). Mouse text-selection is intentionally
+  removed (unusable in Textual); a plain left click posts `OidActivated` via
+  `on_mouse_up` + `oid_info_at()` which also handles entries wrapped across rows
+  (scans down the next rows; even combines two rows if the hex is split by the wrap).
+  `append_error()` renders red without markup. `copy_visible()`/`as_plain_text()` back
+  the `ctrl+shift+c`/`ctrl+shift+x` actions in `tui/app.py`.
+- Textual 8.2.8 gotchas: CSS uses `dock:` (not `docking:`), no `column-gap` (use
+  margins); `DOMQuery` has no `__eq__` so `query(...) == []` is always False (use
+  truthiness); `Strip` yields `(text, style, control)` segments.

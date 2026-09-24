@@ -105,23 +105,15 @@ class MainApp(App[bool]):
                 severity="error",
             )
             return
-        self.run_worker(self._show_oid_file(message.oid, message.path))
-
-    async def _show_oid_file(self, oid: str, path: str) -> None:
-        content = await asyncio.to_thread(
-            self.git_checker.get_blob_content_by_oid, oid
-        )
-        if not content:
-            self.notify(
-                _(
-                    "Blob content for OID {oid} was not found in the "
-                    "local repository."
-                ).format(oid=oid),
-                severity="error",
+        title = f"{message.path} ({message.oid})" if message.path \
+            else f"OID: {message.oid}"
+        self.push_screen(
+            FileViewerScreen(
+                title,
+                lambda: self.git_checker.get_blob_content_by_oid(message.oid),
+                oid=message.oid,
             )
-            return
-        title = f"{path} ({oid})" if path else f"OID: {oid}"
-        self.push_screen(FileViewerScreen(title, content))
+        )
 
     def _get_loop(self) -> asyncio.AbstractEventLoop:
         return asyncio.get_running_loop()

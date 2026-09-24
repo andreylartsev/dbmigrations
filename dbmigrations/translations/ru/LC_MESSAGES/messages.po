@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-24 05:23+0000\n"
+"POT-Creation-Date: 2026-09-24 06:17+0000\n"
 "PO-Revision-Date: 2026-08-16 10:37+0400\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ru\n"
@@ -1380,11 +1380,11 @@ msgstr "Отмена"
 
 #: tui/app.py:49 tui/app.py:50
 msgid "Copy log"
-msgstr ""
+msgstr "Скопировать лог"
 
 #: tui/app.py:51
 msgid "Copy view"
-msgstr ""
+msgstr "Скопировать видимую часть"
 
 #: tui/app.py:52
 msgid "Refresh"
@@ -1398,43 +1398,38 @@ msgstr "Выход"
 msgid "Git repository is not available"
 msgstr "Репозиторий Git недоступен"
 
-#: tui/app.py:117
-#, python-brace-format
-msgid "Blob content for OID {oid} was not found in the local repository."
-msgstr "Содержимое (OID {oid}) не найдено в локальном репозитории."
-
-#: tui/app.py:187
+#: tui/app.py:179
 #, python-brace-format
 msgid "Command finished with exit code: {exit_code}"
 msgstr "Команда завершена с кодом возврата: {exit_code}"
 
-#: tui/app.py:192
+#: tui/app.py:184
 msgid "Refreshing state..."
 msgstr "Обновление состояния..."
 
-#: tui/app.py:207
+#: tui/app.py:199
 #, python-brace-format
 msgid "Unable to probe the database: {error}"
 msgstr "Не удалось опросить базу данных: {error}"
 
-#: tui/app.py:224
+#: tui/app.py:216
 msgid "yes"
 msgstr "да"
 
-#: tui/app.py:224
+#: tui/app.py:216
 msgid "no"
 msgstr "нет"
 
-#: tui/app.py:226
+#: tui/app.py:218
 #, python-brace-format
 msgid "State refreshed: {n} commands available, git repository: {repo}"
 msgstr "Состояние обновлено: доступно команд: {n}, репозиторий git: {repo}"
 
-#: tui/app.py:238 tui/app.py:246
+#: tui/app.py:230 tui/app.py:238
 msgid "Nothing to copy"
 msgstr "Ничего для копирования"
 
-#: tui/app.py:241 tui/app.py:250 tui/widgets/log_panel.py:202
+#: tui/app.py:233 tui/app.py:242
 #, python-brace-format
 msgid "Copied {n} lines to clipboard"
 msgstr "Скопировано строк: {n}"
@@ -1449,10 +1444,24 @@ msgstr "Да"
 msgid "No"
 msgstr "Нет"
 
-#: tui/screens/file_viewer.py:17 tui/screens/file_viewer.py:18
-#: tui/screens/file_viewer.py:19
+#: tui/screens/file_viewer.py:27 tui/screens/file_viewer.py:28
+#: tui/screens/file_viewer.py:29
 msgid "Close"
 msgstr "Закрыть"
+
+#: tui/screens/file_viewer.py:91
+msgid "Loading script content..."
+msgstr "Загрузка содержимого скрипта..."
+
+#: tui/screens/file_viewer.py:119
+#, python-brace-format
+msgid "Failed to load blob content: {error}"
+msgstr "Не удалось загрузить содержимое файла: {error}"
+
+#: tui/screens/file_viewer.py:127
+#, python-brace-format
+msgid "Blob content for OID {oid} was not found in the local repository."
+msgstr "Содержимое (OID {oid}) не найдено в локальном репозитории."
 
 #: tui/widgets/command_panel.py:78
 msgid "force init on non-empty schema"
@@ -1465,7 +1474,7 @@ msgstr "повторно применить последнюю версию"
 #: tui/widgets/command_panel.py:82
 #, fuzzy
 msgid "re-apply all repeatable"
-msgstr "Применение повторяемых скриптов (repeatable)..."
+msgstr "Пере-применить все повторяемые (repeatable)"
 
 #: tui/widgets/command_panel.py:83
 msgid "run cleanup"
@@ -1537,4 +1546,7 @@ msgstr "ожидание"
 
 #~ msgid "Run"
 #~ msgstr "Запустить"
+
+#~ msgid "Esc to close"
+#~ msgstr "Esc — закрыть"
 
