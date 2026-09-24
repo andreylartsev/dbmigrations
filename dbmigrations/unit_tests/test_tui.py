@@ -214,6 +214,33 @@ def test_confirm_delegates_to_modal_screen(monkeypatch) -> None:
     assert callable(callback)
 
 
+def test_confirm_screen_full_modal_shows_message_and_answers() -> None:
+    import asyncio
+
+    from textual.app import App as TextualApp
+
+    from tui.screens.confirm_screen import ConfirmScreen
+
+    answers: list[bool | None] = []
+
+    async def scenario() -> None:
+        app = TextualApp()
+        async with app.run_test() as pilot:
+            screen = ConfirmScreen(
+                "You are going to run updates. Would you like to continue? [y/N]: "
+            )
+            app.push_screen(screen, answers.append)
+            await pilot.pause()
+            text = screen.query_one("#confirm_message").content
+            assert "You are going to run updates" in text
+            assert "[y/N]" not in text
+            await pilot.press("y")
+            await pilot.pause()
+            assert answers == [True]
+
+    asyncio.run(scenario())
+
+
 # ---------------------------------------------------------------------------
 # TUI app (headless)
 # ---------------------------------------------------------------------------
@@ -417,6 +444,33 @@ def test_log_panel_parse_script_name() -> None:
     assert LogPanel.parse_script_name("Running script: [hello.sql]") == "hello.sql"
     assert LogPanel.parse_script_name("Run migration: v1.sql") == "own migrations"
     assert LogPanel.parse_script_name("unrelated line") == ""
+
+
+def test_log_panel_error_renders_red_not_markup() -> None:
+    import asyncio
+
+    from textual.app import App as TextualApp
+
+    from tui.widgets.log_panel import LogPanel
+
+    async def scenario() -> None:
+        app = TextualApp()
+        async with app.run_test(size=(80, 20)) as pilot:
+            panel = LogPanel(id="panel")
+            await app.mount(panel)
+            panel.append_error("Отменено пользователем")
+            await pilot.pause()
+            strip = panel.lines[0]
+            assert strip.text == "Отменено пользователем"
+            assert "[red]" not in strip.text
+            assert any(
+                segment.style is not None
+                and segment.style.color is not None
+                and segment.style.color.name == "red"
+                for segment in strip
+            )
+
+    asyncio.run(scenario())
 
 
 def test_log_panel_mouse_drag_copies_range(fake_launch, monkeypatch) -> None:

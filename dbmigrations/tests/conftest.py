@@ -103,6 +103,16 @@ def load_config_parameters(target_schema) -> TestConfig:
 
 
 # 3. Pytest Fixture providing the NamedTuple to tests
+@pytest.fixture(scope="session", autouse=True)
+def _english_cli_language():
+    """Force English CLI output for e2e assertions regardless of the local
+    dbmigration.toml 'language' setting (overrides the config, like gettext's
+    LANGUAGE variable). Child processes inherit this environment."""
+    import os
+
+    os.environ["DBMIGRATION_LANGUAGE"] = "en"
+
+
 @pytest.fixture(scope="session")
 def session_cfg(request) -> TestConfig:
     """Provides a session-wide named tuple instance containing all settings."""

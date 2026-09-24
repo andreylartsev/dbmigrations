@@ -94,7 +94,7 @@ Opens an interactive TUI (built on [Textual](https://textual.io)) with a live ce
 python3 .\dbmigrations\dbmigration.py tui test2 .\dbmigrations\samples\test1\
 ```
 
-On open, the central area immediately runs the full `verify` and streams its output line by line. If the schema is not initialized yet, a hint runs `init` instead. The right panel lists the commands available for the current schema/repository state (`init`, `update`, `verify`, `run-tests`), each with its option checkboxes. `update` without `--skip-confirmation` asks for confirmation in a modal dialog. The status line shows `idle / running <current script> / cancel requested` plus the final exit code, and the currently running script is highlighted in the log.
+On open, the central area immediately runs the full `verify` and streams its output line by line. If the schema is not initialized yet, a hint runs `init` instead. The right panel lists the commands available for the current schema/repository state (`init`, `update`, `verify`, `run-tests`), each with its option checkboxes. `update` without `--skip-confirmation` asks for confirmation in a modal dialog (styled like the file viewer): the question is shown in a scrollable area with `Yes`/`No` buttons; press `y`/`enter` to confirm, `n`/`escape` to abort. The status line shows `idle / running <current script> / cancel requested` plus the final exit code, and the currently running script is highlighted in the log.
 
 | Shortcut | Action |
 |----------|--------|
@@ -102,10 +102,12 @@ On open, the central area immediately runs the full `verify` and streams its out
 | `ctrl+c` | Cancel the running command (graceful) |
 | `ctrl+shift+c` | Copy the whole log to the clipboard (fallback: `alt+c`) |
 | `ctrl+shift+x` | Copy the visible part of the log to the clipboard |
-| `r`      | Re-probe the schema/repository state (Refresh) |
+| `r`      | Re-probe the schema/repository state (Refresh); the log then shows a summary of what changed (available commands, git repository) |
 | `q`      | Quit |
 
 You can also select a range of log lines with the mouse and release the button to copy that range. Selected lines are highlighted while dragging.
+
+Lines that carry a git `(OID: …)` reference (e.g. in `verify` recent-changes and diffs) act as links: a plain click opens a modal viewer with the file contents read straight from the git repository (`git cat-file`), and `escape`/`q`/`enter` closes it. If git is unavailable, a notification explains why.
 
 The TUI needs an interactive terminal; plain CLI subcommands keep working without it.
 
@@ -419,7 +421,7 @@ The tool reads its settings from `dbmigration.toml` located next to `dbmigration
 
 * `default_dbenv` — name of the database environment group to use when no `--dbenv` option is passed;
 * `[dbenvs.<name>]` — database environment groups. Each group may contain any of the libpq/psycopg connection options (`host`, `port`, `dbname`, `user`, `connect_timeout`, ...) plus tool-specific options such as `no_password` or `run_tests_by`;
-* `[options]` — script file masks (`file_glob_filters`), scripts encoding (`file_read_encoding`, `file_read_encoding_errors`), and the interface language (`language`, e.g. `"ru"`);
+* `[options]` — script file masks (`file_glob_filters`), scripts encoding (`file_read_encoding`, `file_read_encoding_errors`), and the interface language (`language`, e.g. `"ru"`); when `language` is not set, the standard `LANG`/`LC_MESSAGES` environment variables apply, and the `DBMIGRATION_LANGUAGE` environment variable overrides both;
 * `[tools.<name>]` — external tools used to apply baseline dumps (`psql`, `pg_restore`) when a baseline subfolder contains a `use_tool.txt` file.
 
 Connection settings for a group can be overridden on the command line via `--host`, `--port`, `--dbname`, `--user`, `-n/--no-password`. The user password is read from the `USER_PASSWORD` environment variable and must not be stored in the configuration file.

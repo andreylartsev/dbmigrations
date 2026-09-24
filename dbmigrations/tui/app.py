@@ -174,7 +174,7 @@ class MainApp(App[bool]):
         self.status_bar.tick_spinner()
 
     def on_command_error(self, message: str) -> None:
-        self.log_panel.append_line(f"[red]{message}[/red]")
+        self.log_panel.append_error(message)
 
     def on_cancel_requested(self) -> None:
         self.status_bar.cancel_requested = True

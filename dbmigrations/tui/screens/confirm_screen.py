@@ -1,6 +1,9 @@
-"""Modal y/N confirmation screen used instead of the raw terminal get_char()."""
+"""Compact modal confirmation screen: a dialog sized to the question text
+with Yes/No keys and buttons (styled like the file viewer window)."""
 
 from __future__ import annotations
+
+import re
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -8,6 +11,8 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Static
 
 from _i18n import _
+
+_PROMPT_SUFFIX = re.compile(r"\s*\[y/N\]:\s*$")
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -20,9 +25,36 @@ class ConfirmScreen(ModalScreen[bool]):
         ("enter", "answer(True)", _("Yes")),
     ]
 
+    CSS = """
+    ConfirmScreen {
+        align: center middle;
+    }
+    #confirm_dialog {
+        width: auto;
+        height: auto;
+        max-width: 80%;
+        border: round $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #confirm_message {
+        width: auto;
+        height: auto;
+    }
+    #confirm_buttons {
+        width: auto;
+        height: auto;
+        margin-top: 1;
+        align-horizontal: center;
+    }
+    #confirm_buttons Button {
+        margin: 0 1;
+    }
+    """
+
     def __init__(self, message: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._message = message
+        self._message = _PROMPT_SUFFIX.sub("", message)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="confirm_dialog"):

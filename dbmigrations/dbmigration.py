@@ -30,6 +30,7 @@ from typing import NamedTuple, Self, Any, TextIO, Iterable, Type, List, Dict, Se
 #
 # prerequire packages listed in requirements.txt
 # 
+import os
 import psycopg
 from psycopg.rows import TupleRow
 from psycopg import Cursor
@@ -89,11 +90,12 @@ def main() -> int:
 
         config = read_toml_config()
 
-        if OPTIONS_CONFIG_GROUP in config:
+        lang = os.environ.get(LANGUAGE_OVERRIDE_ENV)
+        if lang is None and OPTIONS_CONFIG_GROUP in config:
             options = config[OPTIONS_CONFIG_GROUP]
             lang = options.get(LANGUAGE_ATTR_NAME, None)
-            if lang is not None:
-                setup_translations(lang)
+        if lang is not None:
+            setup_translations(lang)
 
         parser = build_parser(config)
 

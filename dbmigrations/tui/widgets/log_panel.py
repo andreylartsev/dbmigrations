@@ -74,6 +74,9 @@ class LogPanel(RichLog):
         else:
             self.write(text)
 
+    def append_error(self, message: object) -> None:
+        self.write(RichText(str(message), style="red"))
+
     @staticmethod
     def extract_oid(text: str) -> str:
         match = _OID_PATTERN.search(text)

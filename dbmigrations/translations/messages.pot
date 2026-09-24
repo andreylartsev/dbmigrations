@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-23 07:00+0000\n"
+"POT-Creation-Date: 2026-09-24 05:23+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -292,106 +292,106 @@ msgstr ""
 msgid "The tool '{tool_name}' returned unsuccessful result code {result_code}!"
 msgstr ""
 
-#: dbmigration.py:107
+#: dbmigration.py:109
 msgid "Command error:"
 msgstr ""
 
-#: dbmigration.py:110
+#: dbmigration.py:112
 msgid "Server error:"
 msgstr ""
 
-#: dbmigration.py:114
+#: dbmigration.py:116
 #, python-brace-format
 msgid "Error: {error_type_name}:"
 msgstr ""
 
-#: dbmigration.py:198
+#: dbmigration.py:200
 msgid "Simple database migrations tool"
 msgstr ""
 
-#: dbmigration.py:199
+#: dbmigration.py:201
 msgid "Available subcommands"
 msgstr ""
 
-#: dbmigration.py:201
+#: dbmigration.py:203
 msgid ""
 "Applies base, versioned, and repeatable scripts to the target database "
 "schema."
 msgstr ""
 
-#: dbmigration.py:203 dbmigration.py:213 dbmigration.py:228 dbmigration.py:235
-#: dbmigration.py:242
+#: dbmigration.py:205 dbmigration.py:215 dbmigration.py:230 dbmigration.py:237
+#: dbmigration.py:244
 msgid "the name of target database schema"
 msgstr ""
 
-#: dbmigration.py:204 dbmigration.py:214 dbmigration.py:229 dbmigration.py:236
-#: dbmigration.py:243
+#: dbmigration.py:206 dbmigration.py:216 dbmigration.py:231 dbmigration.py:238
+#: dbmigration.py:245
 msgid "source scripts repository path"
 msgstr ""
 
-#: dbmigration.py:205
+#: dbmigration.py:207
 msgid ""
 "clean up the latest version within the database and reapply the included "
 "*.sql scripts."
 msgstr ""
 
-#: dbmigration.py:206
+#: dbmigration.py:208
 msgid "reapply all repeatable scripts, regardless of changes."
 msgstr ""
 
-#: dbmigration.py:207
+#: dbmigration.py:209
 msgid "run the cleanup script before executing version-specific scripts."
 msgstr ""
 
-#: dbmigration.py:208
+#: dbmigration.py:210
 msgid "skip confirmation before executing updates."
 msgstr ""
 
-#: dbmigration.py:211
+#: dbmigration.py:213
 msgid ""
 "Validates the target schema and lists versioned and reproducible scripts "
 "to apply if the 'update' command is executed."
 msgstr ""
 
-#: dbmigration.py:215
+#: dbmigration.py:217
 msgid "skip grouping changes by git commits"
 msgstr ""
 
-#: dbmigration.py:219
+#: dbmigration.py:221
 msgid ""
 "skip unified text diffs between scripts applied in the database (by git "
 "OID) and the current script files in the repository"
 msgstr ""
 
-#: dbmigration.py:222
+#: dbmigration.py:224
 msgid "skip display recent changes stored within target db schema"
 msgstr ""
 
-#: dbmigration.py:223
+#: dbmigration.py:225
 msgid ""
 "the update script path if you want one as an additional result of the "
 "verify command"
 msgstr ""
 
-#: dbmigration.py:226
+#: dbmigration.py:228
 msgid "Creates version control tables in an empty database schema."
 msgstr ""
 
-#: dbmigration.py:230
+#: dbmigration.py:232
 msgid "Force create version control tables even on non empty schema"
 msgstr ""
 
-#: dbmigration.py:233
+#: dbmigration.py:235
 msgid "Runs db unit test scripts to the target database schema."
 msgstr ""
 
-#: dbmigration.py:237
+#: dbmigration.py:239
 msgid ""
 "Skip version and environment ID checks to run tests in any plain "
 "environment not made by the tool itself"
 msgstr ""
 
-#: dbmigration.py:240
+#: dbmigration.py:242
 msgid "Open the interactive Textual user interface"
 msgstr ""
 
@@ -1179,61 +1179,88 @@ msgstr ""
 msgid "No updates to write for script '{script_path}'. Temp file cleaned up"
 msgstr ""
 
-#: tui/app.py:44
-msgid "Run"
-msgstr ""
-
-#: tui/app.py:45
-msgid "Cancel"
-msgstr ""
-
-#: tui/app.py:46 tui/app.py:47
-msgid "Copy log"
+#: tui/app.py:47 tui/widgets/command_panel.py:110
+msgid "Verify"
 msgstr ""
 
 #: tui/app.py:48
+msgid "Cancel"
+msgstr ""
+
+#: tui/app.py:49 tui/app.py:50
+msgid "Copy log"
+msgstr ""
+
+#: tui/app.py:51
 msgid "Copy view"
 msgstr ""
 
-#: tui/app.py:49
+#: tui/app.py:52
 msgid "Refresh"
 msgstr ""
 
-#: tui/app.py:50
+#: tui/app.py:53
 msgid "Quit"
 msgstr ""
 
-#: tui/app.py:151
+#: tui/app.py:103
+msgid "Git repository is not available"
+msgstr ""
+
+#: tui/app.py:117
+#, python-brace-format
+msgid "Blob content for OID {oid} was not found in the local repository."
+msgstr ""
+
+#: tui/app.py:187
 #, python-brace-format
 msgid "Command finished with exit code: {exit_code}"
 msgstr ""
 
-#: tui/app.py:156
+#: tui/app.py:192
 msgid "Refreshing state..."
 msgstr ""
 
-#: tui/app.py:171
+#: tui/app.py:207
 #, python-brace-format
 msgid "Unable to probe the database: {error}"
 msgstr ""
 
-#: tui/app.py:194 tui/app.py:202
+#: tui/app.py:224
+msgid "yes"
+msgstr ""
+
+#: tui/app.py:224
+msgid "no"
+msgstr ""
+
+#: tui/app.py:226
+#, python-brace-format
+msgid "State refreshed: {n} commands available, git repository: {repo}"
+msgstr ""
+
+#: tui/app.py:238 tui/app.py:246
 msgid "Nothing to copy"
 msgstr ""
 
-#: tui/app.py:197 tui/app.py:206 tui/widgets/log_panel.py:138
+#: tui/app.py:241 tui/app.py:250 tui/widgets/log_panel.py:202
 #, python-brace-format
 msgid "Copied {n} lines to clipboard"
 msgstr ""
 
-#: tui/screens/confirm_screen.py:17 tui/screens/confirm_screen.py:20
-#: tui/screens/confirm_screen.py:31
+#: tui/screens/confirm_screen.py:22 tui/screens/confirm_screen.py:25
+#: tui/screens/confirm_screen.py:63
 msgid "Yes"
 msgstr ""
 
-#: tui/screens/confirm_screen.py:18 tui/screens/confirm_screen.py:19
-#: tui/screens/confirm_screen.py:32
+#: tui/screens/confirm_screen.py:23 tui/screens/confirm_screen.py:24
+#: tui/screens/confirm_screen.py:64
 msgid "No"
+msgstr ""
+
+#: tui/screens/file_viewer.py:17 tui/screens/file_viewer.py:18
+#: tui/screens/file_viewer.py:19
+msgid "Close"
 msgstr ""
 
 #: tui/widgets/command_panel.py:78
@@ -1270,10 +1297,6 @@ msgstr ""
 
 #: tui/widgets/command_panel.py:102
 msgid "Update"
-msgstr ""
-
-#: tui/widgets/command_panel.py:110
-msgid "Verify"
 msgstr ""
 
 #: tui/widgets/command_panel.py:118
