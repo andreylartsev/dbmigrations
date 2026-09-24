@@ -65,6 +65,10 @@ class CommandPanel(Vertical):
         color: $accent;
         margin-top: 1;
     }
+    #panel_body {
+        height: 1fr;
+        overflow-y: auto;
+    }
     Checkbox {
         margin-top: 1;
     }

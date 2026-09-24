@@ -177,12 +177,20 @@ $VENV/bin/pybabel compile -d translations -l ru
   `_gen` drops stale loads). A click on the dimmed backdrop outside the dialog
   (`on_click` + `dialog.region.contains(screen_x, screen_y)`) and a `Footer` binding both
   close the screen. Bindings: `escape`/`q`/`enter` → `action_close` (dismiss).
-- `tui/widgets/log_panel.py` — `LogPanel` (RichLog). Mouse text-selection is intentionally
-  removed (unusable in Textual); a plain left click posts `OidActivated` via
-  `on_mouse_up` + `oid_info_at()` which also handles entries wrapped across rows
+- `tui/widgets/log_panel.py` — `LogPanel` (RichLog) with `auto_scroll` (follows newest
+  lines) and `max_lines` from the `[options] log_max_lines` config key (oldest lines are
+  trimmed beyond it); `start_command` in `tui/app.py` does NOT clear the panel, so the
+  central window keeps the whole execution history across commands. Mouse text-selection
+  is intentionally removed (unusable in Textual); a plain left click posts `OidActivated`
+  via `on_mouse_up` + `oid_info_at()` which also handles entries wrapped across rows
   (scans down the next rows; even combines two rows if the hex is split by the wrap).
+  `extract_path` understands both OID line formats: verify recent-changes
+  `[date | type | ver | path (OID: …)]` (takes the part after the last `|`) and update
+  `Running script: [path (OID: …)]...` (takes the part after the last `[`), so the script
+  window caption shows the clean relative path + OID in both cases.
   `append_error()` renders red without markup. `copy_visible()`/`as_plain_text()` back
-  the `ctrl+shift+c`/`ctrl+shift+x` actions in `tui/app.py`.
+  the `ctrl+shift+c`/`ctrl+shift+x` actions in `tui/app.py`. The right `CommandPanel`
+  keeps the command list in a scrollable `#panel_body` (`height: 1fr; overflow-y: auto`).
 - Textual 8.2.8 gotchas: CSS uses `dock:` (not `docking:`), no `column-gap` (use
   margins); `DOMQuery` has no `__eq__` so `query(...) == []` is always False (use
   truthiness); `Strip` yields `(text, style, control)` segments.

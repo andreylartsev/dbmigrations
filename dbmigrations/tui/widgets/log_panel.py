@@ -82,7 +82,10 @@ class LogPanel(RichLog):
         if not match:
             return ""
         prefix = text[: match.start()]
-        return prefix.rsplit("|", 1)[-1].strip()
+        if "|" in prefix:
+            return prefix.rsplit("|", 1)[-1].strip()
+        head = prefix.rsplit("[", 1)[-1] if "[" in prefix else prefix
+        return head.strip()
 
     def oid_info_at(self, index: int) -> tuple[str, str]:
         """Return (oid, path) around the clicked row.

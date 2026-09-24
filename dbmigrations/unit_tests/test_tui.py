@@ -246,7 +246,12 @@ def test_confirm_screen_full_modal_shows_message_and_answers() -> None:
 # ---------------------------------------------------------------------------
 
 def _make_app(
-    state: Any, fake_launch: FakeLaunch, monkeypatch, *, auto_verify: bool = False
+    state: Any,
+    fake_launch: FakeLaunch,
+    monkeypatch,
+    *,
+    auto_verify: bool = False,
+    config: dict[str, Any] | None = None,
 ) -> Any:
     import tui.app as ta
 
@@ -257,7 +262,9 @@ def _make_app(
         dbenv="d",
         scripts_path="/tmp/scripts",
     )
-    return ta.MainApp(config={}, opts=opts, auto_verify=auto_verify)
+    return ta.MainApp(
+        config=config or {}, opts=opts, auto_verify=auto_verify
+    )
 
 
 def test_main_app_headless_boot_and_quit(fake_launch, monkeypatch) -> None:
@@ -508,6 +515,26 @@ def test_log_panel_extract_oid_and_path_from_recent_line() -> None:
     assert LogPanel.extract_path("no oid here") == ""
 
 
+def test_log_panel_extract_oid_and_path_from_update_line() -> None:
+    from tui.widgets.log_panel import LogPanel
+
+    update_line = (
+        "Running script: "
+        "[test1/versions/V002/00_create_view_latest_t1.sql "
+        "(OID: 1504cd9a)]..."
+    )
+    plain_repr = "[test1/versions/V002/00_create_view_latest_t1.sql (OID: 1504cd9a)]"
+    assert LogPanel.extract_oid(update_line) == "1504cd9a"
+    assert (
+        LogPanel.extract_path(update_line)
+        == "test1/versions/V002/00_create_view_latest_t1.sql"
+    )
+    assert (
+        LogPanel.extract_path(plain_repr)
+        == "test1/versions/V002/00_create_view_latest_t1.sql"
+    )
+
+
 def test_log_panel_oid_found_across_wrapped_rows(fake_launch, monkeypatch) -> None:
     import asyncio
 
@@ -580,6 +607,52 @@ def test_log_panel_click_on_oid_line_activates_message(fake_launch, monkeypatch)
     assert len(seen) == 1
     assert seen[0].oid == "ced95c6d"
     assert seen[0].path == "common/repeatable/fn_get_environment_name.sql"
+
+
+def test_log_panel_click_on_update_line_activates_message(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    from tui import app as ta
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+    seen: list[Any] = []
+    monkeypatch.setattr(
+        ta.MainApp,
+        "on_log_panel_oid_activated",
+        lambda self, message: seen.append(message),
+    )
+
+    update_line = (
+        "Running script: "
+        "[test1/versions/V002/00_create_view_latest_t1.sql "
+        "(OID: 1504cd9a)]..."
+    )
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            panel = app.log_panel
+            panel.append_line("First line")
+            panel.append_line(update_line)
+            await pilot.pause(0.05)
+            first_row = panel.content_region.y
+            oid_row = next(
+                i for i, strip in enumerate(panel.lines) if "(OID:" in strip.text
+            )
+            await pilot.click(
+                "#log_panel", offset=(10, first_row + oid_row)
+            )
+            await pilot.pause(0.05)
+
+    asyncio.run(scenario())
+    assert len(seen) == 1
+    assert seen[0].oid == "1504cd9a"
+    assert (
+        seen[0].path == "test1/versions/V002/00_create_view_latest_t1.sql"
+    )
 
 
 def test_log_panel_click_on_plain_line_no_oid_message(
@@ -848,6 +921,52 @@ def test_main_app_log_progress_shown_while_running(
                 await pilot.pause(0.02)
             await pilot.pause(0.05)
             assert app.log_progress.display is False
+
+    asyncio.run(scenario())
+
+
+def test_main_app_log_accumulates_across_commands(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            app.log_panel.append_line("history line before run")
+            await pilot.click("#run_verify")
+            await pilot.pause(0.3)
+            texts = [strip.text for strip in app.log_panel.lines]
+            assert any("history line before run" in t for t in texts)
+            assert any("Running script: [checked]" in t for t in texts)
+
+    asyncio.run(scenario())
+
+
+def test_main_app_log_trims_at_max_lines(fake_launch, monkeypatch) -> None:
+    import asyncio
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(
+        state,
+        fake_launch,
+        monkeypatch,
+        config={"options": {"log_max_lines": 5}},
+    )
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            assert app.log_max_lines == 5
+            for i in range(20):
+                app.log_panel.append_line(f"filler {i}")
+            await pilot.pause(0.05)
+            texts = [strip.text for strip in app.log_panel.lines]
+            assert len(texts) <= 5
+            assert texts[-1] == "filler 19"
 
     asyncio.run(scenario())
 
