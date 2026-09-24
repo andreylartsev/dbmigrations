@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-24 06:17+0000\n"
+"POT-Creation-Date: 2026-09-24 06:31+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1179,66 +1179,76 @@ msgstr ""
 msgid "No updates to write for script '{script_path}'. Temp file cleaned up"
 msgstr ""
 
-#: tui/app.py:47 tui/widgets/command_panel.py:110
+#: tui/app.py:62 tui/widgets/command_panel.py:110
 msgid "Verify"
 msgstr ""
 
-#: tui/app.py:48
+#: tui/app.py:63
 msgid "Cancel"
 msgstr ""
 
-#: tui/app.py:49 tui/app.py:50
+#: tui/app.py:64 tui/app.py:65
 msgid "Copy log"
 msgstr ""
 
-#: tui/app.py:51
+#: tui/app.py:66
 msgid "Copy view"
 msgstr ""
 
-#: tui/app.py:52
+#: tui/app.py:67
 msgid "Refresh"
 msgstr ""
 
-#: tui/app.py:53
+#: tui/app.py:68
 msgid "Quit"
 msgstr ""
 
-#: tui/app.py:103
+#: tui/app.py:125
 msgid "Git repository is not available"
 msgstr ""
 
-#: tui/app.py:179
+#: tui/app.py:144 tui/screens/file_viewer.py:203
+#, python-brace-format
+msgid "Blob content for OID {oid} was not found in the local repository."
+msgstr ""
+
+#: tui/app.py:151
+#, python-brace-format
+msgid "The file '{file_path}' does not exists"
+msgstr ""
+
+#: tui/app.py:235
 #, python-brace-format
 msgid "Command finished with exit code: {exit_code}"
 msgstr ""
 
-#: tui/app.py:184
+#: tui/app.py:240
 msgid "Refreshing state..."
 msgstr ""
 
-#: tui/app.py:199
+#: tui/app.py:255
 #, python-brace-format
 msgid "Unable to probe the database: {error}"
 msgstr ""
 
-#: tui/app.py:216
+#: tui/app.py:272
 msgid "yes"
 msgstr ""
 
-#: tui/app.py:216
+#: tui/app.py:272
 msgid "no"
 msgstr ""
 
-#: tui/app.py:218
+#: tui/app.py:274
 #, python-brace-format
 msgid "State refreshed: {n} commands available, git repository: {repo}"
 msgstr ""
 
-#: tui/app.py:230 tui/app.py:238
+#: tui/app.py:286 tui/app.py:294
 msgid "Nothing to copy"
 msgstr ""
 
-#: tui/app.py:233 tui/app.py:242
+#: tui/app.py:289 tui/app.py:298
 #, python-brace-format
 msgid "Copied {n} lines to clipboard"
 msgstr ""
@@ -1253,23 +1263,34 @@ msgstr ""
 msgid "No"
 msgstr ""
 
-#: tui/screens/file_viewer.py:27 tui/screens/file_viewer.py:28
-#: tui/screens/file_viewer.py:29
+#: tui/screens/file_viewer.py:39 tui/screens/file_viewer.py:40
+#: tui/screens/file_viewer.py:41
 msgid "Close"
 msgstr ""
 
-#: tui/screens/file_viewer.py:91
+#: tui/screens/file_viewer.py:132
 msgid "Loading script content..."
 msgstr ""
 
-#: tui/screens/file_viewer.py:119
-#, python-brace-format
-msgid "Failed to load blob content: {error}"
+#: tui/screens/file_viewer.py:143
+msgid "View mode"
 msgstr ""
 
-#: tui/screens/file_viewer.py:127
+#: tui/screens/file_viewer.py:146
+msgid "Show script text"
+msgstr ""
+
+#: tui/screens/file_viewer.py:151
+msgid "Show as diff"
+msgstr ""
+
+#: tui/screens/file_viewer.py:188
 #, python-brace-format
-msgid "Blob content for OID {oid} was not found in the local repository."
+msgid "Failed to load content: {error}"
+msgstr ""
+
+#: tui/screens/file_viewer.py:195
+msgid "The applied and current versions are identical."
 msgstr ""
 
 #: tui/widgets/command_panel.py:78

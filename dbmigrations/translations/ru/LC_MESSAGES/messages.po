@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-24 06:17+0000\n"
+"POT-Creation-Date: 2026-09-24 06:31+0000\n"
 "PO-Revision-Date: 2026-08-16 10:37+0400\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ru\n"
@@ -34,31 +34,31 @@ msgid "The configuration file '{target_path}' is not a regular file"
 msgstr "По пути '{target_path}' не найден обычный регулярный файл"
 
 #: _config.py:44
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid ""
 "Missing required key '{default_dbenv_config_attribute}' in configuration "
 "file '{toml_config_file}'."
 msgstr ""
-"Отсутствует конфигурационная группа '{tools_config_group}' в файле "
+"Отсутствует обязательный ключ '{default_dbenv_config_attribute}' в файле "
 "конфигурации '{toml_config_file}'."
 
 #: _config.py:61
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid ""
 "Missing required configuration group '{dbenvs_config_group}' in "
 "configuration file '{toml_config_file}'."
 msgstr ""
-"Отсутствует конфигурационная группа '{tools_config_group}' в файле "
-"конфигурации '{toml_config_file}'."
+"Отсутствует обязательная конфигурационная группа '{dbenvs_config_group}' "
+"в файле конфигурации '{toml_config_file}'."
 
 #: _config.py:72
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid ""
 "Missing configuration group '{dbenvs_config_group}.{dbenv_param}' in "
 "configuration file '{toml_config_file}'."
 msgstr ""
-"Отсутствует конфигурационная группа '{tools_config_group}' в файле "
-"конфигурации '{toml_config_file}'."
+"Отсутствует конфигурационная группа '{dbenvs_config_group}.{dbenv_param}' "
+"в файле конфигурации '{toml_config_file}'."
 
 #: _config.py:114
 #, python-brace-format
@@ -129,7 +129,6 @@ msgid "Uncommitted changes"
 msgstr "Незафиксированные изменения"
 
 #: _git.py:46
-#, fuzzy
 msgid "No commit history found"
 msgstr "История коммитов в этой ветке не найдена"
 
@@ -472,14 +471,14 @@ msgstr ""
 "схеме. Необходимо применить следующую миграцию: {desc}"
 
 #: commands/base.py:85
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "The path {script_path} does not exists."
-msgstr "Папка '{dir}' не существует"
+msgstr "Путь '{script_path}' не существует."
 
 #: commands/base.py:89
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "The path {script_path} is not a file."
-msgstr "Путь '{dir}' не является директорией"
+msgstr "Путь '{script_path}' не является файлом."
 
 #: commands/base.py:114
 #, python-brace-format
@@ -560,19 +559,18 @@ msgstr ""
 "'{script_list_file_path}', не является файлом"
 
 #: commands/base.py:261
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "The file '{cleanup_file_path}' does not exists"
-msgstr "Папка '{base_dir}' не существует"
+msgstr "Файл '{cleanup_file_path}' не существует"
 
 #: commands/base.py:265
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "The path '{cleanup_file_path}' is not a file"
-msgstr "Путь '{dir}' не является директорией"
+msgstr "Путь '{cleanup_file_path}' не является файлом"
 
 #: commands/base.py:313
-#, fuzzy
 msgid "The attribute opts.schema_name must not be empty"
-msgstr "Атрибут self.args.schema_name не должен быть пустым"
+msgstr "Атрибут opts.schema_name не должен быть пустым"
 
 #: commands/base.py:330
 msgid "The path specified by 'scripts_path' must not be an empty string"
@@ -911,9 +909,9 @@ msgid "Committed."
 msgstr "Зафиксировано (committed)."
 
 #: commands/update_command.py:75
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Setting the baseline version to: '{version}'."
-msgstr "Бэйзлайн-версия для установки: {baseline_version}."
+msgstr "Установка бэйзлайн-версии: '{version}'."
 
 #: commands/update_command.py:98
 #, python-brace-format
@@ -1151,18 +1149,17 @@ msgid "The parent directory '{parent_dir}' does not exist"
 msgstr "Родительская директория '{parent_dir}' не существует"
 
 #: commands/verify_command.py:63
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "The specified script file '{target_script_path}' already exists"
-msgstr ""
-"Файл '{trimmed_str}', указанный в файле списка скриптов "
-"'{script_list_file_path}', не существует"
+msgstr "Указанный файл скрипта '{target_script_path}' уже существует"
 
 #: commands/verify_command.py:68
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid ""
 "The specified script file '{target_script_path}' is not accessible for "
 "write"
-msgstr "По пути '{target_path}' не найден обычный регулярный файл"
+msgstr ""
+"Указанный файл скрипта '{target_script_path}' недоступен для записи"
 
 #: commands/verify_command.py:74
 #, python-brace-format
@@ -1370,66 +1367,76 @@ msgstr "Скрипт обновления записан в '{script_path}'."
 msgid "No updates to write for script '{script_path}'. Temp file cleaned up"
 msgstr "Нет обновлений для записи в скрипт '{script_path}'. Временный файл удален."
 
-#: tui/app.py:47 tui/widgets/command_panel.py:110
+#: tui/app.py:62 tui/widgets/command_panel.py:110
 msgid "Verify"
 msgstr "Проверка"
 
-#: tui/app.py:48
+#: tui/app.py:63
 msgid "Cancel"
 msgstr "Отмена"
 
-#: tui/app.py:49 tui/app.py:50
+#: tui/app.py:64 tui/app.py:65
 msgid "Copy log"
 msgstr "Скопировать лог"
 
-#: tui/app.py:51
+#: tui/app.py:66
 msgid "Copy view"
 msgstr "Скопировать видимую часть"
 
-#: tui/app.py:52
+#: tui/app.py:67
 msgid "Refresh"
 msgstr "Обновить"
 
-#: tui/app.py:53
+#: tui/app.py:68
 msgid "Quit"
 msgstr "Выход"
 
-#: tui/app.py:103
+#: tui/app.py:125
 msgid "Git repository is not available"
 msgstr "Репозиторий Git недоступен"
 
-#: tui/app.py:179
+#: tui/app.py:144 tui/screens/file_viewer.py:203
+#, python-brace-format
+msgid "Blob content for OID {oid} was not found in the local repository."
+msgstr "Содержимое (OID {oid}) не найдено в локальном репозитории."
+
+#: tui/app.py:151
+#, python-brace-format
+msgid "The file '{file_path}' does not exists"
+msgstr "Файл '{file_path}' не существует"
+
+#: tui/app.py:235
 #, python-brace-format
 msgid "Command finished with exit code: {exit_code}"
 msgstr "Команда завершена с кодом возврата: {exit_code}"
 
-#: tui/app.py:184
+#: tui/app.py:240
 msgid "Refreshing state..."
 msgstr "Обновление состояния..."
 
-#: tui/app.py:199
+#: tui/app.py:255
 #, python-brace-format
 msgid "Unable to probe the database: {error}"
 msgstr "Не удалось опросить базу данных: {error}"
 
-#: tui/app.py:216
+#: tui/app.py:272
 msgid "yes"
 msgstr "да"
 
-#: tui/app.py:216
+#: tui/app.py:272
 msgid "no"
 msgstr "нет"
 
-#: tui/app.py:218
+#: tui/app.py:274
 #, python-brace-format
 msgid "State refreshed: {n} commands available, git repository: {repo}"
 msgstr "Состояние обновлено: доступно команд: {n}, репозиторий git: {repo}"
 
-#: tui/app.py:230 tui/app.py:238
+#: tui/app.py:286 tui/app.py:294
 msgid "Nothing to copy"
 msgstr "Ничего для копирования"
 
-#: tui/app.py:233 tui/app.py:242
+#: tui/app.py:289 tui/app.py:298
 #, python-brace-format
 msgid "Copied {n} lines to clipboard"
 msgstr "Скопировано строк: {n}"
@@ -1444,24 +1451,35 @@ msgstr "Да"
 msgid "No"
 msgstr "Нет"
 
-#: tui/screens/file_viewer.py:27 tui/screens/file_viewer.py:28
-#: tui/screens/file_viewer.py:29
+#: tui/screens/file_viewer.py:39 tui/screens/file_viewer.py:40
+#: tui/screens/file_viewer.py:41
 msgid "Close"
 msgstr "Закрыть"
 
-#: tui/screens/file_viewer.py:91
+#: tui/screens/file_viewer.py:132
 msgid "Loading script content..."
 msgstr "Загрузка содержимого скрипта..."
 
-#: tui/screens/file_viewer.py:119
-#, python-brace-format
-msgid "Failed to load blob content: {error}"
-msgstr "Не удалось загрузить содержимое файла: {error}"
+#: tui/screens/file_viewer.py:143
+msgid "View mode"
+msgstr "Режим отображения"
 
-#: tui/screens/file_viewer.py:127
+#: tui/screens/file_viewer.py:146
+msgid "Show script text"
+msgstr "Текст скрипта"
+
+#: tui/screens/file_viewer.py:151
+msgid "Show as diff"
+msgstr "Diff с текущим скриптом"
+
+#: tui/screens/file_viewer.py:188
 #, python-brace-format
-msgid "Blob content for OID {oid} was not found in the local repository."
-msgstr "Содержимое (OID {oid}) не найдено в локальном репозитории."
+msgid "Failed to load content: {error}"
+msgstr "Не удалось загрузить содержимое: {error}"
+
+#: tui/screens/file_viewer.py:195
+msgid "The applied and current versions are identical."
+msgstr "Применённая и текущая версии скрипта совпадают."
 
 #: tui/widgets/command_panel.py:78
 msgid "force init on non-empty schema"
@@ -1472,7 +1490,6 @@ msgid "re-apply latest version"
 msgstr "повторно применить последнюю версию"
 
 #: tui/widgets/command_panel.py:82
-#, fuzzy
 msgid "re-apply all repeatable"
 msgstr "Пере-применить все повторяемые (repeatable)"
 
@@ -1497,18 +1514,16 @@ msgid "Init"
 msgstr "Инициализация"
 
 #: tui/widgets/command_panel.py:102
-#, fuzzy
 msgid "Update"
-msgstr "Обновлено."
+msgstr "Обновить"
 
 #: tui/widgets/command_panel.py:118
 msgid "Run Tests"
 msgstr "Тесты"
 
 #: tui/widgets/command_panel.py:138
-#, fuzzy
 msgid "Commands"
-msgstr "Ошибка выполнения:"
+msgstr "Команды"
 
 #: tui/widgets/command_panel.py:149 tui/widgets/command_panel.py:165
 msgid "unavailable"

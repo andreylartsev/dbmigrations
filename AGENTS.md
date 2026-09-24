@@ -164,14 +164,19 @@ $VENV/bin/pybabel compile -d translations -l ru
   no window title, no scroll area: a `Static` with the question + `Yes`/`No` buttons.
   Key bindings: `y`/`enter` confirm, `n`/`escape` abort; the trailing `[y/N]: ` part of
   the question text comes from `UpdateCommand` and is stripped before display.
-- `tui/screens/file_viewer.py` — `FileViewerScreen(title, loader, *, oid="")`, `ModalScreen`
-  opened (from `LogPanel.OidActivated`) to view a git blob. It shows an indeterminate
-  `ProgressBar` + "Loading script content..." until the content arrives; `_load()`
-  fetches via `asyncio.to_thread(loader)`, then removes `#file_progress` and writes the
-  text into the central `#file_content` RichLog (`markup=False`); load failures / missing
-  blob are written in red. A `Footer` at the bottom shows the bindings the same way as the
-  main window; `escape` (plus hidden `q`/`enter`) maps to `action_close` (dismiss).
-  Bindings: `escape`/`q`/`enter` → `action_close` (dismiss).
+- `tui/screens/file_viewer.py` — `FileViewerScreen(title, script_loader, *, oid="", diff_loader=None)`,
+  `ModalScreen` opened (from `LogPanel.OidActivated`) to view a git blob. The caption is set on
+  the screen itself (`Header(show_clock=False)` + `self.sub_title`, typically
+  `"<relative path> (OID: <oid>)"`); the dialog has no title row. It shows an indeterminate
+  `ProgressBar` + "Loading script content..." until the content arrives; `_load()` fetches
+  via `asyncio.to_thread(loader)` and writes the text into the central `#file_content`
+  RichLog (`markup=False`); load failures / missing blob are written in red. The right panel
+  (`#file_viewer_panel`) holds a `RadioSet` – `#radio_script` ("Show script text") /
+  `#radio_diff` ("Show as diff"); switching modes reloads the content via a second loader
+  (`diff_loader`, used to show a git diff against the current file; a generation counter
+  `_gen` drops stale loads). A click on the dimmed backdrop outside the dialog
+  (`on_click` + `dialog.region.contains(screen_x, screen_y)`) and a `Footer` binding both
+  close the screen. Bindings: `escape`/`q`/`enter` → `action_close` (dismiss).
 - `tui/widgets/log_panel.py` — `LogPanel` (RichLog). Mouse text-selection is intentionally
   removed (unusable in Textual); a plain left click posts `OidActivated` via
   `on_mouse_up` + `oid_info_at()` which also handles entries wrapped across rows

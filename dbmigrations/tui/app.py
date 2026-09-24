@@ -9,14 +9,16 @@ from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
-from textual.widgets import Footer, Header
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Footer, Header, ProgressBar
 
 from _config import build_connection_settings
 from _confirmation import TuiConfirm
+from _errors import CommandError
 from _git import GitChecker
 from _i18n import _
 from _options import CommonCliOptions
+from _scripts import get_git_blob_sha1_for_file_path, render_script_diff_text
 from _state import State, StateProbe
 from tui.screens.file_viewer import FileViewerScreen
 from tui.widgets.command_panel import CommandPanel, RunCommandRequested
@@ -33,9 +35,22 @@ class MainApp(App[bool]):
     TerminalScreen {
         layout: horizontal;
     }
-    #log_panel {
+    #log_area {
         width: 1fr;
         height: 100%;
+    }
+    #log_progress {
+        display: none;
+        height: 1;
+        padding: 0 1;
+    }
+    #log_progress ProgressBar {
+        width: 100%;
+        height: 1;
+    }
+    #log_panel {
+        width: 1fr;
+        height: 1fr;
     }
     #command_panel {
         width: 46;
@@ -79,14 +94,21 @@ class MainApp(App[bool]):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Horizontal():
-            yield LogPanel(id="log_panel")
+            with Vertical(id="log_area"):
+                yield ProgressBar(
+                    total=None,
+                    show_eta=False,
+                    show_percentage=False,
+                    id="log_progress",
+                )
+                yield LogPanel(id="log_panel")
             yield CommandPanel(state=self.state, id="command_panel")
         yield StatusBar(id="status_bar")
         yield Footer()
 
     def on_mount(self) -> None:
         self.sub_title = (
-            f"{self.opts.schema_name} / {self.get_scripts_path()}"
+            f"{self.opts.dbenv} / {self.opts.schema_name} / {self.get_scripts_path()}"
         )
         self.runner = CommandRunner(self, self._queue, self._get_loop())
         try:
@@ -105,13 +127,45 @@ class MainApp(App[bool]):
                 severity="error",
             )
             return
-        title = f"{message.path} ({message.oid})" if message.path \
+        title = f"{message.path} (OID: {message.oid})" if message.path \
             else f"OID: {message.oid}"
+        checker = self.git_checker
+        scripts_path = self.opts.scripts_path
+        relative_path = message.path or ""
+
+        def script_loader() -> str | None:
+            return checker.get_blob_content_by_oid(message.oid)
+
+        def diff_loader() -> str:
+            blob = checker.get_blob_content_by_oid(message.oid)
+            if blob is None:
+                raise CommandError(
+                    _(
+                        "Blob content for OID {oid} was not found in the "
+                        "local repository."
+                    ).format(oid=message.oid)
+                )
+            file_path = Path(scripts_path).parent.resolve() / relative_path
+            if not file_path.is_file():
+                raise CommandError(
+                    _("The file '{file_path}' does not exists").format(
+                        file_path=file_path
+                    )
+                )
+            new_text = file_path.read_text(
+                encoding="utf-8", errors="replace"
+            )
+            new_oid = get_git_blob_sha1_for_file_path(file_path)
+            return render_script_diff_text(
+                blob, new_text, relative_path, message.oid, new_oid
+            )
+
         self.push_screen(
             FileViewerScreen(
                 title,
-                lambda: self.git_checker.get_blob_content_by_oid(message.oid),
+                script_loader,
                 oid=message.oid,
+                diff_loader=diff_loader,
             )
         )
 
@@ -156,6 +210,7 @@ class MainApp(App[bool]):
         self.log_panel.clear()
         assert self.runner is not None
         self.runner.start(cmd_cls, opts, self._confirm)
+        self.log_progress.display = True
         self.status_bar.set_running()
 
     def on_log_line(self, line: str) -> None:
@@ -175,6 +230,7 @@ class MainApp(App[bool]):
     def on_command_finished(self, exit_code: int) -> None:
         self.exit_code = exit_code
         self.status_bar.set_exit_code(exit_code)
+        self.log_progress.display = False
         self.log_panel.append_line(
             _("Command finished with exit code: {exit_code}").format(exit_code=exit_code)
         )
@@ -254,6 +310,10 @@ class MainApp(App[bool]):
     @property
     def log_panel(self) -> LogPanel:
         return self.query_one("#log_panel")
+
+    @property
+    def log_progress(self) -> ProgressBar:
+        return self.query_one("#log_progress")
 
     @property
     def command_panel(self) -> CommandPanel:

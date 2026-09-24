@@ -280,6 +280,23 @@ def test_main_app_headless_boot_and_quit(fake_launch, monkeypatch) -> None:
     asyncio.run(scenario())
 
 
+def test_main_app_subtitle_includes_dbenv(fake_launch, monkeypatch) -> None:
+    import asyncio
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            assert app.sub_title == (
+                f"{app.opts.dbenv} / {app.opts.schema_name} / "
+                f"{app.get_scripts_path()}"
+            )
+
+    asyncio.run(scenario())
+
+
 def test_main_app_run_verify_via_button(fake_launch, monkeypatch) -> None:
     import asyncio
 
@@ -623,9 +640,7 @@ def test_main_app_oid_activated_opens_file_viewer(fake_launch, monkeypatch) -> N
             await pilot.pause(0.3)
             assert isinstance(app.screen, FileViewerScreen)
             viewer = app.screen
-            assert viewer.query_one("#file_title", object).content == (
-                "p.sql (ced95c6d)"
-            )
+            assert viewer.sub_title == "p.sql (OID: ced95c6d)"
             assert content in "\n".join(
                 strip.text
                 for strip in viewer.query_one("#file_content", object).lines
@@ -668,9 +683,9 @@ def test_main_app_oid_viewer_shows_progress_then_content(
             release.set()
             for _ in range(100):
                 await pilot.pause(0.05)
-                if not app.screen.query("#file_progress"):
+                if not app.screen.query_one("#file_progress").display:
                     break
-            assert not app.screen.query("#file_progress")
+            assert not app.screen.query_one("#file_progress").display
             text = "\n".join(
                 strip.text
                 for strip in app.screen.query_one("#file_content").lines
@@ -707,6 +722,132 @@ def test_main_app_oid_viewer_footer_shows_close(
             await pilot.press("escape")
             await pilot.pause(0.1)
             assert not isinstance(app.screen, FileViewerScreen)
+
+    asyncio.run(scenario())
+
+
+def test_main_app_oid_viewer_radio_switches_to_diff(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    from tui.screens.file_viewer import FileViewerScreen
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            app.push_screen(
+                FileViewerScreen(
+                    "p.sql (ced95c6d)",
+                    lambda: "SELECT 1;\n",
+                    oid="ced95c6d",
+                    diff_loader=lambda: "- old\n+ new\n",
+                )
+            )
+            await pilot.pause(0.2)
+            page = app.screen.query_one("#file_content", object)
+            assert "SELECT 1;" in "\n".join(s.text for s in page.lines)
+            await pilot.click("#radio_diff")
+            for _ in range(100):
+                await pilot.pause(0.05)
+                text = "\n".join(s.text for s in page.lines)
+                if "+ new" in text:
+                    break
+            assert "+ new" in text
+            assert "SELECT 1;" not in text
+
+    asyncio.run(scenario())
+
+
+def test_main_app_oid_viewer_click_outside_closes(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    from tui.screens.file_viewer import FileViewerScreen
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            app.push_screen(
+                FileViewerScreen("p.sql (ced95c6d)", lambda: "SELECT 1;\n",
+                                 oid="ced95c6d")
+            )
+            await pilot.pause(0.3)
+            await pilot.click(offset=(3, 30))
+            await pilot.pause(0.1)
+            assert not isinstance(app.screen, FileViewerScreen)
+
+    asyncio.run(scenario())
+
+
+def test_main_app_oid_viewer_click_inside_keeps_open(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    from tui.screens.file_viewer import FileViewerScreen
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            app.push_screen(
+                FileViewerScreen("p.sql (ced95c6d)", lambda: "SELECT 1;\n",
+                                 oid="ced95c6d")
+            )
+            await pilot.pause(0.3)
+            await pilot.click("#file_content", offset=(1, 1))
+            await pilot.pause(0.1)
+            assert isinstance(app.screen, FileViewerScreen)
+            await pilot.press("escape")
+
+    asyncio.run(scenario())
+
+
+def test_main_app_log_progress_shown_while_running(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    import threading
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    release = threading.Event()
+    real = fake_launch
+
+    def blocking_launch(
+        cmd_cls, opts, config, out=None, confirm=None, use_run_tests_by_user=False
+    ):
+        real(cmd_cls, opts, config, out=out, confirm=confirm,
+             use_run_tests_by_user=use_run_tests_by_user)
+        release.wait(timeout=5)
+        return 0
+
+    monkeypatch.setattr("_launch.launch_command", blocking_launch)
+
+    async def scenario() -> None:
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            await pilot.click("#run_verify")
+            await pilot.pause(0.2)
+            assert app.log_progress.display is True
+            assert app.runner.running
+            release.set()
+            while getattr(app.runner, "_task", None) is not None:
+                await pilot.pause(0.02)
+            await pilot.pause(0.05)
+            assert app.log_progress.display is False
 
     asyncio.run(scenario())
 
