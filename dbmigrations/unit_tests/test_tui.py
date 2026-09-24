@@ -358,7 +358,38 @@ def test_main_app_run_update_via_button_wrong_cmd_cls_regression(
     assert fake_launch.called_with["cmd_cls"] is UpdateCommand
 
 
-def test_main_app_run_tests_via_button_uses_tester_user(fake_launch, monkeypatch) -> None:
+def test_main_app_update_has_no_skip_confirmation_checkbox(
+    fake_launch, monkeypatch
+) -> None:
+    import asyncio
+
+    from commands import UpdateCommand
+
+    state = make_state(control_tables_exist=True)
+    app = _make_app(state, fake_launch, monkeypatch)
+
+    async def scenario() -> None:
+        from textual.css.query import NoMatches
+
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.2)
+            with pytest.raises(NoMatches):
+                app.command_panel.query_one("#opt_update_skip_confirmation")
+            await pilot.click("#run_update")
+            await pilot.pause(0.2)
+            while getattr(app.runner, "_task", None) is not None:
+                await pilot.pause(0.02)
+            await pilot.pause(0.05)
+
+    asyncio.run(scenario())
+    assert fake_launch.called_with is not None
+    assert fake_launch.called_with["cmd_cls"] is UpdateCommand
+    assert fake_launch.called_with["opts"].skip_confirmation is False
+
+
+def test_main_app_run_tests_via_button_uses_tester_user(
+    fake_launch, monkeypatch
+) -> None:
     import asyncio
 
     state = make_state(control_tables_exist=True, tests_dir_exists=True)

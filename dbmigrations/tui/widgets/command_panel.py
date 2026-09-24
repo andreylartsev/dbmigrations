@@ -85,7 +85,6 @@ class CommandPanel(Vertical):
         ("force_reapply_latest_version", _("re-apply latest version")),
         ("force_reapply_all_repeatable", _("re-apply all repeatable")),
         ("force_run_cleanup", _("run cleanup")),
-        ("skip_confirmation", _("skip confirmation")),
     ]
     VERIFY_OPTIONS = [
         ("skip_diffs", _("skip diffs")),

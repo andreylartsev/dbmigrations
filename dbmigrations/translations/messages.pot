@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-24 06:31+0000\n"
+"POT-Creation-Date: 2026-09-24 07:17+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1179,76 +1179,76 @@ msgstr ""
 msgid "No updates to write for script '{script_path}'. Temp file cleaned up"
 msgstr ""
 
-#: tui/app.py:62 tui/widgets/command_panel.py:110
+#: tui/app.py:67 tui/widgets/command_panel.py:113
 msgid "Verify"
 msgstr ""
 
-#: tui/app.py:63
+#: tui/app.py:68
 msgid "Cancel"
 msgstr ""
 
-#: tui/app.py:64 tui/app.py:65
+#: tui/app.py:69 tui/app.py:70
 msgid "Copy log"
 msgstr ""
 
-#: tui/app.py:66
+#: tui/app.py:71
 msgid "Copy view"
 msgstr ""
 
-#: tui/app.py:67
+#: tui/app.py:72
 msgid "Refresh"
 msgstr ""
 
-#: tui/app.py:68
+#: tui/app.py:73
 msgid "Quit"
 msgstr ""
 
-#: tui/app.py:125
+#: tui/app.py:143
 msgid "Git repository is not available"
 msgstr ""
 
-#: tui/app.py:144 tui/screens/file_viewer.py:203
+#: tui/app.py:162 tui/screens/file_viewer.py:198
 #, python-brace-format
 msgid "Blob content for OID {oid} was not found in the local repository."
 msgstr ""
 
-#: tui/app.py:151
+#: tui/app.py:169
 #, python-brace-format
 msgid "The file '{file_path}' does not exists"
 msgstr ""
 
-#: tui/app.py:235
+#: tui/app.py:252
 #, python-brace-format
 msgid "Command finished with exit code: {exit_code}"
 msgstr ""
 
-#: tui/app.py:240
+#: tui/app.py:257
 msgid "Refreshing state..."
 msgstr ""
 
-#: tui/app.py:255
+#: tui/app.py:272
 #, python-brace-format
 msgid "Unable to probe the database: {error}"
 msgstr ""
 
-#: tui/app.py:272
+#: tui/app.py:289
 msgid "yes"
 msgstr ""
 
-#: tui/app.py:272
+#: tui/app.py:289
 msgid "no"
 msgstr ""
 
-#: tui/app.py:274
+#: tui/app.py:291
 #, python-brace-format
 msgid "State refreshed: {n} commands available, git repository: {repo}"
 msgstr ""
 
-#: tui/app.py:286 tui/app.py:294
+#: tui/app.py:303 tui/app.py:311
 msgid "Nothing to copy"
 msgstr ""
 
-#: tui/app.py:289 tui/app.py:298
+#: tui/app.py:306 tui/app.py:315
 #, python-brace-format
 msgid "Copied {n} lines to clipboard"
 msgstr ""
@@ -1263,85 +1263,81 @@ msgstr ""
 msgid "No"
 msgstr ""
 
-#: tui/screens/file_viewer.py:39 tui/screens/file_viewer.py:40
-#: tui/screens/file_viewer.py:41
+#: tui/screens/file_viewer.py:40 tui/screens/file_viewer.py:41
+#: tui/screens/file_viewer.py:42
 msgid "Close"
 msgstr ""
 
-#: tui/screens/file_viewer.py:132
+#: tui/screens/file_viewer.py:127
 msgid "Loading script content..."
 msgstr ""
 
-#: tui/screens/file_viewer.py:143
+#: tui/screens/file_viewer.py:138
 msgid "View mode"
 msgstr ""
 
-#: tui/screens/file_viewer.py:146
+#: tui/screens/file_viewer.py:141
 msgid "Show script text"
 msgstr ""
 
-#: tui/screens/file_viewer.py:151
+#: tui/screens/file_viewer.py:146
 msgid "Show as diff"
 msgstr ""
 
-#: tui/screens/file_viewer.py:188
+#: tui/screens/file_viewer.py:183
 #, python-brace-format
 msgid "Failed to load content: {error}"
 msgstr ""
 
-#: tui/screens/file_viewer.py:195
+#: tui/screens/file_viewer.py:190
 msgid "The applied and current versions are identical."
 msgstr ""
 
-#: tui/widgets/command_panel.py:78
+#: tui/widgets/command_panel.py:82
 msgid "force init on non-empty schema"
 msgstr ""
 
-#: tui/widgets/command_panel.py:81
+#: tui/widgets/command_panel.py:85
 msgid "re-apply latest version"
 msgstr ""
 
-#: tui/widgets/command_panel.py:82
+#: tui/widgets/command_panel.py:86
 msgid "re-apply all repeatable"
 msgstr ""
 
-#: tui/widgets/command_panel.py:83
+#: tui/widgets/command_panel.py:87
 msgid "run cleanup"
 msgstr ""
 
-#: tui/widgets/command_panel.py:84
-msgid "skip confirmation"
-msgstr ""
-
-#: tui/widgets/command_panel.py:87
+#: tui/widgets/command_panel.py:90
 msgid "skip diffs"
 msgstr ""
 
-#: tui/widgets/command_panel.py:88
+#: tui/widgets/command_panel.py:91
 msgid "skip recent changes"
 msgstr ""
 
-#: tui/widgets/command_panel.py:94
+#: tui/widgets/command_panel.py:97
 msgid "Init"
 msgstr ""
 
-#: tui/widgets/command_panel.py:102
+#: tui/widgets/command_panel.py:105
 msgid "Update"
 msgstr ""
 
-#: tui/widgets/command_panel.py:118
+#: tui/widgets/command_panel.py:121
 msgid "Run Tests"
 msgstr ""
 
-#: tui/widgets/command_panel.py:138
+#: tui/widgets/command_panel.py:141
 msgid "Commands"
 msgstr ""
 
-#: tui/widgets/command_panel.py:149 tui/widgets/command_panel.py:165
+#: tui/widgets/command_panel.py:152 tui/widgets/command_panel.py:168
 msgid "unavailable"
 msgstr ""
 
-#: tui/widgets/command_panel.py:179
+#: tui/widgets/command_panel.py:182
 #, python-brace-format
 msgid "Run {title}"
 msgstr ""

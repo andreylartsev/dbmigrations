@@ -191,6 +191,9 @@ $VENV/bin/pybabel compile -d translations -l ru
   `append_error()` renders red without markup. `copy_visible()`/`as_plain_text()` back
   the `ctrl+shift+c`/`ctrl+shift+x` actions in `tui/app.py`. The right `CommandPanel`
   keeps the command list in a scrollable `#panel_body` (`height: 1fr; overflow-y: auto`).
+  The `skip_confirmation` checkbox is deliberately absent from the TUI panel: the TUI
+  must always ask the user before `update` runs (the flag exists only for server-side
+  update chains via the CLI `--skip-confirmation`).
 - Textual 8.2.8 gotchas: CSS uses `dock:` (not `docking:`), no `column-gap` (use
   margins); `DOMQuery` has no `__eq__` so `query(...) == []` is always False (use
   truthiness); `Strip` yields `(text, style, control)` segments.
