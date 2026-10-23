@@ -1,4 +1,9 @@
-*.txt text eol=crlf
-*.sql text eol=crlf
+# Делаем LF стандартом для ВСЕХ текстовых файлов по умолчанию
+* text=auto eol=lf
+
+# Явно фиксируем LF для bash-скриптов
 *.sh text eol=lf
 
+# Если в проекте появятся Windows-скрипты, им ОБЯЗАТЕЛЬНО нужен CRLF (иначе они сломаются)
+*.bat text eol=crlf
+*.cmd text eol=crlf
